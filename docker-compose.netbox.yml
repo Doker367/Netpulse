@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  netbox:
+    image: netboxcommunity/netbox:latest
+    container_name: netpulse-netbox
+    hostname: netbox
+    restart: unless-stopped
+    environment:
+      - SUPERUSER_NAME=admin
+      - SUPERUSER_EMAIL=admin@netpulse.local
+      - SUPERUSER_PASSWORD=***REMOVED***
+      - SUPERUSER_API_TOKEN=***REMOVED***
+      - SUPERUSER_API_KEY=***REMOVED***
+      - SECRET_KEY=***REMOVED***
+      - API_TOKEN_PEPPER_1=***REMOVED***
+      - DB_HOST=netbox-db
+      - DB_NAME=netbox
+      - DB_USER=netbox
+      - DB_PASSWORD=***REMOVED***
+      - REDIS_HOST=netbox-redis
+      - REDIS_PORT=6379
+      - REDIS_DATABASE=0
+      - ALLOWED_HOSTS=*
+      - DEBUG=false
+    ports:
+      - "8000:8080"
+    volumes:
+      - netbox-media:/opt/netbox/netbox/media:z
+      - netbox-reports:/opt/netbox/netbox/reports:z
+      - netbox-scripts:/opt/netbox/netbox/scripts:z
+    networks:
+      netbox-net:
+        ipv4_address: 172.31.0.10
+    depends_on:
+      netbox-db:
+        condition: service_healthy
+      netbox-redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  netbox-db:
+    image: postgres:15-alpine
+    container_name: netpulse-netbox-db
+    hostname: netbox-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=netbox
+      - POSTGRES_USER=netbox
+      - POSTGRES_PASSWORD=***REMOVED***
+    volumes:
+      - netbox-db-data:/var/lib/postgresql/data
+    networks:
+      netbox-net:
+        ipv4_address: 172.31.0.20
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netbox -d netbox"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  netbox-redis:
+    image: redis:7-alpine
+    container_name: netpulse-netbox-redis
+    hostname: netbox-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - netbox-redis-data:/data
+    networks:
+      netbox-net:
+        ipv4_address: 172.31.0.30
+
+volumes:
+  netbox-media:
+  netbox-reports:
+  netbox-scripts:
+  netbox-db-data:
+  netbox-redis-data:
+
+networks:
+  netbox-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24

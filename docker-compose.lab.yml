@@ -1,0 +1,119 @@
+# ============================================================
+# NetPulse — Laboratorio de Simuladores de Red
+# ============================================================
+# Para desarrollo/testing local con dispositivos multivendor.
+# Usa FRRouting (Open Source) como base de routing.
+#
+# Para vendors específicos (requiere licencias/imágenes):
+#   - Cisco IOSv/IOSvL2: Cisco CML/VIRL
+#   - Juniper vJunOS: Juniper vLabs
+#   - Arista vEOS: Arista (registro gratuito)
+# ============================================================
+
+services:
+  # ----------------------------------------------------------
+  # Router "Cisco-like" — FRRouting con CLI tipo Cisco
+  # Puertos: SSH 2222, BGP 179
+  # NAPALM driver: ios (usa CLI Cisco-like de FRR)
+  # ----------------------------------------------------------
+  router-cisco:
+    image: frrouting/frr:latest
+    container_name: netpulse-cisco
+    hostname: cisco-core-01
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    volumes:
+      - ./docker/frr/cisco/daemons:/etc/frr/daemons
+      - ./docker/frr/cisco/frr.conf:/etc/frr/frr.conf
+      - ./docker/frr/cisco/vtysh.conf:/etc/frr/vtysh.conf
+    ports:
+      - "2222:22"    # SSH para NAPALM
+    networks:
+      lab-net:
+        ipv4_address: 172.30.0.10
+
+  # ----------------------------------------------------------
+  # Router "Juniper-like" — FRRouting (mismo software, 
+  # diferente personalidad. Juniper real requiere vJunOS)
+  # ----------------------------------------------------------
+  router-juniper:
+    image: frrouting/frr:latest
+    container_name: netpulse-juniper
+    hostname: juniper-edge-01
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    volumes:
+      - ./docker/frr/juniper/daemons:/etc/frr/daemons
+      - ./docker/frr/juniper/frr.conf:/etc/frr/frr.conf
+      - ./docker/frr/juniper/vtysh.conf:/etc/frr/vtysh.conf
+    ports:
+      - "2223:22"    # SSH para NAPALM
+    networks:
+      lab-net:
+        ipv4_address: 172.30.0.11
+
+  # ----------------------------------------------------------
+  # MikroTik RouterOS 7.22 — API en 8728, SSH en 2225
+  # NAPALM driver: ros (usa API, no SSH)
+  # ----------------------------------------------------------
+  router-mikrotik:
+    image: vaerh/routeros:latest
+    container_name: netpulse-mikrotik
+    hostname: mikrotik-edge-01
+    privileged: true
+    ports:
+      - "2225:22"     # SSH (admin sin password)
+      - "8728:8728"   # API (NAPALM usa este)
+      - "8291:8291"   # Winbox
+    networks:
+      lab-net:
+        ipv4_address: 172.30.0.13
+
+  # ----------------------------------------------------------
+  # Arista vEOS 4.27.3F — eAPI en 443, SSH en 2226
+  # NAPALM driver: eos (usa eAPI HTTPS)
+  # Credenciales: vrnetlab / ***REMOVED***
+  # ----------------------------------------------------------
+  router-arista:
+    image: cminsg/vr-veos:4.27.3F
+    container_name: netpulse-arista
+    hostname: arista-core-01
+    privileged: true
+    ports:
+      - "2226:22"     # SSH
+      - "443:443"     # eAPI (NAPALM usa este)
+    networks:
+      lab-net:
+        ipv4_address: 172.30.0.14
+
+  # ----------------------------------------------------------
+  # Switch Capa 2 — FRRouting con bridge
+  # ----------------------------------------------------------
+  switch-l2:
+    image: frrouting/frr:latest
+    container_name: netpulse-switch
+    hostname: switch-access-01
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    volumes:
+      - ./docker/frr/switch/daemons:/etc/frr/daemons
+      - ./docker/frr/switch/frr.conf:/etc/frr/frr.conf
+      - ./docker/frr/switch/vtysh.conf:/etc/frr/vtysh.conf
+    ports:
+      - "2224:22"
+    networks:
+      lab-net:
+        ipv4_address: 172.30.0.12
+
+networks:
+  lab-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

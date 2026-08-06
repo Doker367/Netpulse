@@ -1,0 +1,12 @@
+devices:
+  - id: mikrotik-edge-01
+    hostname: 127.0.0.1
+    port: 8728
+    driver: ros
+    type: router
+    group: Edge
+    tags: [lab, mikrotik, routeros]
+    credentials:
+      username: admin
+      password: ""
+    description: "MikroTik Edge"

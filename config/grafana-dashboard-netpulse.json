@@ -1,0 +1,79 @@
+{
+  "dashboard": {
+    "title": "NetPulse — Monitoreo de Red",
+    "uid": "netpulse-devices",
+    "timezone": "browser",
+    "refresh": "15s",
+    "panels": [
+      {
+        "title": "Requests por segundo",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 0, "w": 4, "h": 4},
+        "targets": [{"expr": "round(sum(rate(netpulse_requests_total[$__rate_interval])), 0.01)", "legendFormat": "req/s"}],
+        "fieldConfig": {"defaults": {"unit": "reqps", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "orange", "value": 1}, {"color": "green", "value": 10}]}}}
+      },
+      {
+        "title": "Dispositivos UP",
+        "type": "stat",
+        "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4},
+        "targets": [{"expr": "count(count by(device_id)(netpulse_devices_up))", "legendFormat": "UP"}],
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "orange", "value": 3}, {"color": "green", "value": 5}]}}}
+      },
+      {
+        "title": "Eventos de Auditoría",
+        "type": "stat",
+        "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4},
+        "targets": [{"expr": "sum(netpulse_audit_events_total)", "legendFormat": "eventos"}]
+      },
+      {
+        "title": "Latencia API (p95)",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 0, "w": 4, "h": 4},
+        "targets": [{"expr": "round(histogram_quantile(0.95, sum(rate(netpulse_request_duration_seconds_bucket[$__rate_interval])) by (le)), 0.001)", "legendFormat": "p95"}],
+        "fieldConfig": {"defaults": {"unit": "s", "color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.5}, {"color": "red", "value": 2}]}}}
+      },
+      {
+        "title": "Operaciones NAPALM",
+        "type": "stat",
+        "gridPos": {"x": 16, "y": 0, "w": 4, "h": 4},
+        "targets": [{"expr": "sum(rate(netpulse_napalm_operations_total[$__rate_interval]))", "legendFormat": "ops/s"}]
+      },
+      {
+        "title": "Login exitosos",
+        "type": "stat",
+        "gridPos": {"x": 20, "y": 0, "w": 4, "h": 4},
+        "targets": [{"expr": "sum(netpulse_auth_total{status='success'})", "legendFormat": "logins"}]
+      },
+      {
+        "title": "Request Rate (History)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+        "targets": [{"expr": "sum(rate(netpulse_requests_total[$__rate_interval]))", "legendFormat": "req/s"}]
+      },
+      {
+        "title": "API Latency (p50 / p95 / p99)",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {"expr": "histogram_quantile(0.50, sum(rate(netpulse_request_duration_seconds_bucket[$__rate_interval])) by (le))", "legendFormat": "p50"},
+          {"expr": "histogram_quantile(0.95, sum(rate(netpulse_request_duration_seconds_bucket[$__rate_interval])) by (le))", "legendFormat": "p95"},
+          {"expr": "histogram_quantile(0.99, sum(rate(netpulse_request_duration_seconds_bucket[$__rate_interval])) by (le))", "legendFormat": "p99"}
+        ]
+      },
+      {
+        "title": "Estado de Dispositivos",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 12, "w": 12, "h": 7},
+        "targets": [{"expr": "sum by(device_id)(netpulse_devices_up)", "legendFormat": "{{device_id}}"}]
+      },
+      {
+        "title": "Operaciones por Dispositivo",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 12, "w": 12, "h": 7},
+        "targets": [{"expr": "sum by(device_id)(rate(netpulse_napalm_operations_total[$__rate_interval]))", "legendFormat": "{{device_id}}"}]
+      }
+    ],
+    "schemaVersion": 27
+  },
+  "overwrite": true
+}

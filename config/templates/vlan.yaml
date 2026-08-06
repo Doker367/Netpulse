@@ -1,0 +1,14 @@
+name: "Crear VLAN"
+description: "Crea una VLAN en un switch Cisco/Juniper/Arista"
+parameters:
+  - vlan_id
+  - vlan_name
+ios: |
+  vlan {{vlan_id}}
+   name {{vlan_name}}
+junos: |
+  set vlans vlan-{{vlan_id}} vlan-id {{vlan_id}}
+  set vlans vlan-{{vlan_id}} description {{vlan_name}}
+eos: |
+  vlan {{vlan_id}}
+   name {{vlan_name}}

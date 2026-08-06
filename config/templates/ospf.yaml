@@ -1,0 +1,13 @@
+name: "Configurar OSPF"
+description: "Configura OSPF en una interfaz"
+parameters:
+  - process_id
+  - network
+  - wildcard
+  - area
+ios: |
+  router ospf {{process_id}}
+   network {{network}} {{wildcard}} area {{area}}
+eos: |
+  router ospf {{process_id}}
+   network {{network}} {{wildcard}} area {{area}}

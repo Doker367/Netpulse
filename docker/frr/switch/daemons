@@ -1,0 +1,6 @@
+# FRR daemons — L2 Switch
+zebra=yes
+staticd=yes
+watchfrr=yes
+vtysh_enable=yes
+zebra_options="-A 127.0.0.1 -s 9000000"

@@ -1,0 +1,20 @@
+name: "Configurar Interfaz"
+description: "Configura una interfaz con IP y descripción"
+parameters:
+  - interface
+  - ip_address
+  - subnet_mask
+  - description
+ios: |
+  interface {{interface}}
+   description {{description}}
+   ip address {{ip_address}} {{subnet_mask}}
+   no shutdown
+junos: |
+  set interfaces {{interface}} unit 0 family inet address {{ip_address}}/{{subnet_mask}}
+  set interfaces {{interface}} description {{description}}
+eos: |
+  interface {{interface}}
+   description {{description}}
+   ip address {{ip_address}}/{{subnet_mask}}
+   no shutdown

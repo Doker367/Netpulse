@@ -1,0 +1,59 @@
+# Fernet encryption key — NEVER COMMIT
+config/.fernet_key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups (generated)
+backups/*.cfg
+
+# Environment
+.env
+.env.*
+
+# Docker volumes (persistent data)
+docker/volumes/
+
+# NetBox data (persistent)
+netbox-media/
+netbox-reports/
+netbox-scripts/
+netbox-db-data/
+netbox-redis-data/
+
+# Loki/Prometheus data (persistent)
+loki_data/
+prometheus_data/
+grafana_data/
+
+# Scheduler jobs (generated)
+config/scheduler_jobs.json
+
+# Logs
+*.log
+logs/
+
+# Temp files
+/tmp/
+*.tmp
+*.bak
+
+# API tokens (NEVER COMMIT)
+config/.netbox_token
+config/.netbox_token.*

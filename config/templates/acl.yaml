@@ -1,0 +1,13 @@
+name: "Crear ACL"
+description: "Crea una lista de acceso"
+parameters:
+  - acl_number
+  - action
+  - source_ip
+  - destination_ip
+ios: |
+  ip access-list extended {{acl_number}}
+   {{action}} ip {{source_ip}} {{destination_ip}}
+eos: |
+  ip access-list {{acl_number}}
+   {{action}} ip {{source_ip}} {{destination_ip}}

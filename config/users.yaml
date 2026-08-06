@@ -1,0 +1,14 @@
+# NetPulse — Usuarios del sistema RBAC
+# superadmin: Acceso completo a todas las funciones
+# operator: Solo lectura de dispositivos, sin administración
+users:
+  - username: superadmin
+    role: admin
+    name: Super Admin
+    password_hash: null
+    plain_password: ***REMOVED***
+  - username: operator
+    role: operator
+    name: Operador
+    password_hash: null
+    plain_password: ***REMOVED***
