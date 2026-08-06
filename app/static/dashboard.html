@@ -512,17 +512,19 @@ tr:hover td{background:rgba(255,255,255,.01)}
     </div>
   </div>
 </div>
-<div class="view" id="v-monitoreo">
+<div class="view" id="v-monitoreo" style="overflow-y:auto;max-height:calc(100vh - 60px)">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
     <div style="display:flex;align-items:center;gap:10px">
       <h2 style="font-size:16px;font-weight:600">📊 Monitoreo</h2>
       <select id="mon-range" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:11px" onchange="refMon()">
-        <option value="1">Last hour</option>
-        <option value="3">Last 3 hours</option>
-        <option value="6" selected>Last 6 hours</option>
-        <option value="8">Last 8 hours</option>
-        <option value="24">Last 24 hours</option>
+        <option value="1">1 hora</option>
+        <option value="2">2 horas</option>
+        <option value="3">3 horas</option>
+        <option value="6" selected>6 horas</option>
+        <option value="8">8 horas</option>
+        <option value="24">24 horas</option>
       </select>
+      <span id="mon-range-label" style="font-size:10px;color:var(--text-ter)"></span>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <select id="mon-interval" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:11px" onchange="setRefreshInterval(this.value)">
@@ -536,20 +538,8 @@ tr:hover td{background:rgba(255,255,255,.01)}
       <button class="btn btn-o btn-sm" onclick="refMon()" style="padding:7px 14px;font-size:11px">🔄 Refresh</button>
     </div>
   </div>
-  <div class="mon-grid" id="mon-grid" style="grid-template-columns:repeat(6,1fr)"></div>
-  <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    <div class="mon-chart" id="mc-requests"><h4>📈 Request Rate</h4><div class="chart-area"></div></div>
-    <div class="mon-chart" id="mc-latency"><h4>⏱ API Latency <span class="mon-tags"><span class="mt p50">p50</span><span class="mt p95 active">p95</span><span class="mt p99">p99</span></span></h4><div class="chart-area"></div></div>
-    <div class="mon-chart" id="mc-devices"><h4>🟢 Estado Dispositivos</h4><div class="chart-area"></div></div>
-    <div class="mon-chart" id="mc-ops"><h4>⚙️ Operaciones NAPALM</h4><div class="chart-area"></div></div>
-    <div class="mon-chart" id="mc-errors"><h4>❌ Errores NAPALM</h4><div class="chart-area"></div></div>
-    <div class="mon-chart" id="mc-paths"><h4>🛣️ Requests por Endpoint</h4><div class="chart-area"></div></div>
-  </div>
-  <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-    <div class="mon-chart" id="mc-auth"><h4>🔐 Intentos de Auth</h4><div class="chart-area"></div></div>
-    <div class="mon-chart" id="mc-napalm-lat"><h4>⏱ Latencia NAPALM <span class="mon-tags"><span class="mt p95 active">p95</span></span></h4><div class="chart-area"></div></div>
-    <div class="mon-chart" id="mc-uptime"><h4>📡 Uptime Dispositivo</h4><div class="chart-area"></div></div>
-  </div>
+  <div class="mon-grid" id="mon-grid"></div>
+  <div id="mon-charts" style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:10px"></div>
 </div>
 <div class="view" id="v-admin">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
@@ -761,11 +751,39 @@ async function refMon(){
     'histogram_quantile(0.95,sum(rate(netpulse_request_duration_seconds_bucket[5m]))by(le))','sum(netpulse_napalm_operations_total)','sum(netpulse_auth_total)'];
   const colors=['#5b6bf7','#23a55a','#f0b232','#a855f7','#06b6d4','#ea580c'];
   const results=await Promise.all(queries.map(q=>queryProm(q)));
-  g.innerHTML=results.map((res,i)=>`<div class="mon-card" style="border-top:3px solid ${colors[i]}"><h4>${labels[i]}</h4><div class="mon-val">${res?.[0]?.value?.[1]||'—'}</div></div>`).join('');
+  g.innerHTML=results.map((res,i)=>{
+    let v=res?.[0]?.value?.[1];
+    if(v==null||v==='')return`<div class="mon-card" style="border-top:3px solid ${colors[i]}"><h4>${labels[i]}</h4><div class="mon-val">—</div></div>`;
+    v=parseFloat(v);
+    if(isNaN(v))return`<div class="mon-card" style="border-top:3px solid ${colors[i]}"><h4>${labels[i]}</h4><div class="mon-val">—</div></div>`;
+    if(i===0)v=v.toFixed(2);
+    else if(i===1||i===2||i===4||i===5)v=Math.round(v).toLocaleString('es');
+    else if(i===3)v=v<1?(v*1000).toFixed(1)+' ms':v.toFixed(2)+' s';
+    return`<div class="mon-card" style="border-top:3px solid ${colors[i]}"><h4>${labels[i]}</h4><div class="mon-val">${v}</div></div>`;
+  }).join('');
   
   const hrs=parseInt(document.getElementById('mon-range')?.value||6);
   const R=hrs*3600;
-  const colors2=['#5b6bf7','#a855f7','#06b6d4','#23a55a','#f59e0b'];
+  // Update time range label
+  const rl=document.getElementById('mon-range-label');
+  if(rl)rl.textContent=`Últimas ${hrs}h — datos desde ${new Date(Date.now()-hrs*3600*1000).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})} hasta ${new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})}`;
+  
+  // Build chart containers dynamically if empty
+  const mc=document.getElementById('mon-charts');
+  if(mc&&!mc.children.length){
+    const chartDefs=[
+      {id:'mc-requests',title:'📈 Request Rate'},
+      {id:'mc-latency',title:'⏱ API Latency <span class="mon-tags"><span class="mt p95 active">p95</span></span>'},
+      {id:'mc-devices',title:'🟢 Estado Dispositivos'},
+      {id:'mc-ops',title:'⚙️ Operaciones NAPALM'},
+      {id:'mc-errors',title:'❌ Errores NAPALM'},
+      {id:'mc-paths',title:'🛣️ Requests por Endpoint'},
+      {id:'mc-auth',title:'🔐 Intentos de Auth'},
+      {id:'mc-napalm-lat',title:'⏱ Latencia NAPALM <span class="mon-tags"><span class="mt p95 active">p95</span></span>'},
+      {id:'mc-uptime',title:'📡 Uptime Dispositivo'},
+    ];
+    mc.innerHTML=chartDefs.map(c=>`<div class="mon-chart" id="${c.id}"><h4>${c.title}</h4><div class="chart-area"></div></div>`).join('');
+  }
   
   // ── Draw single line chart ──
   async function drawLine(id,q,clr,unit,labelF){
