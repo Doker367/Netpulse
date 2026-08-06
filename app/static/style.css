@@ -281,9 +281,10 @@ body{background:var(--bg);color:var(--text);min-height:100vh}
 /* ── Monitoring Cards ── */
 .mon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
 .mon-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);
-  padding:16px;text-align:center}
-.mon-card h4{font-size:11px;font-weight:500;color:var(--text-muted);margin-bottom:6px}
-.mon-card .mon-val{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+  padding:16px;text-align:center;overflow:hidden;min-width:0}
+.mon-card h4{font-size:11px;font-weight:500;color:var(--text-muted);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mon-card .mon-val{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.5px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mon-chart{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;min-height:140px}
 .mon-chart h4{font-size:11px;font-weight:500;color:var(--text-muted);margin-bottom:6px}
 .mon-chart .mon-tags{display:inline-flex;gap:2px;margin-left:6px}
