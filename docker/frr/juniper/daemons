@@ -1,0 +1,10 @@
+# FRR daemons — Juniper-like router
+zebra=yes
+bgpd=yes
+ospfd=yes
+staticd=yes
+watchfrr=yes
+vtysh_enable=yes
+zebra_options="-A 127.0.0.1 -s 9000000"
+bgpd_options="-A 127.0.0.1"
+ospfd_options="-A 127.0.0.1"

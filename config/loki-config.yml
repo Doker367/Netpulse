@@ -1,0 +1,41 @@
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  allow_deletes: true
+  retention_period: 168h
+
+# Loki apaga el ingester si el disco supera este umbral.
+# El host suele estar ~90-97% lleno; subimos el límite a 0.98
+# para que Loki no se auto-apague. (default: 0.9)
+ingester:
+  wal:
+    disk_full_threshold: 0.98
+
+ruler:
+  alertmanager_url: http://localhost:9093
