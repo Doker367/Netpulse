@@ -110,12 +110,12 @@ body{background:var(--bg);color:var(--text);font:14px/1.5 var(--ff);min-height:1
 .dc.hidden{display:none}
 
 /* ── DETAIL ── */
-.dp{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:24px;display:none;animation:fade .2s}
+.dp{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:24px;display:none;animation:fade .2s}
 .dp.active{display:block}
-.dh{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:var(--surface);border-bottom:1px solid var(--border)}
+.dh{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
 .dh h2{font-size:16px;font-weight:600}
 .dh .dm{font-size:11px;color:var(--text-ter);margin-top:2px}
-.db{padding:16px 20px}
+.db{padding:16px 20px;max-height:calc(100vh - 220px);overflow-y:auto}
 .tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);overflow-x:auto}
 .tab{padding:8px 16px;border-radius:6px 6px 0 0;cursor:pointer;font-size:12px;color:var(--text-ter);background:none;border:none;white-space:nowrap;font-weight:500;transition:all .12s}
 .tab:hover{color:var(--text)}
@@ -1140,7 +1140,7 @@ async function selD(id){
   </div>
   <div id="ping-result" style="display:none;margin-bottom:12px"></div>
   `;
-  document.getElementById('dp').scrollIntoView({behavior:'smooth'});
+  document.getElementById('dp').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 async function rCmdBig(id){
