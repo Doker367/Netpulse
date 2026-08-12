@@ -3156,8 +3156,8 @@
     async function loadConn() {
       const g = document.getElementById('conn-grid'); if (!g || !t) return;
       g.innerHTML = '<div class="sp"></div>';
-      const targets = [{ host: '8.8.8.8', label: 'Google DNS' }, { host: '1.1.1.1', label: 'Cloudflare DNS' },
-      { host: '208.67.222.222', label: 'OpenDNS' }, { host: '9.9.9.9', label: 'Quad9 DNS' }];
+      const targets = [{ host: '172.30.0.10', label: 'NOC / LAN' }, { host: '8.8.8.8', label: 'Internet (WAN)' },
+      { host: '10.0.0.1', label: 'Gateway Local' }];
       const devices = await (await fetch(`${A}/devices`, { headers: h() })).json();
       const online = devices.filter(d => d.id);
       let html = '';
@@ -3452,8 +3452,17 @@
 
     async function loadDev() {
       try {
-        const r = await fetch(`${A}/devices`, { headers: h() }); if (!r.ok) return;
-        const newDevs = await r.json();
+        let newDevs = [];
+        let r = await fetch(`${A}/inventory`, { headers: h() });
+        if (r.ok) {
+          const inv = await r.json();
+          if (Array.isArray(inv)) newDevs = inv.map(i => ({ id: i.id, hostname: i.host || i.ip || i.hostname, driver: i.driver || 'ios', port: i.port || 22, type: i.protocol || 'ssh' }));
+        }
+        if (!newDevs.length) {
+          r = await fetch(`${A}/devices`, { headers: h() });
+          if (r.ok) newDevs = await r.json();
+        }
+        if (!newDevs.length) return;
         // Preserve hardware metrics cache to prevent blinking
         newDevs.forEach(nd => {
           const od = devices.find(x => x.id === nd.id);
@@ -3472,11 +3481,12 @@
       } catch (e) { }
     }
     function buildSchedForms() {
-      const opts = devices.map(d => `<option value="${d.id}">${d.id} (${d.driver})</option>`).join('');
-      const s = document.getElementById('sched-single-form'); if (s) s.innerHTML = `<div class="fg"><label>Dispositivo</label><select id="sched-dev" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;width:100%;font-size:12px">${opts}</select></div>
-    <div class="fg" style="margin-top:6px"><label>En cuántos minutos</label><div style="display:flex;gap:6px"><input id="sched-delay" placeholder="30" value="30" style="flex:1"><button class="btn btn-p btn-sm" onclick="scheduleBackup()" style="white-space:nowrap">➕ Programar</button></div></div>`;
-      const r = document.getElementById('sched-rec-form'); if (r) r.innerHTML = `<div class="fg"><label>Dispositivo</label><select id="sched-rec-dev" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;width:100%;font-size:12px">${opts}</select></div>
-    <div class="fg" style="margin-top:6px"><label>Intervalo (minutos)</label><div style="display:flex;gap:6px"><input id="sched-rec-int" placeholder="60" value="60" style="flex:1"><button class="btn btn-p btn-sm" onclick="scheduleRecurring()" style="white-space:nowrap">➕ Programar</button></div></div>`
+      const opts = '<option value="all">-- TODOS LOS DISPOSITIVOS --</option>' + devices.map(d => `<option value="${d.id}">${d.id} (${d.driver})</option>`).join('');
+      const u = `<select class="sched-unit" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:6px;width:90px;font-size:11px"><option value="1">Minutos</option><option value="60">Horas</option><option value="1440">Días</option><option value="10080">Semanas</option><option value="43200">Meses</option></select>`;
+      const s = document.getElementById('sched-single-form'); if (s) s.innerHTML = `<div class="fg"><label>Dispositivo / Grupo</label><select id="sched-dev" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;width:100%;font-size:12px">${opts}</select></div>
+    <div class="fg" style="margin-top:6px"><label>Dentro de cuánto tiempo</label><div style="display:flex;gap:6px"><input id="sched-delay" type="number" placeholder="30" value="30" style="flex:1;min-width:0">${u.replace('class="sched-unit"', 'id="sched-delay-unit"')}<button class="btn btn-p btn-sm" onclick="scheduleBackup()" style="white-space:nowrap">➕ Programar</button></div></div>`;
+      const r = document.getElementById('sched-rec-form'); if (r) r.innerHTML = `<div class="fg"><label>Dispositivo / Grupo</label><select id="sched-rec-dev" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;width:100%;font-size:12px">${opts}</select></div>
+    <div class="fg" style="margin-top:6px"><label>Ejecutar repetitivamente cada</label><div style="display:flex;gap:6px"><input id="sched-rec-int" type="number" placeholder="1" value="1" style="flex:1;min-width:0">${u.replace('class="sched-unit"', 'id="sched-rec-unit"')}<button class="btn btn-p btn-sm" onclick="scheduleRecurring()" style="white-space:nowrap">➕ Programar</button></div></div>`
     }
     async function loadH() {
       try {
@@ -4460,18 +4470,22 @@
       <td><button class="btn btn-o btn-xs" onclick="cancelJob('${j.id}')">✕</button></td></tr>`).join('')}</table></div>`
       } catch (e) { if (document.getElementById('jobs-list')) document.getElementById('jobs-list').innerHTML = '<div style="font-size:11px;color:var(--text-ter)">Error</div>' }
     }
-    async function scheduleBackup() {
-      const dev = document.getElementById('sched-dev')?.value; const delay = document.getElementById('sched-delay')?.value;
-      if (!dev || !delay) return;
-      try { await fetch(`${A}/scheduler/backup`, { method: 'POST', headers: h(), body: JSON.stringify({ device_id: dev, delay_minutes: parseInt(delay) }) }); toast(`⏰ Backup de ${dev} en ${delay}min`, 's'); loadJobs() }
-      catch (e) { toast('Error al programar', 'error') }
+    async function doBackupMulti(isRec, dev, val, unit) {
+      if (!dev || !val) return;
+      const totalMin = parseInt(val) * parseInt(unit || 1);
+      const devs = dev === 'all' ? devices.map(d => d.id) : [dev];
+      try {
+        for (let d of devs) {
+          const ep = isRec ? '/scheduler/backup/recurring' : '/scheduler/backup';
+          const body = isRec ? { device_id: d, interval_minutes: totalMin } : { device_id: d, delay_minutes: totalMin };
+          await fetch(`${A}${ep}`, { method: 'POST', headers: h(), body: JSON.stringify(body) });
+        }
+        toast(`✅ Programa activado para ${devs.length} equipo(s)`, 's'); loadJobs();
+      } catch (e) { toast('Error al programar múltiples o individual', 'error') }
     }
-    async function scheduleRecurring() {
-      const dev = document.getElementById('sched-rec-dev')?.value; const interval = document.getElementById('sched-rec-int')?.value;
-      if (!dev || !interval) return;
-      try { await fetch(`${A}/scheduler/backup/recurring`, { method: 'POST', headers: h(), body: JSON.stringify({ device_id: dev, interval_minutes: parseInt(interval) }) }); toast(`🔄 Backup recurrente de ${dev} cada ${interval}min`, 's'); loadJobs() }
-      catch (e) { toast('Error al programar', 'error') }
-    }
+
+    function scheduleBackup() { doBackupMulti(false, document.getElementById('sched-dev')?.value, document.getElementById('sched-delay')?.value, document.getElementById('sched-delay-unit')?.value); }
+    function scheduleRecurring() { doBackupMulti(true, document.getElementById('sched-rec-dev')?.value, document.getElementById('sched-rec-int')?.value, document.getElementById('sched-rec-unit')?.value); }
     async function cancelJob(id) {
       try { await fetch(`${A}/scheduler/jobs/${id}`, { method: 'DELETE', headers: h() }); toast('✕ Trabajo cancelado', 'info'); loadJobs() }
       catch (e) { toast('Error al cancelar', 'error') }
