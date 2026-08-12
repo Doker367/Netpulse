@@ -197,6 +197,112 @@ def schedule_recurring(device_id: str, interval_minutes: int) -> str:
     return job_id
 
 
+# ── Reportes programados ─────────────────────────────────────
+
+def _run_report(job_id: str):
+    """Genera los reportes CSV (inventario + health) y actualiza el job."""
+    logger.info("[scheduler] Generating reports (job %s)", job_id)
+    with _lock:
+        jobs = _load_jobs()
+        for j in jobs:
+            if j["job_id"] == job_id:
+                j["status"] = "running"
+                _save_jobs(jobs)
+                break
+
+    try:
+        from datetime import datetime as _dt
+        from app.core.settings import REPORT_DIR
+        from app.services.reports import csv_report
+
+        ts = _dt.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+
+        # Inventario
+        inv_path = REPORT_DIR / f"inventory_{ts}.csv"
+        inv_path.write_text(csv_report.generate_inventory_csv(), encoding="utf-8")
+
+        # Health scores
+        health_path = REPORT_DIR / f"health_{ts}.csv"
+        try:
+            from app.services.ops import health_svc
+            rows = health_svc.health_all()
+            health_path.write_text(csv_report.generate_devices_csv(rows), encoding="utf-8")
+        except Exception as e:
+            logger.warning("[scheduler] Health report falló: %s", e)
+
+        with _lock:
+            jobs = _load_jobs()
+            for j in jobs:
+                if j["job_id"] == job_id:
+                    j["status"] = "completed"
+                    j["error"] = None
+                    _save_jobs(jobs)
+                    break
+        logger.info("[scheduler] Reports generados: %s", inv_path)
+    except Exception as e:
+        logger.error("[scheduler] Report job %s falló: %s", job_id, e)
+        with _lock:
+            jobs = _load_jobs()
+            for j in jobs:
+                if j["job_id"] == job_id:
+                    j["status"] = "failed"
+                    j["error"] = str(e)
+                    _save_jobs(jobs)
+                    break
+    finally:
+        with _lock:
+            _active_timers.pop(job_id, None)
+
+
+def schedule_report(delay_minutes: int = 1, interval_minutes: Optional[int] = None) -> str:
+    """Programa generación de reportes CSV.
+
+    Args:
+        delay_minutes: Minutos hasta la primera ejecución.
+        interval_minutes: Si se da, repite cada N minutos; si no, una sola vez.
+
+    Returns:
+        job_id del trabajo creado.
+    """
+    job_id = _generate_job_id()
+    created_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    job = {
+        "job_id": job_id,
+        "device_id": "all",
+        "job_type": "report",
+        "delay_minutes": delay_minutes,
+        "interval_minutes": interval_minutes,
+        "created_at": created_at,
+        "status": "scheduled",
+        "error": None,
+    }
+
+    def _run_once():
+        _run_report(job_id)
+        if interval_minutes and job_id in _active_timers:
+            with _lock:
+                if job_id in _active_timers:
+                    timer = threading.Timer(interval_minutes * 60.0, _run_once)
+                    timer.daemon = True
+                    timer.start()
+                    _active_timers[job_id] = timer
+
+    with _lock:
+        jobs = _load_jobs()
+        jobs.append(job)
+        _save_jobs(jobs)
+
+        timer = threading.Timer(delay_minutes * 60.0, _run_once)
+        timer.daemon = True
+        timer.start()
+        _active_timers[job_id] = timer
+
+    logger.info("[scheduler] Report programado en %d min (job %s, interval=%s)",
+                delay_minutes, job_id, interval_minutes)
+    return job_id
+
+
 def cancel_job(job_id: str) -> bool:
     """Cancela un trabajo programado.
 

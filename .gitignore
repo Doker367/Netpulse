@@ -22,6 +22,10 @@ Thumbs.db
 
 # Backups (generated)
 backups/*.cfg
+backups/netpulse_self_*.tar.gz
+
+# Audit logs (pueden contener IPs/usernames)
+audit/
 
 # Environment
 .env
@@ -44,6 +48,16 @@ grafana_data/
 
 # Scheduler jobs (generated)
 config/scheduler_jobs.json
+
+# Generated state files
+config/maintenance_windows.json
+config/api_keys.json
+config/drift_history/
+config/baselines/
+reports/
+
+# Secretos locales (no commitear)
+config/alertmanager.yml
 
 # Logs
 *.log

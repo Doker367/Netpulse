@@ -30,6 +30,9 @@ class DeviceDriver(str, Enum):
     ROS = "ros"            # MikroTik
     FORTIOS = "fortios"
     LINUX = "linux"
+    PROCURVE = "procurve"  # HP ProCurve (usa CLI Cisco-like con driver ios)
+    COMWARE = "comware"    # HP/H3C Comware (usa CLI Cisco-like con driver ios)
+    HPE = "hpe"            # HP Enterprise (fallback a ios)
 
 
 class DeviceBase(BaseModel):
@@ -80,6 +83,11 @@ class DeviceBase(BaseModel):
         default="",
         description="Descripción libre del dispositivo",
         examples=["Router principal del datacenter"],
+    )
+    enable_password: Optional[str] = Field(
+        default=None,
+        description="Enable secret para Cisco/HP (si el dispositivo requiere enable mode)",
+        examples=["enable123!"],
     )
 
 

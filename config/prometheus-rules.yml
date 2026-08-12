@@ -1,0 +1,70 @@
+groups:
+  - name: netpulse-devices
+    rules:
+      # Dispositivo caído
+      - alert: DeviceDown
+        expr: netpulse_devices_up == 0
+        for: 5m
+        labels:
+          severity: critical
+          team: netops
+        annotations:
+          summary: "Dispositivo {{ $labels.device_id }} no responde"
+          description: "El dispositivo {{ $labels.device_id }} (driver {{ $labels.driver }}) no responde durante más de 5 minutos."
+
+      # Errores NAPALM excesivos
+      - alert: HighNapalmErrorRate
+        expr: rate(netpulse_napalm_operations_total{status!="success"}[15m]) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          team: netops
+        annotations:
+          summary: "Alta tasa de errores NAPALM en {{ $labels.device_id }}"
+          description: "El dispositivo {{ $labels.device_id }} tiene más de 0.5 errores/seg en operaciones {{ $labels.operation }}."
+
+      # Latencia NAPALM alta (p95)
+      - alert: HighNapalmLatency
+        expr: histogram_quantile(0.95, sum by (device_id, le) (rate(netpulse_napalm_duration_seconds_bucket[15m]))) > 30
+        for: 15m
+        labels:
+          severity: warning
+          team: netops
+        annotations:
+          summary: "Latencia NAPALM alta en {{ $labels.device_id }}"
+          description: "El p95 de latencia de {{ $labels.device_id }} supera 30 segundos."
+
+  - name: netpulse-api
+    rules:
+      # Tasa de error HTTP alta
+      - alert: HighHttpErrorRate
+        expr: sum by (path) (rate(netpulse_requests_total{status=~"5.."}[15m])) > 2
+        for: 10m
+        labels:
+          severity: warning
+          team: netops
+        annotations:
+          summary: "Tasa de error HTTP alta en {{ $labels.path }}"
+          description: "El endpoint {{ $labels.path }} devuelve >2 errores 5xx por segundo."
+
+      # Latencia API alta (p95 > 5s)
+      - alert: HighApiLatency
+        expr: histogram_quantile(0.95, sum by (le) (rate(netpulse_request_duration_seconds_bucket[15m]))) > 5
+        for: 10m
+        labels:
+          severity: warning
+          team: netops
+        annotations:
+          summary: "Latencia API alta"
+          description: "El p95 de latencia de la API supera 5 segundos."
+
+      # Intentos de autenticación fallidos excesivos (brute force)
+      - alert: BruteForceAttempt
+        expr: rate(netpulse_auth_total{status="failure"}[10m]) > 1
+        for: 5m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Posible ataque de fuerza bruta"
+          description: "Más de 1 fallo de autenticación por segundo durante 5 minutos."

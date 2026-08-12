@@ -157,6 +157,48 @@ def notify_event(event_type: str, data: dict):
     for wh in webhooks:
         send_webhook(wh["url"], event_type, data)
 
+    # ── Canales adicionales (Telegram / Email) si están configurados ──
+    _notify_external_channels(event_type, data)
+
+
+def _notify_external_channels(event_type: str, data: dict):
+    """Envía el evento a Telegram y/o Email si están configurados.
+
+    No bloquea ni rompe el flujo si fallan.
+    """
+    title = data.get("title") or data.get("device_id") or event_type
+    message = data.get("message") or str(data)[:300]
+
+    try:
+        from app.core.settings import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+        if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+            from app.services.notify import telegram
+            ok = telegram.send_telegram(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, f"[{event_type}] {title}\n{message}")
+            logger.debug("Telegram: %s", "OK" if ok else "falló")
+    except Exception as e:
+        logger.warning("Telegram no enviado: %s", e)
+
+    try:
+        from app.core.settings import SLACK_WEBHOOK_URL, SLACK_CHANNEL
+        if SLACK_WEBHOOK_URL:
+            from app.services.notify import slack
+            ok = slack.send_slack(SLACK_WEBHOOK_URL, f"[{event_type}] {title}\n{message}", SLACK_CHANNEL)
+            logger.debug("Slack: %s", "OK" if ok else "falló")
+    except Exception as e:
+        logger.warning("Slack no enviado: %s", e)
+
+    try:
+        from app.core.settings import SMTP_HOST, SMTP_FROM, SMTP_TO
+        if SMTP_HOST and SMTP_TO:
+            from app.services.notify import email_smtp
+            ok = email_smtp.send_email_plain(
+                SMTP_HOST, 25, SMTP_FROM, [SMTP_TO],
+                f"[NetPulse] {title}", f"{event_type}\n\n{message}",
+            )
+            logger.debug("Email: %s", "OK" if ok else "falló")
+    except Exception as e:
+        logger.warning("Email no enviado: %s", e)
+
 
 # ── Eventos específicos ──────────────────────────────────────
 

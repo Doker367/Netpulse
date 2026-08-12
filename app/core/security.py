@@ -14,10 +14,20 @@ from passlib.context import CryptContext
 
 # ── Configuración ─────────────────────────────────────────────
 
-# Clave secreta para firmar JWTs (¡cambiar en producción!)
+# Clave secreta para firmar JWTs.
+# En producción DEBE definirse NETPULSE_JWT_SECRET como variable de entorno.
 JWT_SECRET = os.getenv("NETPULSE_JWT_SECRET", "netpulse-dev-secret-change-me")
 JWT_ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE = 30  # minutos
+ACCESS_TOKEN_EXPIRE = int(os.getenv("NETPULSE_TOKEN_EXPIRE", "30"))  # minutos
+
+# Si estamos en modo producción (NETPULSE_ENV=production) y el secret es
+# el default, fallar en lugar de arriesgar tokens predecibles.
+_IS_PRODUCTION = os.getenv("NETPULSE_ENV", "development").lower() == "production"
+if _IS_PRODUCTION and JWT_SECRET == "netpulse-dev-secret-change-me":
+    raise RuntimeError(
+        "NETPULSE_ENV=production requiere NETPULSE_JWT_SECRET configurado. "
+        "Genera uno con: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

@@ -9,24 +9,17 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
-from slowapi.util import get_remote_address
 
+from app.core.limiter import limiter
 from app.core.settings import API_TITLE, API_VERSION
 from app.middleware.audit import AuditMiddleware
 from app.middleware.metrics import MetricsMiddleware
 from app.middleware.security import SecurityHeadersMiddleware
 from app.models.schemas import HealthResponse
-from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy
+from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy, alerts, topology, traffic, ops, security_ext, integrations, collectors
 from app.services.inventory_svc import list_devices
 
-# ── Rate Limiter ─────────────────────────────────────────────
-
-from slowapi import Limiter
-
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["100/minute"],  # 100 requests per minute per IP
-)
+# ── Rate Limiter (definido en app/core/limiter.py) ──────────
 
 
 @asynccontextmanager
@@ -37,7 +30,25 @@ async def lifespan(app: FastAPI):
         from app.services.inventory_svc import add_lab_devices
         add_lab_devices()
         print("📦 Lab inventory initialized with 5 devices")
+
+    # Arrancar collector syslog (si está habilitado)
+    from app.core.settings import SYSLOG_ENABLED
+    if SYSLOG_ENABLED:
+        try:
+            from app.services.collectors import syslog_svc
+            ok = syslog_svc.start_syslog_collector()
+            print(f"📡 Syslog collector {'iniciado' if ok else 'NO iniciado (puerto 514 requiere root?)'}")
+        except Exception as e:
+            print(f"⚠️ Syslog collector no arrancó: {e}")
+
     yield
+
+    # Shutdown: detener collectors
+    try:
+        from app.services.collectors import syslog_svc
+        syslog_svc.stop_syslog_collector()
+    except Exception:
+        pass
 
 
 app = FastAPI(
@@ -112,6 +123,13 @@ app.include_router(compliance.router)
 app.include_router(notifications.router)
 app.include_router(admin_users.router)
 app.include_router(prometheus_proxy.router)
+app.include_router(alerts.router)
+app.include_router(topology.router)
+app.include_router(traffic.router)
+app.include_router(ops.router)
+app.include_router(security_ext.router)
+app.include_router(integrations.router)
+app.include_router(collectors.router)
 
 # ── Static files (Dashboard UI) ──────────────────────────────
 

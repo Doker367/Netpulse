@@ -37,6 +37,18 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Permissions policy
         headers.setdefault("Permissions-Policy", "geolocation=(), camera=(), microphone=()")
 
+        # Content-Security-Policy (allow inline styles/scripts for dashboard)
+        if request.url.path.startswith("/api/"):
+            headers.setdefault(
+                "Content-Security-Policy",
+                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self'",
+            )
+        else:
+            headers.setdefault(
+                "Content-Security-Policy",
+                "default-src 'self'; script-src 'self' 'unsafe-inline' https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com; connect-src 'self'",
+            )
+
         # Remove Server header (uvicorn adds it)
         if "server" in headers:
             del headers["server"]

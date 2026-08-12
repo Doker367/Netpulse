@@ -264,3 +264,49 @@ def device_resources(device_id: str):
     if not result.success:
         raise HTTPException(status_code=502, detail=result.error)
     return result.data
+
+
+# ── Tablas y vecinos (datacenter ops) ───────────────────────
+
+def _op_result(device_id: str, operation: str, error_ok: bool = False):
+    """Ejecuta una operación NAPALM genérica y devuelve data o error."""
+    result = napalm_svc._execute(napalm_svc._find_device(device_id) or {}, operation, retry=False)
+    if result.success:
+        return {"device_id": device_id, "data": result.data}
+    if error_ok and result.error_type == "command_error":
+        # Operación no soportada por el driver — devolver vacío en vez de 502
+        return {"device_id": device_id, "data": [], "unsupported": True}
+    raise HTTPException(status_code=502, detail={
+        "error": result.error, "error_raw": result.error_raw,
+        "error_type": result.error_type or "unknown", "device_id": device_id,
+    })
+
+
+@router.get("/{device_id}/arp", dependencies=[Depends(JWTBearer()), Depends(requires_role("viewer"))])
+def device_arp(device_id: str):
+    """Tabla ARP: IP → MAC del dispositivo."""
+    return _op_result(device_id, "get_arp_table", error_ok=True)
+
+
+@router.get("/{device_id}/mac-table", dependencies=[Depends(JWTBearer()), Depends(requires_role("viewer"))])
+def device_mac_table(device_id: str):
+    """Tabla de direcciones MAC (FDB) del switch."""
+    return _op_result(device_id, "get_mac_address_table", error_ok=True)
+
+
+@router.get("/{device_id}/lldp", dependencies=[Depends(JWTBearer()), Depends(requires_role("viewer"))])
+def device_lldp(device_id: str):
+    """Vecinos LLDP: topología física del dispositivo."""
+    return _op_result(device_id, "get_lldp_neighbors", error_ok=True)
+
+
+@router.get("/{device_id}/ntp", dependencies=[Depends(JWTBearer()), Depends(requires_role("viewer"))])
+def device_ntp(device_id: str):
+    """Servidores NTP configurados en el dispositivo."""
+    return _op_result(device_id, "get_ntp_servers", error_ok=True)
+
+
+@router.get("/{device_id}/environment", dependencies=[Depends(JWTBearer()), Depends(requires_role("viewer"))])
+def device_environment(device_id: str):
+    """Estado del hardware: temperatura, ventiladores, power supplies."""
+    return _op_result(device_id, "get_environment", error_ok=True)

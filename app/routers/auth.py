@@ -8,7 +8,9 @@ Endpoints:
 import yaml
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from app.core.limiter import limiter
 
 from app.core.security import (
     create_access_token,
@@ -63,10 +65,12 @@ def _get_users() -> dict[str, dict]:
 # ── Endpoints ─────────────────────────────────────────────────
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest):
+@limiter.limit("5/minute")  # Anti brute-force: máx 5 intentos/min por IP
+def login(request: Request, body: LoginRequest):
     """Inicia sesión con usuario y contraseña.
 
     Devuelve un token JWT con claims: sub (username), role.
+    Límite: 5 intentos por minuto por IP (anti fuerza bruta).
     """
     users = _get_users()
     user = users.get(body.username)
