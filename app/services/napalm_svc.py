@@ -177,7 +177,24 @@ def _build_optional_args(device: dict) -> dict:
         args["port"] = device["port"]
     if device["driver"] == "eos":
         args["transport"] = "https"
+    # Enable password for Cisco/HP devices that require enable mode
+    if device.get("enable_password"):
+        args["secret"] = device["enable_password"]
     return args
+
+
+# ── Driver aliases (HP ProCurve/Comware use Cisco-like CLI) ──
+
+_DRIVER_ALIASES = {
+    "procurve": "ios",
+    "comware": "ios",
+    "hpe": "ios",
+}
+
+
+def _resolve_driver(driver_name: str) -> str:
+    """Resuelve aliases de drivers a su driver NAPALM real."""
+    return _DRIVER_ALIASES.get(driver_name, driver_name)
 
 
 # ── Core Operations ─────────────────────────────────────────
@@ -227,7 +244,8 @@ def _execute(device: dict, operation: str, *args, retry: bool = True, **kwargs) 
     for attempt in range(1, max_attempts + 1):
         try:
             driver_name = device["driver"]
-            driver_cls = get_network_driver(driver_name)
+            napalm_driver = _resolve_driver(driver_name)
+            driver_cls = get_network_driver(napalm_driver)
             opts = _build_optional_args(device)
             opts["timeout"] = NAPALM_TIMEOUT
 
@@ -701,6 +719,56 @@ def get_bgp_config(device_id: str) -> NapalmResult:
         r.set_error("driver_error", f"Device {device_id} not found")
         return r
     return _execute(d, "get_bgp_config", retry=False)
+
+
+def get_arp_table(device_id: str) -> NapalmResult:
+    """Obtiene la tabla ARP del dispositivo (IP → MAC)."""
+    d = _find_device(device_id)
+    if not d:
+        r = NapalmResult(device_id)
+        r.set_error("driver_error", f"Device {device_id} not found")
+        return r
+    return _execute(d, "get_arp_table", retry=False)
+
+
+def get_mac_address_table(device_id: str) -> NapalmResult:
+    """Obtiene la tabla de direcciones MAC del dispositivo."""
+    d = _find_device(device_id)
+    if not d:
+        r = NapalmResult(device_id)
+        r.set_error("driver_error", f"Device {device_id} not found")
+        return r
+    return _execute(d, "get_mac_address_table", retry=False)
+
+
+def get_lldp_neighbors(device_id: str) -> NapalmResult:
+    """Obtiene vecinos LLDP del dispositivo (topología física)."""
+    d = _find_device(device_id)
+    if not d:
+        r = NapalmResult(device_id)
+        r.set_error("driver_error", f"Device {device_id} not found")
+        return r
+    return _execute(d, "get_lldp_neighbors", retry=False)
+
+
+def get_ntp_servers(device_id: str) -> NapalmResult:
+    """Obtiene los servidores NTP configurados en el dispositivo."""
+    d = _find_device(device_id)
+    if not d:
+        r = NapalmResult(device_id)
+        r.set_error("driver_error", f"Device {device_id} not found")
+        return r
+    return _execute(d, "get_ntp_servers", retry=False)
+
+
+def get_environment(device_id: str) -> NapalmResult:
+    """Obtiene el estado del hardware: temperatura, ventiladores, PSU."""
+    d = _find_device(device_id)
+    if not d:
+        r = NapalmResult(device_id)
+        r.set_error("driver_error", f"Device {device_id} not found")
+        return r
+    return _execute(d, "get_environment", retry=False)
 
 
 def get_config(device_id: str, retrieve: str = "running") -> NapalmResult:
@@ -1289,14 +1357,25 @@ def get_resources(device_id: str) -> NapalmResult:
             sys_res = list(api("/system/resource/print"))
             if sys_res:
                 r = dict(sys_res[0])
+                total_mem = int(r.get("total-memory", 0))
+                free_mem = int(r.get("free-memory", 0))
+                total_hdd = int(r.get("total-hdd-space", 0))
+                free_hdd = int(r.get("free-hdd-space", 0))
                 result.data = {
                     "cpu": r.get("cpu-load", 0),
                     "cpu_count": r.get("cpu-count", 0),
-                    "memory_total": r.get("total-memory", 0),
-                    "memory_free": r.get("free-memory", 0),
-                    "hdd_total": r.get("total-hdd-space", 0),
-                    "hdd_free": r.get("free-hdd-space", 0),
+                    "cpu_frequency": r.get("cpu-frequency", 0),
+                    "memory_total": total_mem,
+                    "memory_used": total_mem - free_mem,
+                    "memory_free": free_mem,
+                    "hdd_total": total_hdd,
+                    "hdd_free": free_hdd,
+                    "hdd_used": total_hdd - free_hdd,
                     "uptime": r.get("uptime", ""),
+                    "board_name": r.get("board-name", ""),
+                    "version": r.get("version", ""),
+                    "architecture": r.get("architecture-name", ""),
+                    "platform": r.get("platform", ""),
                 }
                 result.success = True
             api.close()

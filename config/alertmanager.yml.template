@@ -1,0 +1,21 @@
+# Alertmanager — enruta alertas al webhook de NetPulse
+# COPIA este archivo a config/alertmanager.yml y pon tu API key.
+# El real está en .gitignore (contiene secreto).
+route:
+  group_by: ['alertname', 'device_id']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'netpulse-webhook'
+
+receivers:
+  - name: 'netpulse-webhook'
+    webhook_configs:
+      - url: 'http://127.0.0.1:8082/api/alerts/webhook'
+        send_resolved: true
+        http_config:
+          authorization:
+            # API key de NetPulse (rol admin) para autenticar el webhook.
+            # Crear con: POST /api/security/api-keys {"name":"alertmanager","role":"admin"}
+            type: Bearer
+            credentials: 'CHANGE_ME'

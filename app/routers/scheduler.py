@@ -45,6 +45,29 @@ def schedule_recurring(req: RecurringBackupRequest):
     return job
 
 
+@router.post(
+    "/report",
+    status_code=201,
+    dependencies=[Depends(JWTBearer()), Depends(requires_role("operator"))],
+)
+def schedule_report(payload: dict):
+    """Programa generación de reportes CSV.
+
+    Body: {"delay_minutes": 1, "interval_minutes": 1440} — con
+    interval_minutes se repite (ej. 1440 = diario); sin él, una vez.
+    """
+    delay = int(payload.get("delay_minutes", 1))
+    interval = payload.get("interval_minutes")
+    interval = int(interval) if interval is not None else None
+
+    job_id = scheduler_svc.schedule_report(delay, interval)
+    jobs = scheduler_svc.list_jobs()
+    job = next((j for j in jobs if j["job_id"] == job_id), None)
+    if not job:
+        raise HTTPException(500, "Error al crear el trabajo de reporte")
+    return job
+
+
 @router.get(
     "/jobs",
     response_model=list[ScheduledJobResponse],
