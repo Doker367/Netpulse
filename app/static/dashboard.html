@@ -4462,12 +4462,14 @@
         const r = await fetch(`${A}/scheduler/jobs`, { headers: h() });
         const jobs = await r.json();
         if (!Array.isArray(jobs) || !jobs.length) { el.innerHTML = '<div class="empty"><span class="icon">⏰</span><br>No hay trabajos programados</div>'; return }
+        const activeJobs = jobs.filter(j => j.status !== 'cancelled');
+        if (!activeJobs.length) { el.innerHTML = '<div class="empty"><span class="icon">⏰</span><br>No hay trabajos activos (solo históricos cancelados)</div>'; return }
         el.innerHTML = `<div style="border:1px solid var(--border);border-radius:6px"><table><tr><th>Dispositivo</th><th>Tipo</th><th>Estado</th><th>Programado</th><th>Acción</th></tr>
-      ${jobs.map(j => `<tr><td style="font-weight:500">${esc(j.device_id || '?')}</td>
-      <td>${j.recurring ? '🔄 Recurrente' : '⏳ Único'}</td>
-      <td><span class="badge ${j.status === 'pending' ? 'badge-b' : j.status === 'completed' ? 'badge-g' : 'badge-r'}">${j.status || '?'}</span></td>
+      ${activeJobs.map(j => `<tr><td style="font-weight:500">${esc(j.device_id === 'all' ? 'Todos' : j.device_id || '?')}</td>
+      <td>${j.job_type === 'recurring' ? '🔄 Recurrente' : '⏳ Único'}</td>
+      <td><span class="badge ${j.status === 'pending' || j.status === 'scheduled' ? 'badge-b' : j.status === 'completed' ? 'badge-g' : 'badge-r'}">${j.status || '?'}</span></td>
       <td style="font-size:10px">${j.run_at ? new Date(j.run_at).toLocaleString() : j.interval_minutes ? `Cada ${j.interval_minutes} min` : '—'}</td>
-      <td><button class="btn btn-o btn-xs" onclick="cancelJob('${j.id}')">✕</button></td></tr>`).join('')}</table></div>`
+      <td><button class="btn btn-o btn-xs" onclick="cancelJob('${j.job_id || j.id}')" title="Cancelar">✕</button></td></tr>`).join('')}</table></div>`
       } catch (e) { if (document.getElementById('jobs-list')) document.getElementById('jobs-list').innerHTML = '<div style="font-size:11px;color:var(--text-ter)">Error</div>' }
     }
     async function doBackupMulti(isRec, dev, val, unit) {
