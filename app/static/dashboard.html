@@ -4064,6 +4064,7 @@
       } catch (e) { }
 
       const promises = devices.map(async d => {
+        if (!d._online) { alerts.push({ sev: 'critical', dev: d.id, msg: 'Dispositivo OFFLINE', icon: '🔴' }); return; }
         try {
           const rr = await fetch(`${A}/facts/${d.id}/resources?_t=${Date.now()}`, { headers: h() });
           if (!rr.ok) { alerts.push({ sev: 'critical', dev: d.id, msg: 'Device unreachable — API Error (OFFLINE)', icon: '🔴' }); return; }
