@@ -3843,17 +3843,18 @@
       document.getElementById('dc').innerHTML = `<div class="sp" style="margin:20px auto"></div><div style="text-align:center;font-size:11px;color:var(--text-ter)" data-i18n="m_loading">${__t('m_loading')}</div>`;
 
       // Load all data in parallel
-      const [rF, rI, rC] = await Promise.all([
+      const [rF, rI, rC] = sel._online ? await Promise.all([
         fetch(`${A}/facts/${id}`, { headers: h() }).catch(() => null),
         fetch(`${A}/facts/${id}/interfaces`, { headers: h() }).catch(() => null),
         fetch(`${A}/config/${id}/raw`, { headers: h() }).catch(() => null),
-      ]);
+      ]) : [null, null, null];
       const facts = rF?.ok ? await rF.json() : null;
       const ifaces = rI?.ok ? await rI.json() : null;
       const config = rC?.ok ? await rC.text() : '⚠️ No disponible';
 
       let cpu = 0, memPct = 0, hddPct = 0, memStr = '—';
       try {
+        if (!sel._online) throw new Error('Device Offline');
         const rr = await fetch(`${A}/facts/${id}/resources`, { headers: h() });
         if (rr.ok) {
           const rd = await rr.json(); cpu = rd.cpu || 0;
@@ -3862,6 +3863,10 @@
             memPct = Math.round(mu / rd.memory_total * 100); memStr = `${Math.round(mu / 1024 / 1024)}/${Math.round(rd.memory_total / 1024 / 1024)}MB`;
           }
           if (rd.hdd_total) hddPct = Math.round((rd.hdd_total - rd.hdd_free) / rd.hdd_total * 100);
+          sel._cpu = cpu + '%'; sel._mem = memPct + '%'; sel._dsk = hddPct + '%';
+          const cEl = document.getElementById(`rcpu-${id}`); if (cEl) cEl.textContent = sel._cpu;
+          const mEl = document.getElementById(`rmem-${id}`); if (mEl) mEl.textContent = sel._mem;
+          const dEl = document.getElementById(`rdsk-${id}`); if (dEl) dEl.textContent = sel._dsk;
         }
       } catch (e) { }
 
