@@ -54,16 +54,18 @@ async def device_health(
 
 async def _tcp_check(host: str, port: int, timeout: float = 4.0) -> bool:
     """Fast TCP-connect probe. Returns True if port is reachable."""
-    try:
-        _, writer = await asyncio.wait_for(
-            asyncio.open_connection(host, port),
-            timeout=timeout,
-        )
-        writer.close()
-        await writer.wait_closed()
-        return True
-    except (asyncio.TimeoutError, OSError, ConnectionRefusedError):
-        return False
+    for _ in range(2):
+        try:
+            _, writer = await asyncio.wait_for(
+                asyncio.open_connection(host, port),
+                timeout=timeout,
+            )
+            writer.close()
+            await writer.wait_closed()
+            return True
+        except (asyncio.TimeoutError, OSError, ConnectionRefusedError):
+            pass
+    return False
 
 
 # ── CRUD Endpoints ───────────────────────────────────────────
