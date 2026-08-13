@@ -46,14 +46,3 @@ devices:
   port: 23
   tags: []
   type: switch
-- credentials:
-    password: ***REMOVED***
-    username: wili
-  description: ''
-  driver: ios
-  group: null
-  hostname: 192.168.88.1
-  id: mikrotik-prueba2
-  port: 22
-  tags: []
-  type: router
