@@ -101,7 +101,13 @@ def get_one(device_id: str):
 def create(device: DeviceCreate):
     """Agrega un dispositivo al inventario."""
     try:
-        return inventory_svc.add_device(device.model_dump())
+        dump = device.model_dump()
+        # Convert enums to plain strings for YAML serialization
+        if hasattr(dump.get("driver"), "value"):
+            dump["driver"] = dump["driver"].value
+        if hasattr(dump.get("type"), "value"):
+            dump["type"] = dump["type"].value
+        return inventory_svc.add_device(dump)
     except ValueError as e:
         raise HTTPException(409, str(e))
 
@@ -113,7 +119,12 @@ def create(device: DeviceCreate):
 )
 def update(device_id: str, updates: DeviceUpdate):
     """Actualiza un dispositivo existente."""
-    result = inventory_svc.update_device(device_id, updates.model_dump(exclude_none=True))
+    upd = updates.model_dump(exclude_none=True)
+    if hasattr(upd.get("driver"), "value"):
+        upd["driver"] = upd["driver"].value
+    if hasattr(upd.get("type"), "value"):
+        upd["type"] = upd["type"].value
+    result = inventory_svc.update_device(device_id, upd)
     if not result:
         raise HTTPException(404, f"Dispositivo '{device_id}' no encontrado")
     return result

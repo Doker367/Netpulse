@@ -1,12 +1,48 @@
 devices:
-  - id: mikrotik-edge-01
-    hostname: 127.0.0.1
-    port: 8728
-    driver: ros
-    type: router
-    group: Edge
-    tags: [lab, mikrotik, routeros]
-    credentials:
-      username: admin
-      password: ""
-    description: "MikroTik Edge"
+- credentials:
+    password: ''
+    username: admin
+  description: MikroTik Edge
+  driver: ros
+  group: Edge
+  hostname: 127.0.0.1
+  id: mikrotik-edge-01
+  port: 8728
+  tags:
+  - lab
+  - mikrotik
+  - routeros
+  type: router
+- credentials:
+    password: ***REMOVED***
+    username: admin
+  description: ''
+  driver: procurve
+  group: Access
+  hostname: 10.0.0.50
+  id: hp-procurve-01
+  port: 22
+  tags: []
+  type: switch
+- credentials:
+    password: ***REMOVED***
+    username: admin
+  description: ''
+  driver: ios
+  group: Core
+  hostname: 10.0.0.1
+  id: cisco-core-01
+  port: 22
+  tags: []
+  type: router
+- credentials:
+    password: ***REMOVED***
+    username: admin
+  description: ''
+  driver: ros
+  group: Edge
+  hostname: 10.0.0.20
+  id: mikrotik-edge-02
+  port: 8728
+  tags: []
+  type: router

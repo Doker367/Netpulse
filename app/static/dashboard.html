@@ -3453,7 +3453,7 @@
     async function loadDev() {
       try {
         let newDevs = [];
-        let r = await fetch(`${A}/inventory`, { headers: h() });
+        let r = await fetch(`${A}/devices`, { headers: h() });
         if (r.ok) {
           const inv = await r.json();
           if (Array.isArray(inv)) newDevs = inv.map(i => ({ id: i.id, hostname: i.host || i.ip || i.hostname, driver: i.driver || 'ios', port: i.port || 22, type: i.protocol || 'ssh' }));
@@ -4639,15 +4639,15 @@
     async function addInventoryDevice() {
       const data = {
         id: document.getElementById('inv-id').value,
-        host: document.getElementById('inv-host').value,
+        hostname: document.getElementById('inv-host').value,
         driver: document.getElementById('inv-driver').value,
         protocol: document.getElementById('inv-protocol').value
       };
 
-      if (!data.id || !data.host) { toast('ID / Hostname e IP son obligatorios', 'error'); return; }
+      if (!data.id || !data.hostname) { toast('ID / Hostname e IP son obligatorios', 'error'); return; }
 
       if (data.protocol === 'ssh' || data.protocol === 'telnet') {
-        data.user = document.getElementById('inv-user').value;
+        data.username = document.getElementById('inv-user').value;
         data.password = document.getElementById('inv-pass').value;
         data.secret = document.getElementById('inv-secret').value;
         data.port = parseInt(document.getElementById('inv-port').value || (data.protocol === 'telnet' ? 23 : 22));
@@ -4657,7 +4657,7 @@
 
       toast('⌛ Registrando dispositivo...', 'i');
       try {
-        const r = await fetch(`${A}/inventory`, { method: 'POST', headers: h(), body: JSON.stringify(data) });
+        const r = await fetch(`${A}/devices`, { method: 'POST', headers: h(), body: JSON.stringify(data) });
         if (r.ok) {
           toast('✅ Equipo añadido correctamente.', 's');
           // Limpiar forms y recargar

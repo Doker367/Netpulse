@@ -1346,7 +1346,22 @@ body {
   }
 }
 
-/* ── Responsive ── */
+/* ── Sidebar Overlay Backdrop ── */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  z-index: 199;
+  animation: fade .2s
+}
+
+.sidebar-overlay.active {
+  display: block
+}
+
+/* ── Responsive 768px (tablet) ── */
 @media(max-width:768px) {
   .sidebar {
     display: none
@@ -1356,7 +1371,7 @@ body {
     display: flex;
     position: fixed;
     inset: 0;
-    z-index: 100;
+    z-index: 200;
     width: 280px
   }
 
@@ -1365,7 +1380,7 @@ body {
   }
 
   .grid {
-    grid-template-columns: 1fr
+    grid-template-columns: repeat(2, 1fr)
   }
 
   .stats {
@@ -1373,7 +1388,58 @@ body {
   }
 
   .header {
-    padding: 8px 0 12px
+    padding: 0 16px
+  }
+}
+
+/* ── Responsive 640px (large phone) ── */
+@media(max-width:640px) {
+  .grid {
+    grid-template-columns: 1fr
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, 1fr)
+  }
+
+  .sc .sv {
+    font-size: 18px
+  }
+
+  .header {
+    padding: 0 12px;
+    gap: 8px
+  }
+}
+
+/* ── Responsive 480px (phone) ── */
+@media(max-width:480px) {
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px
+  }
+
+  .sc {
+    padding: 10px 12px
+  }
+
+  .sc .sv {
+    font-size: 16px
+  }
+
+  .sc .sl {
+    font-size: 10px
+  }
+}
+
+/* ── Responsive 360px (small phone) ── */
+@media(max-width:360px) {
+  .stats {
+    grid-template-columns: 1fr 1fr
+  }
+
+  .sc .sv {
+    font-size: 14px
   }
 }
 

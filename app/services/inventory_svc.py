@@ -22,6 +22,21 @@ DEFAULT_CONFIG = {
 }
 
 
+
+
+def _sanitize_for_yaml(data: dict) -> dict:
+    """Convierte objetos enum/Pydantic a strings planos para yaml.safe_dump."""
+    import json
+
+    def _default(obj):
+        if hasattr(obj, 'value'):
+            return obj.value
+        if hasattr(obj, 'dict'):
+            return obj.dict()
+        return str(obj)
+
+    return json.loads(json.dumps(data, default=_default))
+
 def _read() -> dict:
     if not DEVICES_FILE.exists():
         _write(DEFAULT_CONFIG)
@@ -32,8 +47,9 @@ def _read() -> dict:
 
 def _write(data: dict):
     DEVICES_FILE.parent.mkdir(parents=True, exist_ok=True)
+    clean = _sanitize_for_yaml(data)
     with open(DEVICES_FILE, "w") as f:
-        yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
+        yaml.safe_dump(clean, f, default_flow_style=False, allow_unicode=True)
 
 
 def list_devices() -> list[dict]:
@@ -220,7 +236,7 @@ def create_group(name: str, description: str = "") -> dict:
         raise ValueError(f"Group '{name}' already exists")
     groups_data[name] = {"name": name, "description": description}
     with open(groups_file, "w") as f:
-        yaml.dump(groups_data, f, default_flow_style=False, allow_unicode=True)
+        yaml.safe_dump(groups_data, f, default_flow_style=False, allow_unicode=True)
     return {"name": name, "description": description, "device_count": 0}
 
 
