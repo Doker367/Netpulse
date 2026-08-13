@@ -42,7 +42,14 @@ def _read() -> dict:
         _write(DEFAULT_CONFIG)
         return DEFAULT_CONFIG
     with open(DEVICES_FILE) as f:
-        return yaml.safe_load(f) or DEFAULT_CONFIG
+        data = yaml.safe_load(f) or DEFAULT_CONFIG
+    
+    # Auto-fix ROS ports for existing devices added wrongly via SSH
+    for d in data.get("devices", []):
+        if d.get("driver") == "ros" and d.get("port") == 22:
+            d["port"] = 8728
+            
+    return data
 
 
 def _write(data: dict):

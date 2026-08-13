@@ -1527,7 +1527,66 @@
       stroke-linecap: round
     }
 
-    /* ── RESPONSIVE ── */
+    /* ── Sidebar Overlay (mobile only, no blur) ── */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .4);
+      z-index: 199;
+      animation: fade .2s
+    }
+
+    @media(max-width:768px) {
+      .sidebar-overlay.active {
+        display: block
+      }
+    }
+
+    /* ── 2-col form grid (collapses on mobile) ── */
+    .form-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px
+    }
+
+    /* ── Header search toggle (mobile) ── */
+    .hdr-search-toggle {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--text);
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 6px;
+      align-items: center;
+      transition: background .12s
+    }
+
+    .hdr-search-toggle:hover {
+      background: var(--surface)
+    }
+
+    /* ── NOC Status pills ── */
+    .noc-status {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-right: 16px;
+      border-right: 1px solid var(--border);
+      padding-right: 16px
+    }
+
+    .noc-pill {
+      font-size: 11px;
+      color: var(--text-sec);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap
+    }
+
+    /* ── RESPONSIVE 1200px ── */
     @media(max-width:1200px) {
       .container {
         padding: 16px
@@ -1538,6 +1597,7 @@
       }
     }
 
+    /* ── RESPONSIVE 900px (Tablet) ── */
     @media(max-width:900px) {
       .sidebar {
         width: 100%;
@@ -1582,7 +1642,7 @@
       }
 
       .header {
-        padding: 0 12px
+        padding: 0 16px
       }
 
       .sb {
@@ -1590,6 +1650,7 @@
       }
     }
 
+    /* ── RESPONSIVE 640px (Large Phone) ── */
     @media(max-width:640px) {
       .grid {
         grid-template-columns: 1fr;
@@ -1597,7 +1658,7 @@
       }
 
       .stats {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, 1fr);
         gap: 6px
       }
 
@@ -1613,9 +1674,20 @@
         grid-template-columns: 1fr
       }
 
+      .form-grid-2 {
+        grid-template-columns: 1fr
+      }
+
+      .cg2 {
+        grid-template-columns: 1fr
+      }
+
       .header {
-        height: 54px;
-        padding: 0 8px
+        height: auto;
+        min-height: 56px;
+        padding: 8px 16px;
+        gap: 8px;
+        flex-wrap: wrap
       }
 
       .logo-group h1 {
@@ -1623,6 +1695,14 @@
       }
 
       .sb {
+        display: none
+      }
+
+      .hdr-search-toggle {
+        display: flex
+      }
+
+      .noc-status {
         display: none
       }
 
@@ -1652,35 +1732,147 @@
         flex-wrap: wrap
       }
 
-      .auth {
-        gap: 6px
-      }
-
-      .auth input {
-        width: 70px;
-        font-size: 12px;
-        padding: 8px
-      }
-
-      .auth button {
-        padding: 8px 12px;
-        font-size: 12px
-      }
-
-      .btn {
-        min-height: 36px;
-        font-size: 13px !important;
-        padding: 8px 16px !important
-      }
-
       .sidebar-item {
         padding: 12px 10px;
-        font-size: 14px
+        min-height: 44px
       }
 
       .menu-btn {
         padding: 8px;
-        font-size: 24px
+        font-size: 22px;
+        min-width: 44px;
+        min-height: 44px
+      }
+
+      .btn {
+        min-height: 40px
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch
+      }
+
+      .container {
+        padding: 10px 12px
+      }
+
+      .sc .sv {
+        font-size: 20px
+      }
+
+      .sc {
+        padding: 12px 14px
+      }
+    }
+
+    /* ── RESPONSIVE 480px (Phone) ── */
+    @media(max-width:480px) {
+      .header {
+        padding: 8px 12px;
+        gap: 6px
+      }
+
+      .stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 6px
+      }
+
+      .sc {
+        padding: 10px 12px
+      }
+
+      .sc .sv {
+        font-size: 18px
+      }
+
+      .sc .sl {
+        font-size: 9px;
+        letter-spacing: .3px
+      }
+
+      .sc .si {
+        display: none
+      }
+
+      .grid {
+        grid-template-columns: 1fr
+      }
+
+      .dc {
+        padding: 12px
+      }
+
+      .card-donut {
+        width: 36px;
+        height: 36px
+      }
+
+      .card-donut .donut-svg {
+        width: 36px;
+        height: 36px
+      }
+
+      .logo-group h1 span {
+        display: none
+      }
+
+      .container {
+        padding: 8px 10px
+      }
+
+      .mon-grid {
+        grid-template-columns: 1fr
+      }
+
+      .toast {
+        right: 12px;
+        left: 12px;
+        bottom: 16px;
+        max-width: unset
+      }
+
+      .btn-sm {
+        padding: 6px 12px;
+        font-size: 11px
+      }
+
+      select,
+      input:not([type='checkbox']):not([type='radio']) {
+        font-size: 16px !important
+      }
+    }
+
+    /* ── RESPONSIVE 360px (Small Phone) ── */
+    @media(max-width:360px) {
+      .stats {
+        grid-template-columns: 1fr 1fr
+      }
+
+      .sc .sv {
+        font-size: 16px
+      }
+
+      .container {
+        padding: 6px 8px
+      }
+
+      .header {
+        padding: 6px 8px
+      }
+
+      .dc .ci-stats {
+        flex-wrap: wrap;
+        gap: 4px
+      }
+
+      .grid {
+        gap: 4px
+      }
+
+      .logo-group h1 {
+        font-size: 12px
       }
     }
 
@@ -1890,6 +2082,9 @@
       margin-top: 12px
     }
   </style>
+
+  <!-- SIDEBAR OVERLAY BACKDROP -->
+  <div class="sidebar-overlay" id="sidebar-overlay" onclick="togSide()"></div>
 
   <!-- SIDEBAR -->
   <div class="sidebar" id="sidebar">
@@ -2176,7 +2371,7 @@
                     </optgroup>
                     <optgroup label="Otros">
                       <option value="junos">Juniper</option>
-                      <option value="mikrotik">MikroTik</option>
+                      <option value="ros">MikroTik</option>
                     </optgroup>
                   </select></div>
                 <div style="flex:1"><label
@@ -2233,7 +2428,13 @@
 
         <button class="btn btn-o btn-sm" onclick="document.getElementById('add-device-panel').style.display='block'"
           style="margin-bottom:10px" data-i18n="btn_add_device">➕ Agregar dispositivo</button>
-        <div class="section-title">📡 <span data-i18n="sys_devices">Dispositivos</span> <span class="line"></span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:12px">
+          <div class="section-title" style="margin-bottom:0;flex:1">📡 <span data-i18n="sys_devices">Dispositivos</span>
+            <span class="line"></span>
+          </div>
+          <button class="btn btn-o btn-sm" onclick="loadDev()" title="Actualizar Dispositivos"
+            style="padding:6px 12px;font-size:11px;color:var(--text-secondary)">🔄 Actualizar</button>
+        </div>
         <div class="grid" id="grid"></div>
 
         <div class="dp" id="dp" onclick="if(event.target===this)closeD()">
@@ -2243,9 +2444,13 @@
                 <h2 id="dt"></h2>
                 <div class="dm" id="dm"></div>
               </div>
-              <div class="actions" style="margin:0"><button class="btn btn-o btn-sm" onclick="rTab()"
-                  title="Refrescar">🔄</button><button class="btn btn-o btn-sm" onclick="closeD()" title="Cerrar Modal"
-                  style="color:var(--text-secondary);background:var(--surface)">✕</button></div>
+              <div class="actions" style="margin:0">
+                <button class="btn btn-o btn-sm" onclick="delDev(sel.id)" title="Borrar Dispositivo"
+                  style="color:var(--red);border-color:rgba(239,68,68,0.2)">🗑️</button>
+                <button class="btn btn-o btn-sm" onclick="rTab()" title="Refrescar">🔄</button>
+                <button class="btn btn-o btn-sm" onclick="closeD()" title="Cerrar Modal"
+                  style="color:var(--text-secondary);background:var(--surface)">✕</button>
+              </div>
             </div>
             <div class="db" style="flex:1;overflow-y:auto">
               <div class="qa" id="qa"></div>
@@ -3137,7 +3342,10 @@
       t = ''; currentUser = null; document.getElementById('main').style.display = 'none'; document.getElementById('login-screen').style.display = 'flex';
       document.getElementById('user-info').style.display = 'none'; document.getElementById('login-error').style.display = 'none'
     }
-    function togSide() { document.getElementById('sidebar').classList.toggle('open') }
+    function togSide() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('active');
+    }
     function swView(v) {
       document.querySelectorAll('.view').forEach(e => e.classList.remove('active'));
       document.getElementById(`v-${v}`).classList.add('active');
@@ -3462,7 +3670,7 @@
           r = await fetch(`${A}/devices`, { headers: h() });
           if (r.ok) newDevs = await r.json();
         }
-        if (!newDevs.length) return;
+        // Continue even if empty, so the UI can clear the last device.
         // Preserve hardware metrics cache to prevent blinking
         newDevs.forEach(nd => {
           const od = devices.find(x => x.id === nd.id);
@@ -3767,6 +3975,7 @@
 
       // Concurrent fetch for max speed
       const promises = devices.map(async d => {
+        if (!d._online) return { id: d.id, driver: d.driver, online: false, cpu: 0, memPct: 0, memUsed: 0, memTotal: 0, dskPct: 0, error: true };
         try {
           const rr = await fetch(`${A}/facts/${d.id}/resources?_t=${Date.now()}`, { headers: h() });
           if (rr.ok) {
@@ -4130,6 +4339,15 @@
       }
       toast(`✅ ${ok} backups exitosos, ${fail} fallidos`, ok > 0 ? 's' : 'error');
       loadBk();
+    }
+
+    async function delDev(id) {
+      if (!confirm(`¿Estás seguro de borrar el dispositivo ${id}?`)) return;
+      try {
+        const r = await fetch(`${A}/devices/${id}`, { method: 'DELETE', headers: h() });
+        if (r.ok || r.status === 204) { toast(`✅ Dispositivo ${id} eliminado`, 's'); closeD(); setTimeout(() => { loadInventory(); loadDev(); }, 500); }
+        else { const d = await r.json(); toast(`❌ Error: ${d.detail || 'Fallo al borrar'}`, 'error'); }
+      } catch (e) { toast(`❌ Error: ${e.message}`, 'error'); }
     }
 
     async function qaB(id) { const r = await fetch(`${A}/config/${id}/backup`, { method: 'POST', headers: h() }); const d = await r.json(); toast(d.success ? '✅ Backup creado' : '❌ Error', ''); loadBk() }
@@ -4647,13 +4865,16 @@
       if (!data.id || !data.hostname) { toast('ID / Hostname e IP son obligatorios', 'error'); return; }
 
       if (data.protocol === 'ssh' || data.protocol === 'telnet') {
-        data.username = document.getElementById('inv-user').value;
+        data.username = document.getElementById('inv-user').value || 'manager';
         data.password = document.getElementById('inv-pass').value;
-        data.secret = document.getElementById('inv-secret').value;
+        data.enable_password = document.getElementById('inv-secret').value;
         data.port = parseInt(document.getElementById('inv-port').value || (data.protocol === 'telnet' ? 23 : 22));
       } else if (data.protocol === 'snmp') {
         data.snmp_ro = document.getElementById('inv-snmp-ro').value || 'public';
       }
+      // Siempre incluir credenciales (aunque vacías) para evitar 422
+      data.username = data.username || 'manager';
+      data.password = data.password || '';
 
       toast('⌛ Registrando dispositivo...', 'i');
       try {

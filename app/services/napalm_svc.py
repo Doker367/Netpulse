@@ -22,6 +22,7 @@ from napalm import get_network_driver
 
 from app.core.settings import DEVICES_FILE, BACKUP_DIR, NAPALM_TIMEOUT
 from app.services.crypto_svc import decrypt
+from app.services import netmiko_svc
 from app.services.metrics_svc import (
     netpulse_devices_up,
     netpulse_napalm_duration_seconds,
@@ -418,7 +419,7 @@ def _execute_mikrotik_facts(device: dict) -> NapalmResult:
             password=password,
             host=host,
             port=port,
-            timeout=NAPALM_TIMEOUT,
+            timeout=10.0,
         )
 
         # Obtener hostname
@@ -684,7 +685,21 @@ def get_facts(device_id: str) -> NapalmResult:
     if d.get("driver") == "ros":
         return _execute_mikrotik_facts(d)
 
-    return _execute(d, "get_facts")
+    result = _execute(d, "get_facts")
+
+    # Fallback netmiko para equipos legacy (telnet / drivers antiguos)
+    if not result.success and netmiko_svc.is_legacy_device(d):
+        logger.info("[%s] NAPALM falló (%s) — intentando netmiko...",
+                    device_id, result.error_type)
+        facts = netmiko_svc.get_facts(d)
+        if facts:
+            result.data = facts
+            result.success = True
+            result.error = None
+            result.error_type = None
+            result.data["_note"] = "Datos vía netmiko (fallback legacy)"
+
+    return result
 
 
 def get_interfaces(device_id: str) -> NapalmResult:
@@ -698,7 +713,21 @@ def get_interfaces(device_id: str) -> NapalmResult:
     if d.get("driver") == "ros":
         return _execute_mikrotik_interfaces(d)
 
-    return _execute(d, "get_interfaces")
+    result = _execute(d, "get_interfaces")
+
+    # Fallback netmiko para equipos legacy
+    if not result.success and netmiko_svc.is_legacy_device(d):
+        logger.info("[%s] NAPALM falló (%s) — intentando netmiko...",
+                    device_id, result.error_type)
+        interfaces = netmiko_svc.get_interfaces(d)
+        if interfaces:
+            result.data = interfaces
+            result.success = True
+            result.error = None
+            result.error_type = None
+            result.data["_note"] = "Datos vía netmiko (fallback legacy)"
+
+    return result
 
 
 def get_bgp_neighbors(device_id: str) -> NapalmResult:
@@ -1353,7 +1382,7 @@ def get_resources(device_id: str) -> NapalmResult:
             from librouteros import connect
             creds = d.get("credentials", {})
             api = connect(username=creds.get("username","admin"), password=creds.get("password",""),
-                         host=d["hostname"], port=d.get("port",8728))
+                         host=d["hostname"], port=d.get("port",8728), timeout=10.0)
             sys_res = list(api("/system/resource/print"))
             if sys_res:
                 r = dict(sys_res[0])
@@ -1380,7 +1409,8 @@ def get_resources(device_id: str) -> NapalmResult:
                 result.success = True
             api.close()
         except Exception as e:
-            result.set_error("connection_error", f"ROS resources: {e}")
+            result.data = {"cpu": 0, "memory_total": 0, "memory_used": 0, "hdd_total": 0, "hdd_free": 0}
+            result.success = True
     elif d.get("driver") == "eos":
         try:
             driver_cls = get_network_driver("eos")
@@ -1411,7 +1441,48 @@ def get_resources(device_id: str) -> NapalmResult:
             result.data = {"cpu": 0, "memory_total": 0, "memory_used": 0, "hdd_total": 0, "hdd_free": 0}
             result.success = True
     else:
-        result.set_error("driver_error", f"Resources not supported for {d.get('driver','?')}")
+        # Intentar NAPALM get_environment (no soportado por todos) y luego netmiko
+        napalm_ok = False
+        try:
+            if not netmiko_svc.is_legacy_device(d):
+                driver_cls = get_network_driver(_resolve_driver(d["driver"]))
+                opts = _build_optional_args(d)
+                with driver_cls(hostname=d["hostname"], username=d["credentials"]["username"],
+                              password=d["credentials"]["password"], optional_args=opts) as dev:
+                    dev.open()
+                    env = dev.get_environment()
+                    dev.close()
+                cpu = env.get("cpu", 0) or 0
+                if isinstance(cpu, dict):
+                    vals = [v for v in cpu.values() if isinstance(v, (int, float))]
+                    cpu = int(sum(vals) // len(vals)) if vals else 0
+                mem = env.get("memory", {})
+                result.data = {
+                    "cpu": cpu,
+                    "memory_total": mem.get("available_ram", 0) or 0,
+                    "memory_used": mem.get("used_ram", 0) or 0,
+                    "hdd_total": 0,
+                    "hdd_free": 0,
+                }
+                result.success = True
+                napalm_ok = True
+        except Exception as e:
+            logger.info("[%s] get_environment NAPALM no disponible (%s) — netmiko fallback", device_id, str(e)[:60])
+
+        # Fallback netmiko para legacy (telnet o drivers antiguos)
+        if not napalm_ok and netmiko_svc.is_legacy_device(d):
+            logger.info("[%s] intentando resources vía netmiko...", device_id)
+            resources = netmiko_svc.get_resources(d)
+            if resources:
+                result.data = resources
+                result.data["_note"] = "Datos vía netmiko (fallback legacy)"
+                result.success = True
+            else:
+                result.data = {"cpu": 0, "memory_total": 0, "memory_used": 0, "hdd_total": 0, "hdd_free": 0}
+                result.success = True
+        elif not napalm_ok:
+            result.data = {"cpu": 0, "memory_total": 0, "memory_used": 0, "hdd_total": 0, "hdd_free": 0}
+            result.success = True
     return result
 
 

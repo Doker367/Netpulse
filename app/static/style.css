@@ -1346,19 +1346,20 @@ body {
   }
 }
 
-/* ── Sidebar Overlay Backdrop ── */
+/* ── Sidebar Overlay Backdrop (mobile only, no blur) ── */
 .sidebar-overlay {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(2px);
+  background: rgba(0, 0, 0, 0.4);
   z-index: 199;
   animation: fade .2s
 }
 
-.sidebar-overlay.active {
-  display: block
+@media(max-width:768px) {
+  .sidebar-overlay.active {
+    display: block
+  }
 }
 
 /* ── Responsive 768px (tablet) ── */

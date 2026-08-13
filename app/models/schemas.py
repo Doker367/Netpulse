@@ -60,8 +60,8 @@ class DeviceBase(BaseModel):
         examples=["ios", "eos", "ros"],
     )
     username: str = Field(
-        ...,
-        description="Nombre de usuario para autenticación SSH/API",
+        default="",
+        description="Nombre de usuario para autenticación SSH/API (vacío si el equipo solo pide password, ej. HP ProCurve)",
         examples=["admin"],
     )
     type: DeviceType = Field(
@@ -94,7 +94,7 @@ class DeviceBase(BaseModel):
 class DeviceCreate(DeviceBase):
     """Datos necesarios para crear un dispositivo (incluye contraseña)."""
     password: str = Field(
-        ...,
+        default="",
         description="Contraseña para autenticación SSH/API (se cifra antes de almacenar)",
         examples=["Micr0s0ft2024!"],
     )

@@ -42,7 +42,7 @@ async def device_health(
     # Run all TCP checks concurrently
     results = {}
     tasks = {
-        d["id"]: _tcp_check(d["hostname"], d["port"], timeout=2.0)
+        d["id"]: _tcp_check(d["hostname"], d["port"], timeout=4.0)
         for d in devices
     }
 
@@ -52,7 +52,7 @@ async def device_health(
     return results
 
 
-async def _tcp_check(host: str, port: int, timeout: float = 2.0) -> bool:
+async def _tcp_check(host: str, port: int, timeout: float = 4.0) -> bool:
     """Fast TCP-connect probe. Returns True if port is reachable."""
     try:
         _, writer = await asyncio.wait_for(

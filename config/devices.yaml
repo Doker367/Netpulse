@@ -17,32 +17,43 @@ devices:
     password: ***REMOVED***
     username: admin
   description: ''
-  driver: procurve
-  group: Access
-  hostname: 10.0.0.50
-  id: hp-procurve-01
-  port: 22
-  tags: []
-  type: switch
-- credentials:
-    password: ***REMOVED***
-    username: admin
-  description: ''
-  driver: ios
-  group: Core
-  hostname: 10.0.0.1
-  id: cisco-core-01
-  port: 22
-  tags: []
-  type: router
-- credentials:
-    password: ***REMOVED***
-    username: admin
-  description: ''
   driver: ros
   group: Edge
   hostname: 10.0.0.20
   id: mikrotik-edge-02
   port: 8728
+  tags: []
+  type: router
+- credentials:
+    password: ***REMOVED***
+    username: doker
+  description: MikroTik físico - API 8728
+  driver: ros
+  group: Edge
+  hostname: 192.168.88.1
+  id: mikrotik-prueba
+  port: 8728
+  tags: []
+  type: router
+- credentials:
+    password: ***REMOVED***
+    username: manager
+  description: HP ProCurve 3400cl-24G real
+  driver: procurve
+  group: Access
+  hostname: 192.168.88.10
+  id: hp-procurve-sw
+  port: 23
+  tags: []
+  type: switch
+- credentials:
+    password: ***REMOVED***
+    username: wili
+  description: ''
+  driver: ios
+  group: null
+  hostname: 192.168.88.1
+  id: mikrotik-prueba2
+  port: 22
   tags: []
   type: router
