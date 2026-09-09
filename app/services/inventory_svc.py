@@ -129,6 +129,9 @@ def list_devices() -> list[dict]:
             "driver": d["driver"],
             "protocol": d.get("protocol", _infer_protocol(d)),
             "netmiko_device_type": d.get("netmiko_device_type"),
+            "cli_transport": d.get("cli_transport"),
+            "cli_port": d.get("cli_port"),
+            "noauth_telnet": bool(d.get("noauth_telnet", False)),
             "community": (d.get("credentials", {}) or {}).get("community") or d.get("community"),
             "type": d.get("type", "router"),
             "group": d.get("group"),
@@ -190,6 +193,18 @@ def add_device(device: dict) -> dict:
     if hasattr(netmiko_dt, "value"):
         netmiko_dt = netmiko_dt.value
 
+    cli_transport = device.get("cli_transport")
+    if hasattr(cli_transport, "value"):
+        cli_transport = cli_transport.value
+    cli_transport = (cli_transport or "").lower() or None
+    if cli_transport not in ("ssh", "telnet"):
+        cli_transport = None
+    cli_port = device.get("cli_port")
+    if cli_transport and not cli_port:
+        cli_port = 23 if cli_transport == "telnet" else 22
+
+    noauth_telnet = bool(device.get("noauth_telnet", False))
+
     enable_raw = device.get("enable_password")
     if hasattr(enable_raw, "value"):
         enable_raw = enable_raw.value
@@ -205,6 +220,9 @@ def add_device(device: dict) -> dict:
         "tags": device.get("tags", []),
         "description": device.get("description", ""),
         "netmiko_device_type": netmiko_dt or None,
+        "cli_transport": cli_transport,
+        "cli_port": cli_port,
+        "noauth_telnet": noauth_telnet,
         "credentials": {
             "username": device.get("username", ""),
             "password": encrypt(device.get("password", "")),
@@ -228,9 +246,11 @@ def update_device(device_id: str, updates: dict) -> Optional[dict]:
     data = copy.deepcopy(_read())
     for i, d in enumerate(data.get("devices", [])):
         if d["id"] == device_id:
-            for key in ["hostname", "port", "driver", "protocol", "type", "tags", "description", "group", "netmiko_device_type"]:
+            for key in ["hostname", "port", "driver", "protocol", "type", "tags", "description", "group", "netmiko_device_type", "cli_transport", "cli_port", "noauth_telnet"]:
                 if key in updates and updates[key] is not None:
                     if key == "netmiko_device_type" and hasattr(updates[key], "value"):
+                        updates[key] = updates[key].value
+                    if key == "cli_transport" and hasattr(updates[key], "value"):
                         updates[key] = updates[key].value
                     d[key] = updates[key]
             if "enable_password" in updates and updates["enable_password"] is not None:

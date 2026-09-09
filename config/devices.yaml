@@ -35,26 +35,18 @@ devices:
   port: 8728
   tags: []
   type: router
-- credentials:
-    password: ***REMOVED***
-    username: manager
-  description: HP ProCurve 3400cl-24G real
-  driver: procurve
-  group: Access
-  hostname: 192.168.88.10
-  id: hp-procurve-sw
-  port: 23
-  tags: []
-  type: switch
-- credentials:
+- cli_port: 23
+  cli_transport: telnet
+  credentials:
     community: ***REMOVED***
     password: ''
-    username: snmp
-  description: 'HP ProCurve 3400cl-24G (SNMP)'
+    username: manager
+  description: HP ProCurve 3400cl-24G — SNMP (telemetría) + Telnet (CLI legacy)
   driver: procurve
   group: null
   hostname: 192.168.1.10
   id: prueba hp pro curve
+  noauth_telnet: true
   port: 161
   protocol: snmp
   tags: []

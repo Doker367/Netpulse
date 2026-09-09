@@ -194,6 +194,23 @@ def _netmiko_direct(device: dict) -> bool:
     return str(device.get("driver", "")).lower() in netmiko_svc.NETMIKO_DIRECT_DRIVERS
 
 
+def _dual_cli(device: dict) -> bool:
+    """True si el dispositivo es dual: telemetría SNMP + canal CLI netmiko.
+
+    Un equipo con ``protocol='snmp'`` puede declarar además acceso CLI
+    (``cli_transport`` en ssh/telnet) para operaciones de red: interfaces,
+    config y comandos viajan por netmiko, mientras la telemetría (CPU/RAM,
+    estado online) sigue usando SNMP.
+    """
+    if not device:
+        return False
+    proto = str(device.get("protocol") or "").lower()
+    driver = str(device.get("driver") or "").lower()
+    if proto != "snmp" and driver != "snmp":
+        return False
+    return bool((device.get("cli_transport") or "").lower() in ("ssh", "telnet"))
+
+
 def _build_optional_args(device: dict) -> dict:
     """Construye optional_args para NAPALM según el driver."""
     args = {}
@@ -916,8 +933,15 @@ def get_interfaces(device_id: str) -> NapalmResult:
         r.set_error("driver_error", f"Device {device_id} not found")
         return r
 
-    # Dispositivos SNMP
+    # Dispositivos SNMP (modo dual → CLI primero, telemetría SNMP)
     if d.get("protocol") == "snmp" or d.get("driver") == "snmp":
+        if _dual_cli(d):
+            cli_result = _netmiko_interfaces(d)
+            if cli_result.success:
+                logger.info("[%s] get_interfaces → OK via CLI dual (netmiko telnet)", device_id)
+                return cli_result
+            logger.info("[%s] CLI dual falló (%s) — usando interfaces SNMP",
+                        device_id, cli_result.error)
         return _execute_snmp_interfaces(d)
 
     # MikroTik RouterOS 7.22 workaround
@@ -1050,8 +1074,20 @@ def get_config(device_id: str, retrieve: str = "running") -> NapalmResult:
             r.data = f"⚠️ No se pudo obtener config: {e}"
             r.success = True
             return r
-    # SNMP devices: raw CLI running-config is not available over SNMP
+    # SNMP devices: raw CLI running-config is not available over SNMP.
+    # En modo dual (SNMP + cli_transport) se obtiene por telnet/ssh.
     if d.get("protocol") == "snmp" or d.get("driver") == "snmp":
+        if _dual_cli(d):
+            cfg_text = netmiko_svc.get_running_config(d)
+            if cfg_text:
+                r = NapalmResult(device_id)
+                r.data = {"running": cfg_text}
+                r.success = True
+                logger.info("[%s] get_config → OK via CLI dual (netmiko, %d bytes)",
+                            device_id, len(cfg_text))
+                return r
+            logger.info("[%s] CLI dual running-config no disponible, usando nota SNMP",
+                        device_id)
         r = NapalmResult(device_id)
         r.data = (
             f"! NetPulse Telemetría — Dispositivo gestionado por SNMP v2c ({d['hostname']})\n"
@@ -1105,6 +1141,22 @@ def backup_config(device_id: str) -> NapalmResult:
         result.success = True
         result.data = {"file": str(fname), "size": fname.stat().st_size, "timestamp": ts, "success": True}
         return result
+
+    # SNMP (modo dual con CLI): backup preferido = running-config real vía telnet/ssh
+    if (d.get("protocol") == "snmp" or d.get("driver") == "snmp") and _dual_cli(d):
+        cfg_text = netmiko_svc.get_running_config(d)
+        if cfg_text:
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            fname = BACKUP_DIR / f"{safe_id}_{ts}.cfg"
+            fname.write_text(cfg_text)
+            result = NapalmResult(device_id)
+            result.success = True
+            result.data = {"file": str(fname), "size": fname.stat().st_size, "timestamp": ts, "success": True}
+            logger.info("[%s] backup → OK via CLI dual (running-config, %d bytes)",
+                        device_id, len(cfg_text))
+            return result
+        logger.info("[%s] CLI dual no disponible para backup, usando snapshot SNMP",
+                    device_id)
 
     # SNMP: backup snapshot of facts + interfaces + resources
     if d.get("protocol") == "snmp" or d.get("driver") == "snmp":
@@ -1653,8 +1705,10 @@ def run_commands(device_id: str, commands: list[str]) -> NapalmResult:
     if d.get("driver") == "ros":
         return _execute_ros_commands(device_id, commands, d)
 
-    # SNMP devices: no CLI execution
+    # SNMP devices: ejecución CLI solo en modo dual (cli_transport) vía netmiko
     if d.get("protocol") == "snmp" or d.get("driver") == "snmp":
+        if _dual_cli(d):
+            return _execute_netmiko_commands(device_id, commands, d)
         r = NapalmResult(device_id)
         r.data = [
             {

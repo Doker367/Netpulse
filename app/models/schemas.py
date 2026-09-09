@@ -109,6 +109,21 @@ class DeviceBase(BaseModel):
         description="Override del device_type netmiko (ej. 'cisco_s300', 'hp_comware_telnet', 'alcatel_aos'). Si se define, NetPulse usa netmiko para este equipo.",
         examples=["cisco_s300", "alcatel_aos"],
     )
+    cli_transport: Optional[str] = Field(
+        default=None,
+        description="Canal CLI del dispositivo para modo dual con SNMP ('ssh', 'telnet'). Si el protocolo es 'snmp' y defines cli_transport, la telemetría (CPU/RAM) va por SNMP y la CLI (interfaces/config/comandos) por telnet/ssh.",
+        examples=["telnet", "ssh"],
+    )
+    cli_port: Optional[int] = Field(
+        default=None,
+        description="Puerto del canal CLI cuando se usa cli_transport (default: 23 telnet, 22 ssh)",
+        examples=[23, 22],
+    )
+    noauth_telnet: Optional[bool] = Field(
+        default=None,
+        description="Para telnet legacy tipo ProCurve/Aruba que NO piden login (banner → 'Press any key' → shell directo). Usa el motor ligero en vez de netmiko.",
+        examples=[True],
+    )
     snmp_ro: Optional[str] = Field(
         default=None,
         description="Comunidad SNMP v2c (ej. 'public')",
@@ -153,6 +168,9 @@ class DeviceResponse(BaseModel):
     driver: DeviceDriver = Field(..., description="Driver NAPALM", examples=["ios"])
     protocol: Optional[str] = Field(default="ssh", description="Protocolo (ssh/telnet/snmp)")
     netmiko_device_type: Optional[str] = Field(default=None, description="Override device_type netmiko")
+    cli_transport: Optional[str] = Field(default=None, description="Canal CLI dual (telnet/ssh) si protocolo es snmp")
+    cli_port: Optional[int] = Field(default=None, description="Puerto del canal CLI dual")
+    noauth_telnet: Optional[bool] = Field(default=None, description="Telnet sin login (ProCurve/legacy)")
     community: Optional[str] = Field(default=None, description="Comunidad SNMP si aplica")
     type: DeviceType = Field(default=DeviceType.ROUTER, description="Tipo de dispositivo", examples=["router"])
     group: Optional[str] = Field(default=None, description="Grupo del dispositivo", examples=["Core"])
@@ -167,6 +185,9 @@ class DeviceUpdate(BaseModel):
     driver: Optional[DeviceDriver] = Field(None, description="Nuevo driver NAPALM", examples=["eos"])
     protocol: Optional[str] = Field(None, description="Nuevo protocolo (ssh/telnet/snmp)")
     netmiko_device_type: Optional[str] = Field(None, description="Nuevo override device_type netmiko")
+    cli_transport: Optional[str] = Field(None, description="Nuevo canal CLI dual (telnet/ssh)")
+    cli_port: Optional[int] = Field(None, description="Nuevo puerto del canal CLI dual")
+    noauth_telnet: Optional[bool] = Field(None, description="Telnet sin login (ProCurve/legacy)")
     enable_password: Optional[str] = Field(None, description="Nuevo enable secret (se cifra al almacenar)")
     community: Optional[str] = Field(None, description="Nueva comunidad SNMP")
     snmp_ro: Optional[str] = Field(None, description="Nueva comunidad SNMP")
