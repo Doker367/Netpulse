@@ -226,12 +226,13 @@ def ping_target(device_id: str, target: str = "8.8.8.8"):
             )
     
     # Si todo falló, devolver error graceful
-    logger.warning("[%s] Ping no disponible: %s", device_id, result.error)
-    return PingResult(
-        device_id=device_id, target=target, success=False,
-        probes_sent=0, probes_received=0,
-        rtt_min=0.0, rtt_avg=0.0, rtt_max=0.0,
-    )
+    if not result.success:
+        logger.warning("[%s] Ping no disponible: %s", device_id, result.error)
+        return PingResult(
+            device_id=device_id, target=target, success=False,
+            probes_sent=0, probes_received=0,
+            rtt_min=0.0, rtt_avg=0.0, rtt_max=0.0,
+        )
 
     p = result.data or {}
     # NAPALM ping() returns {'success': {...}} — unwrap first

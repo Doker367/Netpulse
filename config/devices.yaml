@@ -46,3 +46,16 @@ devices:
   port: 23
   tags: []
   type: switch
+- credentials:
+    community: ***REMOVED***
+    password: ''
+    username: snmp
+  description: 'HP ProCurve 3400cl-24G (SNMP)'
+  driver: procurve
+  group: null
+  hostname: 192.168.1.10
+  id: prueba hp pro curve
+  port: 161
+  protocol: snmp
+  tags: []
+  type: switch

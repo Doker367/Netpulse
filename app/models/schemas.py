@@ -33,6 +33,14 @@ class DeviceDriver(str, Enum):
     PROCURVE = "procurve"  # HP ProCurve (usa CLI Cisco-like con driver ios)
     COMWARE = "comware"    # HP/H3C Comware (usa CLI Cisco-like con driver ios)
     HPE = "hpe"            # HP Enterprise (fallback a ios)
+    # Soporte para monitoreo SNMP y opciones de UI
+    SNMP = "snmp"
+    GENERIC = "generic"
+    MIKROTIK = "mikrotik"
+    HP_PROCURVE = "hp_procurve"
+    HP_COMWARE = "hp_comware"
+    HUAWEI = "huawei"
+    ALCATEL_AOS = "alcatel_aos"
 
 
 class DeviceBase(BaseModel):
@@ -89,6 +97,21 @@ class DeviceBase(BaseModel):
         description="Enable secret para Cisco/HP (si el dispositivo requiere enable mode)",
         examples=["enable123!"],
     )
+    protocol: Optional[str] = Field(
+        default="ssh",
+        description="Protocolo de comunicación ('ssh', 'telnet', 'snmp')",
+        examples=["ssh", "snmp"],
+    )
+    snmp_ro: Optional[str] = Field(
+        default=None,
+        description="Comunidad SNMP v2c (ej. 'public')",
+        examples=["public"],
+    )
+    community: Optional[str] = Field(
+        default=None,
+        description="Comunidad SNMP v2c",
+        examples=["public"],
+    )
 
 
 class DeviceCreate(DeviceBase):
@@ -109,6 +132,7 @@ class DeviceResponse(BaseModel):
                 "hostname": "192.168.1.1",
                 "port": 22,
                 "driver": "ios",
+                "protocol": "ssh",
                 "type": "router",
                 "group": "Core",
                 "tags": ["produccion", "core"],
@@ -120,6 +144,8 @@ class DeviceResponse(BaseModel):
     hostname: str = Field(..., description="IP o FQDN", examples=["192.168.1.1"])
     port: int = Field(default=22, description="Puerto de conexión", examples=[22])
     driver: DeviceDriver = Field(..., description="Driver NAPALM", examples=["ios"])
+    protocol: Optional[str] = Field(default="ssh", description="Protocolo (ssh/telnet/snmp)")
+    community: Optional[str] = Field(default=None, description="Comunidad SNMP si aplica")
     type: DeviceType = Field(default=DeviceType.ROUTER, description="Tipo de dispositivo", examples=["router"])
     group: Optional[str] = Field(default=None, description="Grupo del dispositivo", examples=["Core"])
     tags: list[str] = Field(default_factory=list, description="Etiquetas", examples=[["produccion"]])
@@ -131,6 +157,9 @@ class DeviceUpdate(BaseModel):
     hostname: Optional[str] = Field(None, description="Nueva IP o FQDN", examples=["10.0.0.1"])
     port: Optional[int] = Field(None, description="Nuevo puerto", examples=[2222])
     driver: Optional[DeviceDriver] = Field(None, description="Nuevo driver NAPALM", examples=["eos"])
+    protocol: Optional[str] = Field(None, description="Nuevo protocolo (ssh/telnet/snmp)")
+    community: Optional[str] = Field(None, description="Nueva comunidad SNMP")
+    snmp_ro: Optional[str] = Field(None, description="Nueva comunidad SNMP")
     username: Optional[str] = Field(None, description="Nuevo usuario", examples=["netadmin"])
     password: Optional[str] = Field(None, description="Nueva contraseña", examples=["NewPass123!"])
     type: Optional[DeviceType] = Field(None, description="Nuevo tipo", examples=["switch"])

@@ -34,38 +34,78 @@ async def device_health(
     """
     devices = inventory_svc.list_devices()
 
-    if device_id:
+    if device_id and isinstance(device_id, str):
         devices = [d for d in devices if d["id"] == device_id]
         if not devices:
             raise HTTPException(404, f"Dispositivo '{device_id}' no encontrado")
 
-    # Run all TCP checks concurrently
-    results = {}
-    tasks = {
-        d["id"]: _tcp_check(d["hostname"], d["port"], timeout=4.0)
-        for d in devices
+    # Run checks concurrently in parallel
+    dev_ids = [d["id"] for d in devices]
+    probe_results = await asyncio.gather(
+        *(_probe_device(d, timeout=2.5) for d in devices),
+        return_exceptions=True,
+    )
+    return {
+        dev_id: (res is True)
+        for dev_id, res in zip(dev_ids, probe_results)
     }
 
-    for dev_id, coro in tasks.items():
-        results[dev_id] = await coro
 
-    return results
+async def _probe_device(dev: dict, timeout: float = 2.5) -> bool:
+    """Sondea la conectividad del dispositivo según su protocolo."""
+    import sys
+    host = dev.get("hostname", "")
+    port = int(dev.get("port", 22))
+    protocol = (dev.get("protocol") or "").lower()
+    driver = (dev.get("driver") or "").lower()
 
-
-async def _tcp_check(host: str, port: int, timeout: float = 4.0) -> bool:
-    """Fast TCP-connect probe. Returns True if port is reachable."""
-    for _ in range(2):
+    if protocol == "snmp" or driver == "snmp" or port == 161:
+        # 1. ICMP Ping probe
+        ping_args = ["ping", "-c", "1", "-t", "2", host] if sys.platform == "darwin" else ["ping", "-c", "1", "-W", "2", host]
         try:
-            _, writer = await asyncio.wait_for(
-                asyncio.open_connection(host, port),
-                timeout=timeout,
+            proc = await asyncio.create_subprocess_exec(
+                *ping_args,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
             )
-            writer.close()
-            await writer.wait_closed()
-            return True
-        except (asyncio.TimeoutError, OSError, ConnectionRefusedError):
+            code = await asyncio.wait_for(proc.wait(), timeout=timeout)
+            if code == 0:
+                return True
+        except Exception:
             pass
-    return False
+
+        # 2. SNMP sysUpTime query
+        try:
+            from app.services.collectors import snmp_svc
+            creds = dev.get("credentials") or {}
+            community = dev.get("community") or creds.get("community") or dev.get("snmp_ro") or "public"
+            loop = asyncio.get_running_loop()
+            metrics = await loop.run_in_executor(
+                None,
+                lambda: snmp_svc.poll_device_snmp(host, community=community, timeout=2, driver=driver)
+            )
+            if metrics:
+                return True
+        except Exception:
+            pass
+
+        return False
+
+    return await _tcp_check(host, port, timeout=timeout)
+
+
+async def _tcp_check(host: str, port: int, timeout: float = 2.0) -> bool:
+    """Fast TCP-connect probe. Returns True if port is reachable."""
+    try:
+        _, writer = await asyncio.wait_for(
+            asyncio.open_connection(host, port),
+            timeout=timeout,
+        )
+        writer.close()
+        await writer.wait_closed()
+        return True
+    except (asyncio.TimeoutError, OSError, ConnectionRefusedError):
+        return False
 
 
 # ── CRUD Endpoints ───────────────────────────────────────────

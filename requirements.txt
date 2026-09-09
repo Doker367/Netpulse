@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+slowapi
+napalm
+prometheus-client
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt<4.1.0
+httpx
+pyotp
+librouteros
+nornir
+python-docx
+reportlab
