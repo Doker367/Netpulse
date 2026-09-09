@@ -2369,6 +2369,9 @@
                     <optgroup label="Alcatel">
                       <option value="alcatel_aos">Alcatel AOS</option>
                     </optgroup>
+                    <optgroup label="SNMP Standalone">
+                      <option value="snmp">SNMP Genérico (RFC1213 / MIB-II)</option>
+                    </optgroup>
                     <optgroup label="Otros">
                       <option value="junos">Juniper</option>
                       <option value="ros">MikroTik</option>
@@ -2376,7 +2379,7 @@
                   </select></div>
                 <div style="flex:1"><label
                     style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Protocolo
-                    Dev</label><select id="inv-protocol" onchange="toggleInvAuth()"
+                    Dev</label><select id="inv-protocol" onchange="toggleInvAuth(this)"
                     style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
                     <option value="ssh">SSH (Rec.)</option>
                     <option value="telnet">Telnet</option>
@@ -2419,7 +2422,7 @@
                 <input id="inv-snmp-ro" type="text" placeholder="public"
                   style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
               </div>
-              <button class="btn btn-p" onclick="addInventoryDevice()"
+              <button class="btn btn-p" onclick="addInventoryDevice(this)"
                 style="margin-top:auto;padding:10px;font-weight:600;width:100%" data-i18n="btn_register">➕ Interconectar
                 Dispositivo</button>
             </div>
@@ -2850,9 +2853,12 @@
                   <optgroup label="Alcatel">
                     <option value="alcatel_aos">Alcatel AOS</option>
                   </optgroup>
+                  <optgroup label="SNMP Standalone">
+                    <option value="snmp">SNMP Genérico (RFC1213 / MIB-II)</option>
+                  </optgroup>
                   <optgroup label="Otros">
                     <option value="junos">Juniper JUNOS</option>
-                    <option value="mikrotik">MikroTik RouterOS</option>
+                    <option value="ros">MikroTik RouterOS</option>
                   </optgroup>
                 </select>
               </div>
@@ -2861,7 +2867,7 @@
                 <label
                   style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Protocolo
                   Primario</label>
-                <select id="inv-protocol" onchange="toggleInvAuth()"
+                <select id="inv-protocol" onchange="toggleInvAuth(this)"
                   style="width:100%;background:var(--bg);border:1px solid var(--border);padding:8px 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px;box-sizing:border-box">
                   <option value="ssh">SSH (Recomendado)</option>
                   <option value="telnet">Telnet (Legacy)</option>
@@ -2904,7 +2910,7 @@
                 <div style="font-size:10px;color:var(--orange)">Nota: Para SNMPv3, use la API v3/provision.</div>
               </div>
 
-              <button class="btn btn-p" onclick="addInventoryDevice()"
+              <button class="btn btn-p" onclick="addInventoryDevice(this)"
                 style="margin-top:10px;padding:10px;font-weight:600;width:100%">➕ Agregar / Actualizar Equipo</button>
             </div>
           </div>
@@ -3664,7 +3670,7 @@
         let r = await fetch(`${A}/devices`, { headers: h() });
         if (r.ok) {
           const inv = await r.json();
-          if (Array.isArray(inv)) newDevs = inv.map(i => ({ id: i.id, hostname: i.host || i.ip || i.hostname, driver: i.driver || 'ios', port: i.port || 22, type: i.protocol || 'ssh' }));
+          if (Array.isArray(inv)) newDevs = inv.map(i => ({ id: i.id, hostname: i.host || i.ip || i.hostname, driver: i.driver || 'ios', port: i.port || 22, type: i.type || i.protocol || 'device', protocol: i.protocol || 'ssh', tags: i.tags || [] }));
         }
         if (!newDevs.length) {
           r = await fetch(`${A}/devices`, { headers: h() });
@@ -3842,20 +3848,26 @@
 
       document.getElementById('dc').innerHTML = `<div class="sp" style="margin:20px auto"></div><div style="text-align:center;font-size:11px;color:var(--text-ter)" data-i18n="m_loading">${__t('m_loading')}</div>`;
 
+      const encId = encodeURIComponent(id);
       // Load all data in parallel
-      const [rF, rI, rC] = sel._online ? await Promise.all([
-        fetch(`${A}/facts/${id}`, { headers: h() }).catch(() => null),
-        fetch(`${A}/facts/${id}/interfaces`, { headers: h() }).catch(() => null),
-        fetch(`${A}/config/${id}/raw`, { headers: h() }).catch(() => null),
+      const [rF, rI, rC] = (sel._online !== false) ? await Promise.all([
+        fetch(`${A}/facts/${encId}`, { headers: h() }).catch(() => null),
+        fetch(`${A}/facts/${encId}/interfaces`, { headers: h() }).catch(() => null),
+        fetch(`${A}/config/${encId}/raw`, { headers: h() }).catch(() => null),
       ]) : [null, null, null];
       const facts = rF?.ok ? await rF.json() : null;
       const ifaces = rI?.ok ? await rI.json() : null;
       const config = rC?.ok ? await rC.text() : '⚠️ No disponible';
 
+      if (facts && !sel._online) {
+        sel._online = true;
+        renderD();
+      }
+
       let cpu = 0, memPct = 0, hddPct = 0, memStr = '—';
       try {
-        if (!sel._online) throw new Error('Device Offline');
-        const rr = await fetch(`${A}/facts/${id}/resources`, { headers: h() });
+        if (sel._online === false && !facts) throw new Error('Device Offline');
+        const rr = await fetch(`${A}/facts/${encId}/resources`, { headers: h() });
         if (rr.ok) {
           const rd = await rr.json(); cpu = rd.cpu || 0;
           if (rd.memory_total) {
@@ -3933,7 +3945,7 @@
         }
         let c = 0, mp = 0, hp = 0, ms = '—';
         try {
-          const rr = await fetch(`${A}/facts/${id}/resources?_t=${Date.now()}`, { headers: h() });
+          const rr = await fetch(`${A}/facts/${encId}/resources?_t=${Date.now()}`, { headers: h() });
           if (rr.ok) {
             const rd = await rr.json(); c = Math.round(rd.cpu || 0);
             if (rd.memory_total) {
@@ -3958,7 +3970,7 @@
       cmdH.push(i.value); let o = ''; t.innerHTML = '<div class="sp"></div>';
       for (const q of c) {
         o += `<span class="p">${id}$ </span>${esc(q)}\n`;
-        const r = await fetch(`${A}/command/${id}`, { method: 'POST', headers: h(), body: JSON.stringify({ commands: [q] }) });
+        const r = await fetch(`${A}/command/${encodeURIComponent(id)}`, { method: 'POST', headers: h(), body: JSON.stringify({ commands: [q] }) });
         const d = await r.json();
         const txt = d.results?.[0]?.output || d.results?.[0]?.error || '';
         if (!txt && (q.startsWith('ping') || q.startsWith('traceroute'))) o += `<span style="color:var(--cyan);font-size:11px">ℹ️ Usá 📡 Ping en acciones rápidas</span>\n`;
@@ -3982,7 +3994,7 @@
       const promises = devices.map(async d => {
         if (!d._online) return { id: d.id, driver: d.driver, online: false, cpu: 0, memPct: 0, memUsed: 0, memTotal: 0, dskPct: 0, error: true };
         try {
-          const rr = await fetch(`${A}/facts/${d.id}/resources?_t=${Date.now()}`, { headers: h() });
+          const rr = await fetch(`${A}/facts/${encodeURIComponent(d.id)}/resources?_t=${Date.now()}`, { headers: h() });
           if (rr.ok) {
             const rd = await rr.json();
             const cpu = Math.round(rd.cpu || 0);
@@ -4071,7 +4083,7 @@
       const promises = devices.map(async d => {
         if (!d._online) { alerts.push({ sev: 'critical', dev: d.id, msg: 'Dispositivo OFFLINE', icon: '🔴' }); return; }
         try {
-          const rr = await fetch(`${A}/facts/${d.id}/resources?_t=${Date.now()}`, { headers: h() });
+          const rr = await fetch(`${A}/facts/${encodeURIComponent(d.id)}/resources?_t=${Date.now()}`, { headers: h() });
           if (!rr.ok) { alerts.push({ sev: 'critical', dev: d.id, msg: 'Device unreachable — API Error (OFFLINE)', icon: '🔴' }); return; }
           const rd = await rr.json();
           const cpu = Math.round(rd.cpu || 0);
@@ -4338,7 +4350,7 @@
       let ok = 0, fail = 0;
       for (const d of devices) {
         try {
-          const r = await fetch(`${A}/config/${d.id}/backup`, { method: 'POST', headers: h() });
+          const r = await fetch(`${A}/config/${encodeURIComponent(d.id)}/backup`, { method: 'POST', headers: h() });
           const res = await r.json();
           if (res.success) ok++; else fail++;
         } catch (e) { fail++; }
@@ -4350,19 +4362,21 @@
     async function delDev(id) {
       if (!confirm(`¿Estás seguro de borrar el dispositivo ${id}?`)) return;
       try {
-        const r = await fetch(`${A}/devices/${id}`, { method: 'DELETE', headers: h() });
+        const r = await fetch(`${A}/devices/${encodeURIComponent(id)}`, { method: 'DELETE', headers: h() });
         if (r.ok || r.status === 204) { toast(`✅ Dispositivo ${id} eliminado`, 's'); closeD(); setTimeout(() => { loadInventory(); loadDev(); }, 500); }
         else { const d = await r.json(); toast(`❌ Error: ${d.detail || 'Fallo al borrar'}`, 'error'); }
       } catch (e) { toast(`❌ Error: ${e.message}`, 'error'); }
     }
 
-    async function qaB(id) { const r = await fetch(`${A}/config/${id}/backup`, { method: 'POST', headers: h() }); const d = await r.json(); toast(d.success ? '✅ Backup creado' : '❌ Error', ''); loadBk() }
-    async function qaS(id) { const r = await fetch(`${A}/command/${id}`, { method: 'POST', headers: h(), body: JSON.stringify({ commands: ['write memory'] }) }); toast('💿 Guardado', 's') }
+    async function qaB(id) { const r = await fetch(`${A}/config/${encodeURIComponent(id)}/backup`, { method: 'POST', headers: h() }); const d = await r.json(); toast(d.success ? '✅ Backup creado' : '❌ Error', ''); loadBk() }
+    async function qaS(id) { const r = await fetch(`${A}/command/${encodeURIComponent(id)}`, { method: 'POST', headers: h(), body: JSON.stringify({ commands: ['write memory'] }) }); toast('💿 Guardado', 's') }
     async function qaP(id) {
-      const tgt = prompt('Target:', id.includes('mikrotik') ? '8.8.8.8' : '172.30.0.10'); if (!tgt) return;
+      const devObj = devices.find(d => d.id === id);
+      const defTarget = (devObj?.hostname && devObj.hostname !== '127.0.0.1') ? devObj.hostname : (id.includes('mikrotik') ? '8.8.8.8' : '1.1.1.1');
+      const tgt = prompt('Target:', defTarget); if (!tgt) return;
       const el = document.getElementById('ping-result'); el.style.display = 'block'; el.innerHTML = '<div class="sp"></div>';
-      const r = await fetch(`${A}/facts/${id}/ping?target=${tgt}`, { method: 'POST', headers: h() });
-      if (!r.ok) { el.innerHTML = '<div style="color:var(--red);padding:8px">Error</div>'; return }
+      const r = await fetch(`${A}/facts/${encodeURIComponent(id)}/ping?target=${encodeURIComponent(tgt)}`, { method: 'POST', headers: h() });
+      if (!r.ok) { el.innerHTML = '<div style="color:var(--red);padding:8px">Error en prueba de ping</div>'; return }
       const d = await r.json();
       el.innerHTML = `<div class="mp"><h4 class="mph">📡 Ping a ${tgt}</h4><div style="display:flex;gap:16px;padding:8px">
     <div><span style="color:var(--text-ter);font-size:10px">Paquetes</span><br><span style="font-weight:700">${d.probes_received || 0}/${d.probes_sent || 0}</span></div>
@@ -4375,14 +4389,14 @@
     function qaM(id) { swView('compare'); document.getElementById('cmp-a').value = id; if (document.getElementById('cmp-b').value === id) document.getElementById('cmp-b').selectedIndex = 1; dCmp() }
 
     async function loadF(id, el) {
-      const r = await fetch(`${A}/facts/${id}`, { headers: h() });
+      const r = await fetch(`${A}/facts/${encodeURIComponent(id)}`, { headers: h() });
       if (!r.ok) { el.innerHTML = '<div class="empty"><div class="icon">⚠️</div>Error</div>'; return }
       const d = await r.json();
 
       // Load resources
       let cpu = 0, memPct = 0, hddPct = 0;
       try {
-        const rr = await fetch(`${A}/facts/${id}/resources`, { headers: h() });
+        const rr = await fetch(`${A}/facts/${encodeURIComponent(id)}/resources`, { headers: h() });
         if (rr.ok) {
           const rd = await rr.json();
           if (rd.memory_total) {
@@ -4408,7 +4422,7 @@
 
     async function loadI(id, el) {
       try {
-        const r = await fetch(`${A}/facts/${id}/interfaces`, { headers: h() });
+        const r = await fetch(`${A}/facts/${encodeURIComponent(id)}/interfaces`, { headers: h() });
         if (!r.ok || r.status !== 200) { el.innerHTML = '<div class="empty"><span class="icon">🌐</span><br>Interfaces no disponibles</div>'; return }
         const d = await r.json();
         if (!d.interfaces || !d.interfaces.length) { el.innerHTML = '<div class="empty"><span class="icon">🌐</span><br>0 interfaces</div>'; return }
@@ -4420,7 +4434,7 @@
 
     let curC = '';
     async function loadC(id, el) {
-      const r = await fetch(`${A}/config/${id}/raw`, { headers: h() });
+      const r = await fetch(`${A}/config/${encodeURIComponent(id)}/raw`, { headers: h() });
       if (!r.ok) { el.innerHTML = '<div class="empty"><span class="icon">⚙️</span><br>Error al obtener config</div>'; return }
       curC = await r.text();
       if (!curC || curC.includes('⚠️') || curC.includes('Config no disponible')) {
@@ -4854,47 +4868,85 @@
     async function deleteWebhook(id) { try { await fetch(`${A}/notifications/webhooks/${id}`, { method: 'DELETE', headers: h() }); toast('✕ Webhook eliminado', 'info'); loadWebhooks() } catch (e) { } }
 
     // ── DEVICE MANAGER (V-INVENTORY) ──
-    function toggleInvAuth() {
-      const p = document.getElementById('inv-protocol').value;
-      document.getElementById('inv-auth-ssh').style.display = (p === 'ssh' || p === 'telnet') ? 'block' : 'none';
-      document.getElementById('inv-auth-snmp').style.display = (p === 'snmp') ? 'block' : 'none';
+    function toggleInvAuth(el) {
+      const container = el ? (el.closest('#add-device-panel') || el.closest('#v-devices') || document) : document;
+      const protoEl = container.querySelector('#inv-protocol') || document.getElementById('inv-protocol');
+      const p = protoEl ? protoEl.value : 'ssh';
+      const sshEl = container.querySelector('#inv-auth-ssh') || document.getElementById('inv-auth-ssh');
+      const snmpEl = container.querySelector('#inv-auth-snmp') || document.getElementById('inv-auth-snmp');
+      if (sshEl) sshEl.style.display = (p === 'ssh' || p === 'telnet') ? 'block' : 'none';
+      if (snmpEl) snmpEl.style.display = (p === 'snmp') ? 'block' : 'none';
     }
 
-    async function addInventoryDevice() {
-      const data = {
-        id: document.getElementById('inv-id').value,
-        hostname: document.getElementById('inv-host').value,
-        driver: document.getElementById('inv-driver').value,
-        protocol: document.getElementById('inv-protocol').value
+    async function addInventoryDevice(triggerEl) {
+      const container = triggerEl ? (triggerEl.closest('#add-device-panel') || triggerEl.closest('#v-devices') || document) : document;
+      const getVal = (id, fallback = '') => {
+        const el = container.querySelector('#' + id) || document.getElementById(id);
+        return el ? (el.value.trim ? el.value.trim() : el.value) : fallback;
       };
 
-      if (!data.id || !data.hostname) { toast('ID / Hostname e IP son obligatorios', 'error'); return; }
+      const protocol = getVal('inv-protocol', 'ssh');
+      const driver = getVal('inv-driver', 'ios');
+      const data = {
+        id: getVal('inv-id'),
+        hostname: getVal('inv-host'),
+        driver: driver,
+        protocol: protocol
+      };
+
+      if (!data.id || !data.hostname) {
+        toast('ID / Hostname e IP son obligatorios', 'error');
+        return;
+      }
 
       if (data.protocol === 'ssh' || data.protocol === 'telnet') {
-        data.username = document.getElementById('inv-user').value || 'manager';
-        data.password = document.getElementById('inv-pass').value;
-        data.enable_password = document.getElementById('inv-secret').value;
-        data.port = parseInt(document.getElementById('inv-port').value || (data.protocol === 'telnet' ? 23 : 22));
-      } else if (data.protocol === 'snmp') {
-        data.snmp_ro = document.getElementById('inv-snmp-ro').value || 'public';
+        data.username = getVal('inv-user', 'manager') || 'manager';
+        data.password = getVal('inv-pass', '');
+        data.enable_password = getVal('inv-secret', '');
+        data.port = parseInt(getVal('inv-port') || (data.protocol === 'telnet' ? 23 : 22));
+      } else if (data.protocol === 'snmp' || data.driver === 'snmp') {
+        data.protocol = 'snmp';
+        data.snmp_ro = getVal('inv-snmp-ro', 'public') || 'public';
+        data.community = data.snmp_ro;
+        data.port = parseInt(getVal('inv-port') || 161);
+        data.username = 'snmp';
+        data.password = '';
       }
-      // Siempre incluir credenciales (aunque vacías) para evitar 422
-      data.username = data.username || 'manager';
-      data.password = data.password || '';
+
+      // Si el usuario seleccionó driver snmp
+      if (data.driver === 'snmp') {
+        data.protocol = 'snmp';
+        if (!data.port) data.port = 161;
+      }
 
       toast('⌛ Registrando dispositivo...', 'i');
       try {
-        const r = await fetch(`${A}/devices`, { method: 'POST', headers: h(), body: JSON.stringify(data) });
+        const r = await fetch(`${A}/devices`, {
+          method: 'POST',
+          headers: h(),
+          body: JSON.stringify(data)
+        });
         if (r.ok) {
           toast('✅ Equipo añadido correctamente.', 's');
           // Limpiar forms y recargar
-          document.getElementById('inv-id').value = '';
-          document.getElementById('inv-host').value = '';
+          const idEl = container.querySelector('#inv-id') || document.getElementById('inv-id');
+          const hostEl = container.querySelector('#inv-host') || document.getElementById('inv-host');
+          if (idEl) idEl.value = '';
+          if (hostEl) hostEl.value = '';
+          const panel = document.getElementById('add-device-panel');
+          if (panel) panel.style.display = 'none';
           setTimeout(() => { loadInventory(); loadDev(); }, 1000);
         } else {
-          const d = await r.json(); toast(`❌ Error: ${d.detail || d.error}`, 'error');
+          const d = await r.json();
+          let errDetail = d.detail || d.error || 'Error desconocido';
+          if (Array.isArray(d.detail)) {
+            errDetail = d.detail.map(e => `${e.loc ? e.loc.join('.') : ''}: ${e.msg}`).join(', ');
+          }
+          toast(`❌ Error: ${errDetail}`, 'error');
         }
-      } catch (e) { toast('❌ Fetch error: ' + e.message, 'error'); }
+      } catch (e) {
+        toast('❌ Fetch error: ' + e.message, 'error');
+      }
     }
 
     async function loadInventory() {

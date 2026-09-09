@@ -68,6 +68,8 @@ def list_devices() -> list[dict]:
             "hostname": d["hostname"],
             "port": d.get("port", 22),
             "driver": d["driver"],
+            "protocol": d.get("protocol", "ssh"),
+            "community": (d.get("credentials", {}) or {}).get("community") or d.get("community"),
             "type": d.get("type", "router"),
             "group": d.get("group"),
             "tags": d.get("tags", []),
@@ -91,11 +93,28 @@ def add_device(device: dict) -> dict:
     if any(d["id"] == device["id"] for d in data.get("devices", [])):
         raise ValueError(f"Device {device['id']} already exists")
 
+    driver = device.get("driver", "ios")
+    if hasattr(driver, "value"):
+        driver = driver.value
+    # Normalizar aliases
+    if driver == "mikrotik":
+        driver = "ros"
+    elif driver == "hp_procurve":
+        driver = "procurve"
+    elif driver == "hp_comware":
+        driver = "comware"
+
+    protocol = device.get("protocol") or ("snmp" if driver == "snmp" else "ssh")
+    default_port = 161 if protocol == "snmp" or driver == "snmp" else 22
+    port = int(device.get("port") or default_port)
+    community = device.get("snmp_ro") or device.get("community") or "public"
+
     entry = {
         "id": device["id"],
         "hostname": device["hostname"],
-        "port": device.get("port", 22),
-        "driver": device["driver"],
+        "port": port,
+        "driver": driver,
+        "protocol": protocol,
         "type": device.get("type", "router"),
         "group": device.get("group"),
         "tags": device.get("tags", []),
@@ -103,6 +122,7 @@ def add_device(device: dict) -> dict:
         "credentials": {
             "username": device.get("username", ""),
             "password": encrypt(device.get("password", "")),
+            "community": community,
         },
     }
     data.setdefault("devices", []).append(entry)
@@ -110,6 +130,7 @@ def add_device(device: dict) -> dict:
     # Return without password
     result = dict(entry)
     del result["credentials"]
+    result["community"] = community
     return result
 
 
@@ -118,11 +139,14 @@ def update_device(device_id: str, updates: dict) -> Optional[dict]:
     data = _read()
     for i, d in enumerate(data.get("devices", [])):
         if d["id"] == device_id:
-            for key in ["hostname", "port", "driver", "type", "tags", "description", "group"]:
+            for key in ["hostname", "port", "driver", "protocol", "type", "tags", "description", "group"]:
                 if key in updates and updates[key] is not None:
                     d[key] = updates[key]
-            if "username" in updates or "password" in updates:
+            comm = updates.get("community") or updates.get("snmp_ro")
+            if comm or "username" in updates or "password" in updates:
                 creds = d.setdefault("credentials", {})
+                if comm:
+                    creds["community"] = comm
                 if "username" in updates:
                     creds["username"] = updates["username"]
                 if "password" in updates:

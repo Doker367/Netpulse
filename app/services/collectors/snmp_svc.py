@@ -20,20 +20,34 @@ from app.services.crypto_svc import decrypt
 
 logger = logging.getLogger(__name__)
 
-# OIDs por defecto (Cisco / estándar)
+# OIDs por defecto (Cisco / estándar MIB-II)
 DEFAULT_OIDS = {
     "cpu": "1.3.6.1.4.1.9.9.109.1.1.1.1.3",      # cpmCPUTotal5minRev
     "mem": "1.3.6.1.4.1.9.9.48.1.1.1.5",          # ciscoMemoryPoolUsed
     "uptime": "1.3.6.1.2.1.1.3.0",                # sysUpTime
+    "descr": "1.3.6.1.2.1.1.1.0",                 # sysDescr
+    "name": "1.3.6.1.2.1.1.5.0",                  # sysName
+}
+
+# OIDs específicos para switches HP ProCurve / ArubaOS-S
+HP_PROCURVE_OIDS = {
+    "cpu": "1.3.6.1.4.1.11.2.14.11.5.1.9.6.1.0",           # hpSwitchCpuStat (1 min avg)
+    "mem_total": "1.3.6.1.4.1.11.2.14.11.5.1.1.2.1.1.1.5.1",# hpGlobalMemTotalBytes
+    "mem_free": "1.3.6.1.4.1.11.2.14.11.5.1.1.2.1.1.1.6.1", # hpGlobalMemFreeBytes
+    "mem_alloc": "1.3.6.1.4.1.11.2.14.11.5.1.1.2.1.1.1.7.1",# hpGlobalMemAllocBytes
+    "uptime": "1.3.6.1.2.1.1.3.0",                         # sysUpTime
+    "descr": "1.3.6.1.2.1.1.1.0",                          # sysDescr
+    "name": "1.3.6.1.2.1.1.5.0",                           # sysName
 }
 
 SNMP_COMMUNITY = "public"
 SNMP_PORT = 161
 SNMP_TIMEOUT = 5  # segundos
 
-# Drivers NAPALM que normalmente exponen SNMP
+# Drivers que soportan o representan SNMP
 SNMP_DRIVERS = [
     "ios", "iosxr", "nxos", "junos", "eos", "procurve", "comware", "hpe",
+    "snmp", "generic", "ros", "mikrotik", "linux", "huawei", "alcatel_aos",
 ]
 
 # pysnmp es opcional — si no está instalado se usa `snmpget`
@@ -137,7 +151,7 @@ def _poll_with_snmpget(
             continue
 
         value = proc.stdout.strip().strip('"')
-        if value:
+        if value and not value.startswith("No Such") and not value.startswith("Error"):
             results[name] = value
 
     return results
@@ -148,32 +162,79 @@ def poll_device_snmp(
     community: str = SNMP_COMMUNITY,
     oids: Optional[dict] = None,
     timeout: int = SNMP_TIMEOUT,
+    driver: str = "",
 ) -> dict:
     """Consulta SNMP v2c a un dispositivo y devuelve {oid: valor_str}.
 
     Usa pysnmp si está disponible; si no responde o no está instalado,
     hace fallback al binario ``snmpget``.
-
-    Args:
-        host: IP o hostname del dispositivo.
-        community: Community SNMP (por defecto "public").
-        oids: Dict {nombre: oid_numérico}. Por defecto, CPU, memoria
-            y uptime (DEFAULT_OIDS).
-        timeout: Timeout total en segundos (5 por defecto).
-
-    Returns:
-        Dict {nombre_oid: valor_str} con los OIDs que respondieron.
-        Vacío si el dispositivo no responde.
     """
-    oid_map = oids or DEFAULT_OIDS
+    oid_map = oids
+    if not oid_map:
+        drv = (driver or "").lower()
+        if "procurve" in drv or "hpe" in drv or drv == "comware":
+            oid_map = HP_PROCURVE_OIDS
+        else:
+            oid_map = DEFAULT_OIDS
 
+    results = {}
     if PYSNMP_AVAILABLE:
         results = _poll_with_pysnmp(host, oid_map, community, timeout)
-        if results:
-            return results
-        logger.debug("pysnmp sin resultados para %s, probando snmpget", host)
+        if not results:
+            logger.debug("pysnmp sin resultados para %s, probando snmpget", host)
 
-    return _poll_with_snmpget(host, oid_map, community, timeout)
+    if not results:
+        results = _poll_with_snmpget(host, oid_map, community, timeout)
+
+    # Si se usó DEFAULT_OIDS pero no se obtuvo CPU, intentar con HP_PROCURVE_OIDS
+    if "cpu" not in results and oids is None and oid_map != HP_PROCURVE_OIDS:
+        hp_res = _poll_with_snmpget(host, HP_PROCURVE_OIDS, community, timeout)
+        results.update(hp_res)
+
+    return results
+
+
+def get_snmp_interfaces(
+    host: str, community: str = SNMP_COMMUNITY, timeout: int = 5
+) -> dict:
+    """Obtiene interfaces del switch vía SNMP ifTable."""
+    interfaces = {}
+    try:
+        cmd_desc = ["snmpwalk", "-v2c", "-c", community, "-t", "2", "-r", "1", "-Oqv", host, "1.3.6.1.2.1.2.2.1.2"]
+        p_desc = subprocess.run(cmd_desc, capture_output=True, text=True, timeout=timeout)
+        names = [x.strip().strip('"') for x in p_desc.stdout.strip().splitlines() if x.strip()]
+
+        cmd_stat = ["snmpwalk", "-v2c", "-c", community, "-t", "2", "-r", "1", "-Oqv", host, "1.3.6.1.2.1.2.2.1.8"]
+        p_stat = subprocess.run(cmd_stat, capture_output=True, text=True, timeout=timeout)
+        stats = [x.strip() for x in p_stat.stdout.strip().splitlines() if x.strip()]
+
+        cmd_spd = ["snmpwalk", "-v2c", "-c", community, "-t", "2", "-r", "1", "-Oqv", host, "1.3.6.1.2.1.2.2.1.5"]
+        p_spd = subprocess.run(cmd_spd, capture_output=True, text=True, timeout=timeout)
+        speeds = [x.strip() for x in p_spd.stdout.strip().splitlines() if x.strip()]
+
+        cmd_mac = ["snmpwalk", "-v2c", "-c", community, "-t", "2", "-r", "1", "-Oqv", host, "1.3.6.1.2.1.2.2.1.6"]
+        p_mac = subprocess.run(cmd_mac, capture_output=True, text=True, timeout=timeout)
+        macs = [x.strip() for x in p_mac.stdout.strip().splitlines() if x.strip()]
+
+        for i, raw_name in enumerate(names):
+            if not raw_name or raw_name.startswith("No Such"):
+                continue
+            is_up = stats[i] == "1" if i < len(stats) else False
+            speed_bps = int(speeds[i]) if i < len(speeds) and speeds[i].isdigit() else 1000000000
+            speed_mbps = speed_bps // 1000000
+            mac = macs[i] if i < len(macs) else "N/A"
+            name = f"Port {raw_name}" if raw_name.isdigit() else raw_name
+            interfaces[name] = {
+                "name": name,
+                "is_up": is_up,
+                "is_enabled": True,
+                "speed": speed_mbps,
+                "mac_address": mac,
+                "description": f"{name} (SNMP Managed)",
+            }
+    except Exception as e:
+        logger.debug("get_snmp_interfaces error para %s: %s", host, e)
+    return interfaces
 
 
 def poll_all_devices(
@@ -194,8 +255,9 @@ def poll_all_devices(
 
     for dev in devices:
         driver = (dev.get("driver") or "").lower()
-        if driver not in SNMP_DRIVERS:
-            logger.debug("Driver %s sin soporte SNMP — omitido", driver)
+        protocol = (dev.get("protocol") or "").lower()
+        if protocol != "snmp" and driver not in SNMP_DRIVERS:
+            logger.debug("Driver %s / Protocolo %s sin soporte SNMP — omitido", driver, protocol)
             continue
 
         host = dev.get("hostname")
@@ -203,15 +265,13 @@ def poll_all_devices(
             logger.warning("Dispositivo sin hostname: %s", dev.get("id", "?"))
             continue
 
-        # Desencriptar credenciales por si el flujo las requiere
-        # (SNMP v2c usa community, no user/password, pero el archivo
-        # guarda los passwords cifrados con crypto_svc)
         creds = dev.get("credentials") or {}
         if creds.get("password"):
             creds["password"] = decrypt(creds["password"])
 
-        logger.info("Polling SNMP a %s (%s)", host, driver)
-        metrics = poll_device_snmp(host, community=community, timeout=timeout)
+        dev_comm = creds.get("community") or dev.get("community") or dev.get("snmp_ro") or community
+        logger.info("Polling SNMP a %s (%s) [comm=%s]", host, driver, dev_comm)
+        metrics = poll_device_snmp(host, community=dev_comm, timeout=timeout)
         if metrics:
             results[dev.get("id", host)] = metrics
 
