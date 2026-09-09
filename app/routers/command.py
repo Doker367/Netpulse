@@ -8,7 +8,6 @@ POST /api/command/bulk          — Ejecutar comandos en múltiples dispositivos
 """
 
 import logging
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 

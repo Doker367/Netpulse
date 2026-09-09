@@ -6,12 +6,11 @@ Todos los endpoints requieren rol **admin**.
 Si NetBox no está disponible, devuelven 503.
 """
 
-from pathlib import Path
 from typing import Optional
 
 import httpx
 import yaml
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.core.settings import NETBOX_TOKEN, NETBOX_URL, DEVICES_FILE
 from app.middleware.auth import JWTBearer

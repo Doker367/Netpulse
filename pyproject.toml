@@ -1,0 +1,29 @@
+# Configuración de herramientas (ruff, pytest, pyright).
+# Las dependencias de runtime se declaran en requirements.txt.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "backups", "reports", "docs"]
+
+[tool.ruff.lint]
+# pragmático: errores de código (undefined/unused/bug) + bare except
+select = ["F", "E9", "E7"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+# pysnmp se importa con `from pysnmp.hlapi import *` (import dinámico opcional)
+"app/services/collectors/snmp_svc.py" = ["F405"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+venvPath = "."
+venv = ".venv"
+typeCheckingMode = "basic"
+exclude = ["**/__pycache__", "backups", "reports", "docs", "audit", "docker"]
+

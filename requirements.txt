@@ -2,13 +2,12 @@ fastapi
 uvicorn[standard]
 slowapi
 napalm
+netmiko
 prometheus-client
 python-jose[cryptography]
-passlib[bcrypt]
-bcrypt<4.1.0
+bcrypt>=4.1.0
 httpx
 pyotp
 librouteros
 nornir
-python-docx
 reportlab

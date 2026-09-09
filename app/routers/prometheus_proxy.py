@@ -28,7 +28,7 @@ def prom_query_range(
 ):
     """Proxy Prometheus range query."""
     try:
-        url = f"http://localhost:9090/api/v1/query_range"
+        url = "http://localhost:9090/api/v1/query_range"
         params = f"query={urllib.parse.quote(query)}&start={start}&end={end}&step={step}"
         r = urllib.request.urlopen(f"{url}?{params}", timeout=10)
         return json.loads(r.read().decode())

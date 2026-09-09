@@ -10,7 +10,6 @@ import json
 import re
 import urllib.error
 import urllib.request
-from pathlib import Path
 
 from app.core.settings import CONFIG_DIR
 from app.services import inventory_svc

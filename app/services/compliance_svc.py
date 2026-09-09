@@ -4,7 +4,6 @@ Validación de configuración contra líneas base (baselines)
 almacenadas en config/baselines/ (un archivo por grupo).
 """
 
-import difflib
 import logging
 from pathlib import Path
 from typing import Optional

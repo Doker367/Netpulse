@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, IPvAnyAddress, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ── Device Inventory ────────────────────────────────────────
@@ -41,6 +41,8 @@ class DeviceDriver(str, Enum):
     HP_COMWARE = "hp_comware"
     HUAWEI = "huawei"
     ALCATEL_AOS = "alcatel_aos"
+    ALCATEL_SROS = "alcatel_sros"
+    H3C_COMWARE = "h3c_comware"
 
 
 class DeviceBase(BaseModel):
@@ -100,7 +102,12 @@ class DeviceBase(BaseModel):
     protocol: Optional[str] = Field(
         default="ssh",
         description="Protocolo de comunicación ('ssh', 'telnet', 'snmp')",
-        examples=["ssh", "snmp"],
+        examples=["ssh", "telnet", "snmp"],
+    )
+    netmiko_device_type: Optional[str] = Field(
+        default=None,
+        description="Override del device_type netmiko (ej. 'cisco_s300', 'hp_comware_telnet', 'alcatel_aos'). Si se define, NetPulse usa netmiko para este equipo.",
+        examples=["cisco_s300", "alcatel_aos"],
     )
     snmp_ro: Optional[str] = Field(
         default=None,
@@ -145,6 +152,7 @@ class DeviceResponse(BaseModel):
     port: int = Field(default=22, description="Puerto de conexión", examples=[22])
     driver: DeviceDriver = Field(..., description="Driver NAPALM", examples=["ios"])
     protocol: Optional[str] = Field(default="ssh", description="Protocolo (ssh/telnet/snmp)")
+    netmiko_device_type: Optional[str] = Field(default=None, description="Override device_type netmiko")
     community: Optional[str] = Field(default=None, description="Comunidad SNMP si aplica")
     type: DeviceType = Field(default=DeviceType.ROUTER, description="Tipo de dispositivo", examples=["router"])
     group: Optional[str] = Field(default=None, description="Grupo del dispositivo", examples=["Core"])
@@ -158,6 +166,8 @@ class DeviceUpdate(BaseModel):
     port: Optional[int] = Field(None, description="Nuevo puerto", examples=[2222])
     driver: Optional[DeviceDriver] = Field(None, description="Nuevo driver NAPALM", examples=["eos"])
     protocol: Optional[str] = Field(None, description="Nuevo protocolo (ssh/telnet/snmp)")
+    netmiko_device_type: Optional[str] = Field(None, description="Nuevo override device_type netmiko")
+    enable_password: Optional[str] = Field(None, description="Nuevo enable secret (se cifra al almacenar)")
     community: Optional[str] = Field(None, description="Nueva comunidad SNMP")
     snmp_ro: Optional[str] = Field(None, description="Nueva comunidad SNMP")
     username: Optional[str] = Field(None, description="Nuevo usuario", examples=["netadmin"])

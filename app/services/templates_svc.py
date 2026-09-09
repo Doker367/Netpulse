@@ -4,7 +4,6 @@ Gestión de templates pre-armados para operaciones comunes de datacenter.
 Los templates son archivos YAML con snippets Jinja2 multi-driver (ios, junos, eos).
 """
 
-import difflib
 import logging
 from pathlib import Path
 from typing import Optional

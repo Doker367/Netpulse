@@ -5,7 +5,7 @@ Provee:
 - requires_role: factory que genera una dependencia para exigir rol mínimo.
 """
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import HTTPException, Request
 
 from app.models.schemas import UserRole
 

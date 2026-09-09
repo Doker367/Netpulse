@@ -3,14 +3,15 @@
 Provee:
 - create_access_token: genera un token JWT con claims y expiración.
 - verify_token: valida y decodifica un token JWT.
-- hash_password / verify_password: hashing bcrypt via passlib.
+- hash_password / verify_password: hashing bcrypt directo (sin passlib,
+  que está abandonado). Compatible con hashes $2a$/$2b$ ya existentes.
 """
 
 import os
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 # ── Configuración ─────────────────────────────────────────────
 
@@ -29,7 +30,15 @@ if _IS_PRODUCTION and JWT_SECRET == "netpulse-dev-secret-change-me":
         "Genera uno con: python -c \"import secrets; print(secrets.token_hex(32))\""
     )
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# bcrypt solo usa los primeros 72 bytes; imitar el truncado histórico de passlib
+_BCRYPT_MAX_BYTES = 72
+
+
+def _bcrypt_bytes(password: str) -> bytes:
+    data = password.encode("utf-8")
+    if len(data) > _BCRYPT_MAX_BYTES:
+        data = data[:_BCRYPT_MAX_BYTES]
+    return data
 
 
 # ── Funciones de token JWT ────────────────────────────────────
@@ -68,7 +77,7 @@ def verify_token(token: str) -> dict | None:
         return None
 
 
-# ── Hashing de contraseñas ────────────────────────────────────
+# ── Hashing de contraseñas (bcrypt directo) ───────────────────
 
 def hash_password(password: str) -> str:
     """Hashea una contraseña con bcrypt.
@@ -77,12 +86,14 @@ def hash_password(password: str) -> str:
         password: Contraseña en texto plano.
 
     Returns:
-        Hash bcrypt de la contraseña.
+        Hash bcrypt ($2b$) de la contraseña.
     """
-    return pwd_context.hash(password)
+    if not password:
+        return ""
+    return bcrypt.hashpw(_bcrypt_bytes(password), bcrypt.gensalt(rounds=12)).decode("ascii")
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
+def verify_password(plain_password: str, hashed_password: str | None) -> bool:
     """Verifica una contraseña contra su hash bcrypt.
 
     Args:
@@ -92,4 +103,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         True si coinciden, False en caso contrario.
     """
-    return pwd_context.verify(plain_password, hashed_password)
+    if not plain_password or not hashed_password:
+        return False
+    try:
+        return bcrypt.checkpw(_bcrypt_bytes(plain_password), hashed_password.encode("ascii"))
+    except ValueError:
+        # Hash no válido (no es bcrypt) — nunca dar una pista al usuario
+        return False

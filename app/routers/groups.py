@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import requires_role
-from app.models.schemas import GroupCreate, GroupResponse, DeviceResponse, DeviceUpdate
+from app.models.schemas import GroupCreate, GroupResponse, DeviceResponse
 from app.services import inventory_svc
 
 router = APIRouter(prefix="/api/groups", tags=["Groups"])

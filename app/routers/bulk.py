@@ -6,11 +6,11 @@ dispositivos, usando Nornir (con fallback serial a NAPALM).
 
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends
 
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import requires_role
-from app.models.schemas import BulkDeployRequest, BulkDeployResponse, BulkDeployDeviceResult, BulkResult, FactsResponse, DeviceStatus
+from app.models.schemas import BulkDeployRequest, BulkDeployResponse, BulkDeployDeviceResult, BulkResult
 from app.services import napalm_svc, nornir_svc
 
 router = APIRouter(prefix="/api/bulk", tags=["Bulk Operations"])

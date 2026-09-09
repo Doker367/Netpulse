@@ -5,10 +5,8 @@ at rest in config/devices.yaml. The Fernet key is stored in
 config/.fernet_key and NEVER committed to version control.
 """
 
-import base64
 import logging
 import os
-from pathlib import Path
 
 import yaml
 from cryptography.fernet import Fernet, InvalidToken
