@@ -1,0 +1,6 @@
+# Dependencias de desarrollo (tests / lint / typecheck)
+-r requirements.txt
+pytest
+pytest-asyncio
+ruff
+pyright

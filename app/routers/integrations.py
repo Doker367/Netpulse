@@ -6,7 +6,7 @@ Proxy Loki (log viewer del dashboard), sync NetBox, reportes CSV.
 import logging
 import time
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import PlainTextResponse
 
 from app.middleware.auth import JWTBearer

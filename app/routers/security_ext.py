@@ -5,7 +5,7 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import get_current_user, requires_role

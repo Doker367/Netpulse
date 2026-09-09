@@ -4,7 +4,7 @@ Endpoints para verificar y gestionar compliance de configuraciones
 de red contra líneas base (baselines) por grupo de dispositivos.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import requires_role
@@ -12,9 +12,6 @@ from app.models.schemas import (
     ComplianceBaselineRequest,
     ComplianceBaselineResponse,
     ComplianceCheckRequest,
-    ComplianceCheckResponse,
-    ComplianceReportResponse,
-    ComplianceViolation,
 )
 from app.services import compliance_svc
 from app.services.notifications_svc import notify_compliance_violation

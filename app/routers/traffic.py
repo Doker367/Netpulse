@@ -5,7 +5,6 @@ para mostrarlas en el dashboard.
 """
 
 import logging
-import time
 import urllib.request
 import urllib.parse
 import json
@@ -47,11 +46,8 @@ def interface_traffic(
     (si están disponibles) o devuelve el inventario de interfaces con
     su estado actual como fallback.
     """
-    end = time.time()
-    start = end - range_hours * 3600
-
     # Intentar obtener series de tráfico (si algún exporter las genera)
-    expr = f'sum by (interface) (rate(netpulse_interface_rx_bytes[5m]))'
+    expr = 'sum by (interface) (rate(netpulse_interface_rx_bytes[5m]))'
     rx_series = _query_prom(expr)
 
     # Fallback: estado de interfaces vía NAPALM

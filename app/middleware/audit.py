@@ -7,10 +7,7 @@ with streaming responses, background tasks, and other middleware interactions.
 Skips /api/health and /docs paths.
 """
 
-import time
 import uuid
-
-from app.services.audit_svc import log_event
 
 SKIP_PREFIXES = (
     "/api/health",
@@ -46,7 +43,6 @@ class AuditMiddleware:
                 return await self.app(scope, receive, send)
 
         session_id = str(uuid.uuid4())
-        start = time.monotonic()
         status_code = 500
 
         # ── Wrap send() to capture the response status ─────────
@@ -71,9 +67,9 @@ class AuditMiddleware:
             if query_string:
                 details += f"?{query_string}"
 
-            log_event(
+            # Escribir fuera del event loop (SQLite en executor, sin bloquear)
+            _log_async(
                 action=f"api_{method.lower()}",
-                device_id=None,
                 username="anonymous",
                 details=details,
                 ip_address=client_ip,
@@ -83,6 +79,26 @@ class AuditMiddleware:
                 method=method,
                 response_status=status_code,
             )
+
+
+def _log_async(**kwargs) -> None:
+    """Delega log_event a un executor (fire-and-forget, sin bloquear)."""
+    try:
+        import asyncio
+        from functools import partial
+
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(None, partial(_safe_log, **kwargs))
+    except Exception:
+        pass
+
+
+def _safe_log(**kwargs) -> None:
+    try:
+        from app.services.audit_svc import log_event
+        log_event(**kwargs)
+    except Exception:
+        pass
 
 
 def _get_client_ip(scope: dict) -> str:

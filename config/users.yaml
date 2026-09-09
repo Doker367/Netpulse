@@ -1,14 +1,15 @@
 # NetPulse — Usuarios del sistema RBAC
 # superadmin: Acceso completo a todas las funciones
 # operator: Solo lectura de dispositivos, sin administración
+# Los hashes bcrypt se generan con app/core/security.hash_password().
 users:
   - username: superadmin
     role: admin
     name: Super Admin
-    password_hash: null
-    plain_password: ***REMOVED***
+    password_hash: $2b$12$BZ0vQFCzeH7M2Fwu/OzVG.lNM.LEjlmmw3I5cAxV7JE1sSQoCicri
+    plain_password: null
   - username: operator
     role: operator
     name: Operador
-    password_hash: null
-    plain_password: ***REMOVED***
+    password_hash: $2b$12$uYs8XNxrmtvDULBLavIYweFHyaHIgKYUXI.vmzPDP4nNHxCYshkFW
+    plain_password: null

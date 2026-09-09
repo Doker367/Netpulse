@@ -17,14 +17,13 @@ import http.client
 from datetime import datetime, timezone
 from typing import Optional
 
-import yaml
 from napalm import get_network_driver
 
-from app.core.settings import DEVICES_FILE, BACKUP_DIR, NAPALM_TIMEOUT
+from app.core.settings import BACKUP_DIR, NAPALM_TIMEOUT
+from app.services.concurrency import limited
 from app.services.crypto_svc import decrypt
 from app.services import netmiko_svc
 from app.services.metrics_svc import (
-    netpulse_devices_up,
     netpulse_napalm_duration_seconds,
     netpulse_napalm_operations_total,
     update_device_metrics,
@@ -149,18 +148,18 @@ def _is_retryable(error_type: str) -> bool:
 # ── Inventory ───────────────────────────────────────────────
 
 def _load_devices() -> list[dict]:
-    """Carga el inventario desde YAML con passwords descifrados (efímero)."""
-    if not DEVICES_FILE.exists():
-        return []
-    with open(DEVICES_FILE) as f:
-        data = yaml.safe_load(f)
-    devices = data.get("devices", [])
-    # Decrypt passwords transparently for NAPALM
+    """Carga el inventario (cacheado) con passwords descifrados (efímero)."""
+    from app.services import inventory_svc
+    devices = inventory_svc.get_raw_devices()
+    # Decrypt passwords transparently for NAPALM/netmiko (sobre la copia)
     for d in devices:
         creds = d.get("credentials", {})
         pw = creds.get("password", "")
         if pw:
             creds["password"] = decrypt(pw)
+        ep = d.get("enable_password")
+        if ep:
+            d["enable_password"] = decrypt(ep)
     return devices
 
 
@@ -169,6 +168,30 @@ def _find_device(device_id: str) -> Optional[dict]:
         if d["id"] == device_id:
             return d
     return None
+
+
+def _netmiko_direct(device: dict) -> bool:
+    """True si la operación debe ir por netmiko directo (sin intentar NAPALM).
+
+    Casos: telnet (protocolo o puerto 23), override ``netmiko_device_type``,
+    o drivers sin driver NAPALM real (h3c_comware, alcatel_aos, alcatel_sros).
+    """
+    if not device:
+        return False
+    proto = str(device.get("protocol") or "").lower()
+    if proto == "snmp":
+        return False
+    if proto == "telnet":
+        return True
+    try:
+        port = int(device.get("port", 0) or 0)
+    except (TypeError, ValueError):
+        port = 0
+    if port == 23:
+        return True
+    if device.get("netmiko_device_type"):
+        return True
+    return str(device.get("driver", "")).lower() in netmiko_svc.NETMIKO_DIRECT_DRIVERS
 
 
 def _build_optional_args(device: dict) -> dict:
@@ -220,6 +243,7 @@ class NapalmResult:
         self.error = map_napalm_error(error_type, self.device_id)
 
 
+@limited
 def _execute(device: dict, operation: str, *args, retry: bool = True, **kwargs) -> NapalmResult:
     """Ejecuta una operación NAPALM genérica con retry y logging contextual."""
     result = NapalmResult(device["id"])
@@ -322,6 +346,7 @@ def _execute(device: dict, operation: str, *args, retry: bool = True, **kwargs) 
 
 # ── MikroTik-specific workarounds ───────────────────────────
 
+@limited
 def _execute_mikrotik_facts(device: dict) -> NapalmResult:
     """Obtiene facts de MikroTik con fallback via librouteros.
 
@@ -407,7 +432,6 @@ def _execute_mikrotik_facts(device: dict) -> NapalmResult:
     logger.info("[%s] mikrotik_facts: activando fallback librouteros", device_id)
     try:
         from librouteros import connect
-        from librouteros.exceptions import LibRouterosError
 
         port = device.get("port", 8728)
         host = device["hostname"]
@@ -440,8 +464,6 @@ def _execute_mikrotik_facts(device: dict) -> NapalmResult:
             if resources:
                 r = resources[0]
                 board = r.get("board-name", "")
-                version = r.get("version", "")
-                arch = r.get("architecture-name", "")
                 model = f"MikroTik {board}" if board else "MikroTik RouterOS"
         except Exception:
             pass
@@ -531,6 +553,7 @@ def _execute_mikrotik_facts(device: dict) -> NapalmResult:
         return result
 
 
+@limited
 def _execute_mikrotik_interfaces(device: dict) -> NapalmResult:
     """Obtiene interfaces de MikroTik vía librouteros como fallback."""
     result = NapalmResult(device["id"])
@@ -753,6 +776,103 @@ def _execute_snmp_interfaces(device: dict) -> NapalmResult:
 
 # ── Public API ──────────────────────────────────────────────
 
+def _netmiko_facts(device: dict) -> NapalmResult:
+    """Facts vía netmiko (legacy/telnet), enriqueciendo con interface_list."""
+    device_id = device["id"]
+    result = NapalmResult(device_id)
+    try:
+        facts = netmiko_svc.get_facts(device)
+        if not facts:
+            result.set_error("driver_error", f"netmiko facts falló para {device_id}")
+            return result
+        # interface_list para FactsResponse.interface_count
+        try:
+            ifaces = netmiko_svc.get_interfaces(device)
+            if ifaces:
+                facts["interface_list"] = list(ifaces.keys())
+        except Exception:
+            pass
+        facts.setdefault("interface_list", [])
+        result.data = facts
+        result.success = True
+        logger.info("[%s] get_facts → OK via netmiko", device_id)
+    except Exception as e:
+        result.set_error("connection_error", f"netmiko facts: {e}")
+    return result
+
+
+def _netmiko_interfaces(device: dict) -> NapalmResult:
+    """Interfaces vía netmiko (legacy/telnet)."""
+    device_id = device["id"]
+    result = NapalmResult(device_id)
+    try:
+        ifaces = netmiko_svc.get_interfaces(device)
+        if not ifaces:
+            result.set_error("driver_error", f"netmiko interfaces vacías para {device_id}")
+            return result
+        result.data = ifaces
+        result.success = True
+        logger.info("[%s] get_interfaces → OK via netmiko (%d)", device_id, len(ifaces))
+    except Exception as e:
+        result.set_error("connection_error", f"netmiko interfaces: {e}")
+    return result
+
+
+def _netmiko_running_config(device: dict) -> Optional[str]:
+    """Running-config vía netmiko para diff/deploy."""
+    try:
+        return netmiko_svc.get_running_config(device)
+    except Exception as e:
+        logger.error("[%s] netmiko running-config: %s", device["id"], e)
+        return None
+
+
+def _netmiko_compare_config(device: dict, candidate: str) -> NapalmResult:
+    """Dry-run por netmiko: diff contra la running-config (sin cambios)."""
+    import difflib
+    device_id = device["id"]
+    result = NapalmResult(device_id)
+    running = _netmiko_running_config(device)
+    if running is None:
+        result.set_error("driver_error", f"netmiko dry-run falló (running-config no disponible) para {device_id}")
+        return result
+    candidate_fixed = candidate if candidate.endswith("\n") else candidate + "\n"
+    diff_lines = list(difflib.unified_diff(
+        running.splitlines(keepends=True),
+        candidate_fixed.splitlines(keepends=True),
+        fromfile=f"{device_id}-running",
+        tofile=f"{device_id}-candidate",
+    ))
+    result.data = "".join(diff_lines)
+    result.success = True
+    result.rollback_mode = "best-effort"
+    return result
+
+
+def _netmiko_deploy_session(device: dict, candidate: str) -> dict:
+    """Deploy por netmiko (legacy/telnet). Best-effort, sin candidate transaccional."""
+    start = time.monotonic()
+    device_id = device["id"]
+    # Diff previo para el payload (dry-run implícito antes de aplicar)
+    compare = _netmiko_compare_config(device, candidate)
+    diff = compare.data if compare.success else ""
+
+    if not compare.success:
+        return {"diff": diff, "committed": False,
+                "error": compare.error, "duration_ms": 0,
+                "rollback_mode": "best-effort"}
+
+    res = netmiko_svc.send_config_lines(device, candidate)
+    duration = round((time.monotonic() - start) * 1000, 2)
+    if not res["ok"]:
+        return {"diff": diff, "committed": False, "error": res["error"],
+                "duration_ms": duration, "rollback_mode": "best-effort",
+                "error_type": "connection_error" if _is_connection_like(res["error"] or "") else "command_error"}
+    logger.info("[%s] deploy → OK via netmiko (best-effort, %.0fms)", device_id, duration)
+    return {"diff": diff, "committed": True, "error": None,
+            "duration_ms": duration, "rollback_mode": "best-effort"}
+
+
 def get_facts(device_id: str) -> NapalmResult:
     d = _find_device(device_id)
     if not d:
@@ -767,6 +887,10 @@ def get_facts(device_id: str) -> NapalmResult:
     # MikroTik RouterOS 7.22 workaround
     if d.get("driver") == "ros":
         return _execute_mikrotik_facts(d)
+
+    # Legacy/telnet: netmiko directo (sin esperar timeout NAPALM)
+    if _netmiko_direct(d):
+        return _netmiko_facts(d)
 
     result = _execute(d, "get_facts")
 
@@ -799,6 +923,10 @@ def get_interfaces(device_id: str) -> NapalmResult:
     # MikroTik RouterOS 7.22 workaround
     if d.get("driver") == "ros":
         return _execute_mikrotik_interfaces(d)
+
+    # Legacy/telnet: netmiko directo (sin esperar timeout NAPALM)
+    if _netmiko_direct(d):
+        return _netmiko_interfaces(d)
 
     result = _execute(d, "get_interfaces")
 
@@ -907,9 +1035,10 @@ def get_config(device_id: str, retrieve: str = "running") -> NapalmResult:
                 try:
                     r = list(api(cmd))
                     if r:
-                        lines = "\n".join(f"  {k}: {v}" for item in r for k,v in dict(item).items())
+                        lines = "\n".join(f"  {k}: {v}" for item in r for k, v in dict(item).items())
                         sections[label] = lines
-                except: pass
+                except Exception:
+                    pass
             api.close()
             if sections:
                 r = NapalmResult(device_id)
@@ -930,6 +1059,20 @@ def get_config(device_id: str, retrieve: str = "running") -> NapalmResult:
             f"! Consulta las pestañas 'Overview' e 'Interfaces' para métricas en vivo (CPU, RAM, Puertos)."
         )
         r.success = True
+        return r
+
+    # Legacy/telnet: running-config vía netmiko
+    if _netmiko_direct(d):
+        cfg_text = netmiko_svc.get_running_config(d)
+        if cfg_text:
+            r = NapalmResult(device_id)
+            r.data = {"running": cfg_text}
+            r.success = True
+            logger.info("[%s] get_config → OK via netmiko (%d bytes)",
+                        device_id, len(cfg_text))
+            return r
+        r = NapalmResult(device_id)
+        r.set_error("driver_error", f"netmiko get_config falló para {device_id}")
         return r
 
     return _execute(d, "get_config", retrieve=retrieve)
@@ -985,6 +1128,23 @@ def backup_config(device_id: str) -> NapalmResult:
         result.data = {"file": str(fname), "size": fname.stat().st_size, "timestamp": ts, "success": True}
         return result
 
+    # Legacy/telnet: backup vía netmiko (show running-config)
+    if _netmiko_direct(d):
+        cfg_text = netmiko_svc.get_running_config(d)
+        if not cfg_text:
+            result = NapalmResult(device_id)
+            result.set_error("driver_error", f"netmiko get_config falló para {device_id}")
+            return result
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        fname = BACKUP_DIR / f"{safe_id}_{ts}.cfg"
+        fname.write_text(cfg_text)
+        result = NapalmResult(device_id)
+        result.success = True
+        result.data = {"file": str(fname), "size": len(cfg_text), "timestamp": ts, "success": True}
+        logger.info("[%s] backup → OK via netmiko (%s, %d bytes)",
+                    device_id, fname.name, len(cfg_text))
+        return result
+
     result = _execute(d, "get_config", retrieve="running")
     if result.success and result.data:
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -997,6 +1157,7 @@ def backup_config(device_id: str) -> NapalmResult:
 
 # ── Config Deploy / Rollback ────────────────────────────────
 
+@limited
 def _execute_config_session(device: dict, candidate: str, commit: bool) -> dict:
     """Abre una conexión NAPALM y ejecuta load + compare + (opcional) commit.
 
@@ -1121,6 +1282,10 @@ def compare_config(device_id: str, candidate: str) -> NapalmResult:
     result = NapalmResult(device_id)
     start = time.monotonic()
 
+    # Legacy/telnet: dry-run por netmiko (difflib contra running-config)
+    if _netmiko_direct(d):
+        return _netmiko_compare_config(d, candidate)
+
     # Try NAPALM full flow: load → compare → discard
     session = _execute_config_session(d, candidate, commit=False)
 
@@ -1194,7 +1359,10 @@ def deploy_config(device_id: str, candidate: str) -> dict:
                              if isinstance(backup_result.data, dict) else str(backup_result.data))
 
     # Step 2 & 3: Load + Compare + Commit
-    session = _execute_config_session(d, candidate, commit=True)
+    if _netmiko_direct(d):
+        session = _netmiko_deploy_session(d, candidate)
+    else:
+        session = _execute_config_session(d, candidate, commit=True)
 
     result["diff"] = session["diff"]
 
@@ -1248,6 +1416,12 @@ def rollback_config(device_id: str) -> NapalmResult:
         r.set_error("driver_error", f"Device {device_id} not found")
         return r
 
+    # Legacy/telnet: sin rollback transaccional NAPALM → restaurar desde backup
+    if _netmiko_direct(d):
+        logger.info("[%s] rollback_config: netmiko (best-effort) → restaurando último backup",
+                    device_id)
+        return _restore_from_backup(device_id, d)
+
     # Attempt 1: NAPALM rollback() — reverts last commit
     result = _execute(d, "rollback")
     if result.success:
@@ -1266,7 +1440,12 @@ def rollback_config(device_id: str) -> NapalmResult:
     logger.warning("[%s] rollback_config: discard_config also failed: %s — trying backup restore",
                    device_id, result.error)
 
-    # Attempt 3: Restore from last backup file
+    return _restore_from_backup(device_id, d)
+
+
+def _restore_from_backup(device_id: str, device: dict) -> NapalmResult:
+    """Restaura la configuración desde el último backup en disco (best-effort)."""
+    result = NapalmResult(device_id)
     try:
         backups = sorted(BACKUP_DIR.glob(f"{device_id}_*.cfg"), reverse=True)
         if backups:
@@ -1279,6 +1458,7 @@ def rollback_config(device_id: str) -> NapalmResult:
             result.data = {
                 "restored_from": str(last_backup),
                 "committed": deploy_result["committed"],
+                "rollback_mode": "best-effort",
             }
             if not deploy_result["committed"]:
                 result.set_error("command_error", deploy_result.get("error", "Restore deploy failed"))
@@ -1352,12 +1532,49 @@ def _validate_commands(commands: list[str], device_driver: str) -> tuple[bool, O
     return True, None
 
 
+def _execute_netmiko_commands(device_id: str, commands: list[str], device: dict) -> NapalmResult:
+    """Ejecuta comandos CLI vía netmiko (legacy/telnet).
+
+    Un comando por sesión (los equipos viejos no permiten colas).
+    Mantiene la estructura {command, output, error} y éxito si la
+    conexión fue OK (los errores de comando van por comando).
+    """
+    result = NapalmResult(device_id)
+    outputs = []
+    connection_errors = 0
+    for cmd in commands:
+        res = netmiko_svc.execute_command(device, cmd)
+        error = res.get("error")
+        if error and _is_connection_like(error):
+            connection_errors += 1
+        outputs.append({"command": cmd, "output": res.get("output", ""), "error": error})
+
+    result.data = outputs
+    if connection_errors == len(commands):
+        result.set_error("connection_error", outputs[0]["error"])
+    else:
+        result.success = True
+        logger.info("[%s] run_commands → OK via netmiko (%d comandos)",
+                    device_id, len(commands))
+    return result
+
+
+def _is_connection_like(error: str) -> bool:
+    """Heurística: ¿el error es de conexión/auth y no del comando en sí?"""
+    if not error:
+        return False
+    low = error.lower()
+    return any(k in low for k in (
+        "connection", "timed out", "timeout", "refused", "unreachable",
+        "authentication", "unable to connect", "socket", "eof",
+    ))
+
+
 def _execute_ros_commands(device_id: str, commands: list[str], device: dict) -> NapalmResult:
     """Ejecuta comandos en MikroTik RouterOS vía API librouteros."""
     result = NapalmResult(device_id)
     try:
         from librouteros import connect
-        from librouteros.exceptions import LibRouterosError
         host = device["hostname"]
         port = device.get("port", 8728)
         creds = device.get("credentials", {})
@@ -1450,6 +1667,10 @@ def run_commands(device_id: str, commands: list[str]) -> NapalmResult:
         r.success = True
         return r
 
+    # Legacy/telnet: ejecución vía netmiko (un comando por sesión)
+    if _netmiko_direct(d):
+        return _execute_netmiko_commands(device_id, commands, d)
+
     # Execute via NAPALM cli() — passes commands as list
     result = _execute(d, "cli", commands=commands, retry=False)
 
@@ -1487,6 +1708,12 @@ def run_commands(device_id: str, commands: list[str]) -> NapalmResult:
             {"command": cmd, "output": "", "error": result.error}
             for cmd in commands
         ]
+
+    # Fallback netmiko para legacy SSH cuando NAPALM cli() no es soportado
+    if not result.success and netmiko_svc.is_legacy_device(d):
+        logger.info("[%s] run_commands: NAPALM cli() falló (%s) — reintentando via netmiko",
+                    device_id, result.error)
+        return _execute_netmiko_commands(device_id, commands, d)
 
     return result
 
@@ -1537,6 +1764,22 @@ def ping(device_id: str, target: str) -> NapalmResult:
         except Exception as e:
             result.set_error("ping_error", str(e))
             return result
+
+    # Legacy/telnet: ping vía netmiko (CLI del equipo, por familia)
+    if _netmiko_direct(d):
+        try:
+            out = netmiko_svc.ping(d, target)
+        except Exception as e:
+            result = NapalmResult(device_id)
+            result.set_error("connection_error", f"netmiko ping: {e}")
+            return result
+        stats = out.get("success", {})
+        result = NapalmResult(device_id)
+        result.data = {"success": stats}
+        result.success = bool(stats.get("packet_loss", 100) < 100)
+        if out.get("raw"):
+            result.data["raw"] = out["raw"]
+        return result
 
     result = _execute(d, "ping", destination=target, retry=False)
     # NAPALM devuelve {"error": "..."} cuando el comando no es soportado
@@ -1632,7 +1875,7 @@ def get_resources(device_id: str) -> NapalmResult:
                 }
                 result.success = True
             api.close()
-        except Exception as e:
+        except Exception:
             result.data = {"cpu": 0, "memory_total": 0, "memory_used": 0, "hdd_total": 0, "hdd_free": 0}
             result.success = True
     elif d.get("driver") == "eos":

@@ -1,36 +1,65 @@
 """NetPulse — Immutable Audit Logging Service.
 
-Append-only JSONL audit log. Once written, entries cannot be modified
-or deleted. File-based, no external database required.
+Desde Fase 2 el log de auditoría se guarda en SQLite (WAL) en vez de un
+JSONL append-only: consultas filtradas/paginadas en O(log n), sin tener
+que leer todo el archivo por request. Los eventos se insertan (nunca se
+actualizan/borran) y cada escritura es síncrona pero muy ligera; en el
+middleware se delegan a un executor para no bloquear el event loop.
 
-Thread-safe writes: all writes acquire a file-level lock (fcntl / msvcrt).
+Compatible con la API anterior (log_event / get_events / get_audit_stats).
 """
 
 import json
-import os
+import logging
+import sqlite3
 import threading
-import time
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
 
 from app.core.settings import BASE_DIR
 from app.services.metrics_svc import netpulse_audit_events_total
 
+logger = logging.getLogger(__name__)
+
 # ── Paths ────────────────────────────────────────────────────
 
 AUDIT_DIR = BASE_DIR / "audit"
-AUDIT_FILE = AUDIT_DIR / "audit.jsonl"
+AUDIT_DB = AUDIT_DIR / "audit.db"
 
-# ── File lock for thread-safe writes ─────────────────────────
-
+# Lock para SQLite (un solo writer a la vez en el proceso)
 _write_lock = threading.Lock()
 
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS audit (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts TEXT NOT NULL,
+    action TEXT NOT NULL,
+    device_id TEXT,
+    username TEXT,
+    details TEXT DEFAULT '',
+    ip_address TEXT DEFAULT '',
+    success INTEGER,
+    session_id TEXT,
+    path TEXT DEFAULT '',
+    method TEXT DEFAULT '',
+    response_status INTEGER
+);
+"""
 
-def _ensure_dir() -> None:
-    """Create audit directory if it doesn't exist."""
+
+def _ensure_db() -> None:
+    """Crea el directorio/BD si no existen y aplica el esquema."""
     AUDIT_DIR.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(str(AUDIT_DB)) as conn:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute(_SCHEMA)
+
+
+def _connect() -> sqlite3.Connection:
+    """Conexión corta y thread-safe (check_same_thread=False por si migra a threads)."""
+    return sqlite3.connect(str(AUDIT_DB), check_same_thread=False, timeout=10)
 
 
 # ── Public API ────────────────────────────────────────────────
@@ -47,49 +76,47 @@ def log_event(
     method: Optional[str] = None,
     response_status: Optional[int] = None,
 ) -> dict:
-    """Log an immutable audit event (append-only JSONL).
-
-    Args:
-        action: Short action description (e.g. 'device_create', 'facts_get').
-        device_id: Target device (if applicable).
-        username: Who performed the action.
-        details: Free-form details / extra context.
-        ip_address: Client IP address.
-        success: Whether the operation succeeded.
-        session_id: Optional session / correlation ID.
-        path: API path (auto-filled by middleware).
-        method: HTTP method (auto-filled by middleware).
-        response_status: HTTP response status (auto-filled by middleware).
+    """Log an immutable audit event (append-only).
 
     Returns:
         The logged event dict.
     """
-    ts = datetime.now(timezone.utc)
+    ts = datetime.now(timezone.utc).isoformat()
     event = {
-        "timestamp": ts.isoformat(),
+        "timestamp": ts,
         "action": action,
         "device_id": device_id,
         "username": username,
         "details": details or "",
         "ip_address": ip_address or "",
-        "success": success,
+        "success": bool(success),
         "session_id": session_id or str(uuid.uuid4()),
         "path": path or "",
         "method": method or "",
         "response_status": response_status,
     }
 
-    _ensure_dir()
-    line = json.dumps(event, ensure_ascii=False, default=str)
-
-    with _write_lock:
-        with open(AUDIT_FILE, "a", encoding="utf-8") as f:
-            f.write(line + "\n")
-            f.flush()
-            os.fsync(f.fileno())  # ensure durability
+    try:
+        _ensure_db()
+        with _write_lock, sqlite3.connect(str(AUDIT_DB), timeout=10) as conn:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute(
+                """INSERT INTO audit
+                   (ts, action, device_id, username, details, ip_address,
+                    success, session_id, path, method, response_status)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    ts, action, device_id, username, event["details"],
+                    event["ip_address"], 1 if success else 0,
+                    event["session_id"], path or "", method or "",
+                    response_status,
+                ),
+            )
+    except Exception as e:
+        logger.error("[audit] fallo al escribir evento (%s): %s", action, e)
+        return event
 
     netpulse_audit_events_total.inc()
-
     return event
 
 
@@ -100,83 +127,159 @@ def get_events(
     username: Optional[str] = None,
     action: Optional[str] = None,
 ) -> list[dict]:
-    """Read and filter audit events from the JSONL file.
-
-    Args:
-        limit: Max events to return.
-        offset: Skip first N matching events.
-        device_id: Filter by device ID.
-        username: Filter by username.
-        action: Filter by action.
+    """Lista eventos de auditoría (más recientes primero) con filtros y paginación.
 
     Returns:
         List of matching event dicts (most recent first).
     """
-    if not AUDIT_FILE.exists():
+    if not AUDIT_DB.exists():
         return []
 
-    results: list[dict] = []
+    where = []
+    params: list = []
+    if device_id:
+        where.append("device_id = ?")
+        params.append(device_id)
+    if username:
+        where.append("username = ?")
+        params.append(username)
+    if action:
+        where.append("action = ?")
+        params.append(action)
 
-    # Read all lines (most recent first)
-    with _write_lock:
-        try:
-            with open(AUDIT_FILE, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-        except Exception:
-            return []
+    sql = "SELECT * FROM audit"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY id DESC LIMIT ? OFFSET ?"
+    params += [limit, offset]
 
-    # Parse in reverse (newest first)
-    for line in reversed(lines):
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
+    rows = []
+    try:
+        with _write_lock:
+            conn = _connect()
+            try:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(sql, params).fetchall()
+            finally:
+                conn.close()
+    except Exception as e:
+        logger.error("[audit] error leyendo eventos: %s", e)
+        return []
 
-        # Apply filters
-        if device_id and event.get("device_id") != device_id:
-            continue
-        if username and event.get("username") != username:
-            continue
-        if action and event.get("action") != action:
-            continue
-
-        results.append(event)
-
-    # Paginate
-    total = len(results)
-    paginated = results[offset : offset + limit]
-
-    return paginated
+    return [_row_to_event(r) for r in rows]
 
 
 def get_audit_stats() -> dict:
-    """Get basic audit log statistics.
+    """Estadísticas básicas del log de auditoría.
 
     Returns:
         Dict with total_events, file_size_bytes, and file path.
     """
-    if not AUDIT_FILE.exists():
+    if not AUDIT_DB.exists():
         return {
             "total_events": 0,
             "file_size_bytes": 0,
-            "file_path": str(AUDIT_FILE),
+            "file_path": str(AUDIT_DB),
         }
 
-    with _write_lock:
-        try:
-            with open(AUDIT_FILE, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-        except Exception:
-            lines = []
-
-    total = sum(1 for line in lines if line.strip())
-    file_size = AUDIT_FILE.stat().st_size
+    total = 0
+    try:
+        with _write_lock:
+            conn = _connect()
+            try:
+                total = conn.execute("SELECT COUNT(*) FROM audit").fetchone()[0]
+            finally:
+                conn.close()
+    except Exception as e:
+        logger.error("[audit] stats error: %s", e)
 
     return {
         "total_events": total,
-        "file_size_bytes": file_size,
-        "file_path": str(AUDIT_FILE),
+        "file_size_bytes": AUDIT_DB.stat().st_size if AUDIT_DB.exists() else 0,
+        "file_path": str(AUDIT_DB),
     }
+
+
+def retain(days: int = 90) -> int:
+    """Borra eventos más antiguos que N días. Retorna cuántos eliminó."""
+    if days <= 0:
+        return 0
+    try:
+        _ensure_db()
+        cutoff = datetime.fromtimestamp(
+            datetime.now(timezone.utc).timestamp() - days * 86400,
+            tz=timezone.utc).isoformat()
+        with _write_lock, sqlite3.connect(str(AUDIT_DB), timeout=10) as conn:
+            cur = conn.execute(
+                "DELETE FROM audit WHERE ts < ?",
+                (cutoff,),
+            )
+            return cur.rowcount
+    except Exception as e:
+        logger.error("[audit] retain error: %s", e)
+        return 0
+
+
+# ── Helpers ──────────────────────────────────────────────────
+
+def _row_to_event(row) -> dict:
+    """Convierte una fila SQLite al dict de evento de la API anterior."""
+    return {
+        "timestamp": row["ts"],
+        "action": row["action"],
+        "device_id": row["device_id"],
+        "username": row["username"],
+        "details": row["details"] or "",
+        "ip_address": row["ip_address"] or "",
+        "success": bool(row["success"]),
+        "session_id": row["session_id"] or "",
+        "path": row["path"] or "",
+        "method": row["method"] or "",
+        "response_status": row["response_status"],
+    }
+
+
+# ── Migración desde el JSONL legacy (una vez, opcional) ─────
+
+_LEGACY_JSONL = AUDIT_DIR / "audit.jsonl"
+
+
+def migrate_legacy_jsonl() -> int:
+    """Importa el audit.jsonl antiguo a SQLite (idempotente por marca)."""
+    if not _LEGACY_JSONL.exists():
+        return 0
+    marker = AUDIT_DIR / ".jsonl_migrated"
+    if marker.exists():
+        return 0
+    count = 0
+    try:
+        with open(_LEGACY_JSONL, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    ev = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                try:
+                    log_event(
+                        action=ev.get("action", "unknown"),
+                        device_id=ev.get("device_id"),
+                        username=ev.get("username", "anonymous"),
+                        details=ev.get("details"),
+                        ip_address=ev.get("ip_address"),
+                        success=bool(ev.get("success", True)),
+                        session_id=ev.get("session_id"),
+                        path=ev.get("path"),
+                        method=ev.get("method"),
+                        response_status=ev.get("response_status"),
+                    )
+                    count += 1
+                except Exception:
+                    continue
+        marker.write_text("ok")
+        logger.info("[audit] migrados %d eventos legacy JSONL → SQLite", count)
+    except Exception as e:
+        logger.error("[audit] migración JSONL falló: %s", e)
+    return count

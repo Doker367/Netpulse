@@ -209,7 +209,8 @@ def ping_target(device_id: str, target: str = "8.8.8.8"):
         if bash_ping.success and bash_ping.data:
             bash_out = str(bash_ping.data)
             has_success = "bytes from" in bash_out.lower() or "packets transmitted" in bash_out
-            rx = 0; tx = 0
+            rx = 0
+            tx = 0
             for line in bash_out.split("\n"):
                 if "packets transmitted" in line:
                     parts = line.split()
@@ -218,7 +219,8 @@ def ping_target(device_id: str, target: str = "8.8.8.8"):
                         rx = int(parts[3])
                 elif "bytes from" in line:
                     rx += 1
-            if tx == 0: tx = 2
+            if tx == 0:
+                tx = 2
             return PingResult(
                 device_id=device_id, target=target, success=rx > 0,
                 probes_sent=tx, probes_received=rx,

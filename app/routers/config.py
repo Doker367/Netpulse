@@ -5,7 +5,7 @@ Endpoints para backup, diff, y restauración de configuraciones.
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 
 from app.middleware.auth import JWTBearer
