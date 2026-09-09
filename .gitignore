@@ -20,9 +20,8 @@ build/
 .DS_Store
 Thumbs.db
 
-# Backups (generated)
-backups/*.cfg
-backups/netpulse_self_*.tar.gz
+# Backups (generated) — nunca commitear snapshots de dispositivos
+backups/*
 
 # Audit logs (pueden contener IPs/usernames)
 audit/
