@@ -67,7 +67,10 @@ html {
 body {
   background: var(--bg);
   color: var(--text);
-  min-height: 100vh
+  height: 100dvh;
+  min-height: 100vh;
+  display: flex;
+  overflow: hidden;
 }
 
 ::selection {
@@ -222,7 +225,9 @@ body {
 .main {
   display: none;
   height: 100vh;
-  overflow: hidden
+  overflow-y: auto;
+  flex: 1;
+  flex-direction: column;
 }
 
 .layout {
@@ -331,15 +336,22 @@ body {
 }
 
 .menu-btn {
-  background: transparent;
-  border: 0;
-  color: var(--text-ter);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all .15s
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .15s;
 }
 
 .menu-btn:hover {
-  color: var(--text)
+  background: var(--surface-hover);
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .logo-group {
@@ -371,21 +383,24 @@ body {
 /* ── Stats Bar ── */
 .stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 10px;
-  margin-bottom: 16px
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px
 }
 
 .sc {
-  background: var(--bg2);
+  background: var(--elevated);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  transition: border-color .15s
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  transition: all .2s ease
 }
 
 .sc:hover {
-  border-color: var(--border-h)
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
 }
 
 .sc .sl {
@@ -741,9 +756,9 @@ body {
   background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(4px);
   z-index: 9999;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 0;
   animation: fade .2s ease
 }
 
@@ -754,15 +769,20 @@ body {
 #dp .modal-content {
   background: var(--bg);
   width: 100%;
-  max-width: 1100px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
-  max-height: 90vh;
+  max-width: 900px;
+  border-radius: 0;
+  border-left: 1px solid var(--border);
+  box-shadow: -10px 0 50px rgba(0, 0, 0, 0.5);
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: sl 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: slideLeft 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }
 
 #dp .dh {

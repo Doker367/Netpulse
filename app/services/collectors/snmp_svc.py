@@ -208,6 +208,10 @@ def get_snmp_interfaces(
         p_stat = subprocess.run(cmd_stat, capture_output=True, text=True, timeout=timeout)
         stats = [x.strip() for x in p_stat.stdout.strip().splitlines() if x.strip()]
 
+        cmd_admin = ["snmpwalk", "-v2c", "-c", community, "-t", "2", "-r", "1", "-Oqv", host, "1.3.6.1.2.1.2.2.1.7"]
+        p_admin = subprocess.run(cmd_admin, capture_output=True, text=True, timeout=timeout)
+        admins = [x.strip() for x in p_admin.stdout.strip().splitlines() if x.strip()]
+
         cmd_spd = ["snmpwalk", "-v2c", "-c", community, "-t", "2", "-r", "1", "-Oqv", host, "1.3.6.1.2.1.2.2.1.5"]
         p_spd = subprocess.run(cmd_spd, capture_output=True, text=True, timeout=timeout)
         speeds = [x.strip() for x in p_spd.stdout.strip().splitlines() if x.strip()]
@@ -219,7 +223,12 @@ def get_snmp_interfaces(
         for i, raw_name in enumerate(names):
             if not raw_name or raw_name.startswith("No Such"):
                 continue
-            is_up = stats[i] == "1" if i < len(stats) else False
+            oper = stats[i] if i < len(stats) else ""
+            admin = admins[i] if i < len(admins) else "up"
+            # snmpwalk -Oqv devuelve etiquetas ("up"/"down") en vez de
+            # enteros ("1"/"2") — aceptar ambos formatos.
+            is_up = oper.lower() in ("up", "1", "true")
+            is_enabled = admin.lower() in ("up", "1", "true")
             speed_bps = int(speeds[i]) if i < len(speeds) and speeds[i].isdigit() else 1000000000
             speed_mbps = speed_bps // 1000000
             mac = macs[i] if i < len(macs) else "N/A"
@@ -227,7 +236,7 @@ def get_snmp_interfaces(
             interfaces[name] = {
                 "name": name,
                 "is_up": is_up,
-                "is_enabled": True,
+                "is_enabled": is_enabled,
                 "speed": speed_mbps,
                 "mac_address": mac,
                 "description": f"{name} (SNMP Managed)",

@@ -13,6 +13,7 @@ sufijo ``_telnet`` del ``device_type``.
 
 import logging
 import re
+import time
 from typing import Optional
 
 from netmiko import ConnectHandler
@@ -113,7 +114,7 @@ _RUNNING_CMDS = {
 _INTERFACES_CMDS = {
     "ios": ["show interfaces status", "show ip interface brief", "show interfaces"],
     "sg": ["show interfaces status", "show port status"],
-    "procurve": ["show interfaces status", "show interfaces summary"],
+    "procurve": ["show interfaces brief", "show interfaces status", "show interfaces summary"],
     "comware": ["display interface brief", "display interface"],
     "aos": ["show interfaces status", "show interfaces summary"],
     "sros": ["show port", "show interfaces"],
@@ -123,8 +124,160 @@ _INTERFACES_CMDS = {
 
 # ── Detección de transporte / driver ──────────────────────────────────────
 
+def _cli_channel(device: dict) -> Optional[str]:
+    """Devuelve el canal CLI del dispositivo si lo declara (modo dual SNMP+CLI).
+
+    Un equipo puede estar monitoreado por SNMP (protocol='snmp') pero tener
+    además acceso CLI por telnet/ssh (campo ``cli_transport``). En ese caso
+    las operaciones de red (interfaces, config, comandos) viajan por netmiko
+    usando este canal y su puerto (``cli_port``).
+    """
+    transport = str(device.get("cli_transport") or "").lower()
+    if transport not in ("ssh", "telnet"):
+        return None
+    return transport
+
+
+def _effective_port(device: dict) -> int:
+    """Puerto efectivo para la conexión netmiko (CLI dual o el del equipo)."""
+    transport = _cli_channel(device)
+    if transport:
+        return int(device.get("cli_port") or (23 if transport == "telnet" else 22))
+    try:
+        return int(device.get("port", 22) or 22)
+    except (TypeError, ValueError):
+        return 22
+
+
+# ── Motor telnet ligero para ProCurve/Aruba sin login (noauth) ────────────
+
+_NOAUTH_ANSI = re.compile(rb"\x1b\[[0-9;?]*[A-Za-z]|\x1b[=>]|[\x07]")
+
+
+def is_noauth_telnet(device: dict) -> bool:
+    """True si el equipo usa el motor ligero telnet (banner → shell directo).
+
+    Aplica a switches legacy tipo HP ProCurve/Aruba cuya sesión telnet no
+    pide usuario/contraseña (solo 'Press any key to continue').
+    """
+    return bool(device.get("noauth_telnet")) and is_telnet_device(device)
+
+
+def _noauth_clean(data: bytes) -> bytes:
+    return _NOAUTH_ANSI.sub(b"", data)
+
+
+def _noauth_family(device: dict) -> Optional[str]:
+    """Familia para el motor ligero, o None si no aplica."""
+    if not is_noauth_telnet(device):
+        return None
+    driver = str(device.get("driver") or "").lower()
+    if driver in ("procurve", "hpe", "aruba"):
+        return "procurve"
+    return None
+
+
+def _noauth_login(device: dict, timeout: float = 12.0):
+    """Abre sesión telnet y deja el shell listo. Devuelve (socket, prompt_bytes)."""
+    import socket as _socket
+    s = _socket.create_connection(
+        (device["hostname"], _effective_port(device)), timeout=8
+    )
+    s.settimeout(0.25)
+    buf = b""
+    t0 = time.monotonic()
+    while b"Press any key to continue" not in buf and time.monotonic() - t0 < timeout:
+        try:
+            d = s.recv(4096)
+            if d:
+                buf += d
+        except _socket.timeout:
+            continue
+    s.sendall(b"\r")
+    buf = b""
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < timeout:
+        try:
+            d = s.recv(4096)
+            if d:
+                buf += d
+                if b"#" in buf:
+                    break
+        except _socket.timeout:
+            continue
+    text = _noauth_clean(buf)
+    idx = max(text.rfind(b"\n"), text.rfind(b"\r"))
+    base = text[idx + 1:].strip() if idx >= 0 else text.strip()
+    if not base:
+        base = b"#"
+    return s, base
+
+
+def _noauth_exec(device: dict, command: str, read_timeout: float = 25.0) -> str:
+    """Ejecuta un comando por telnet ligero y devuelve la salida limpia."""
+    import socket as _socket
+    s = None
+    try:
+        s, base = _noauth_login(device)
+        # Desactivar paginación (equivalente a netmiko disable_paging)
+        s.sendall(b"no page\r")
+        t0 = time.monotonic()
+        while time.monotonic() - t0 < 2.0:
+            try:
+                d = s.recv(4096)
+                if d and b"# " in d or (d and base in d):
+                    break
+            except _socket.timeout:
+                break
+
+        s.sendall(command.encode("utf-8", "replace") + b"\r")
+        buf = b""
+        t0 = time.monotonic()
+        last = time.monotonic()
+        while time.monotonic() - t0 < read_timeout:
+            try:
+                d = s.recv(4096)
+                if d:
+                    buf += d
+                    last = time.monotonic()
+            except _socket.timeout:
+                pass
+            t = _noauth_clean(buf)
+            # Avanzar paginación "-- MORE --"
+            if b"MORE" in t[-100:] and time.monotonic() - last > 0.15:
+                s.sendall(b" ")
+                last = time.monotonic()
+            if base and (t.endswith(base) or base in t[-len(base) - 60:]):
+                if time.monotonic() - last > 0.25:
+                    break
+        clean = _noauth_clean(buf)
+        # Quitar el eco del comando (hasta el primer salto de línea)
+        cut = clean.find(b"\n\r")
+        if cut < 0:
+            cut = clean.find(b"\r\n")
+        if cut < 0:
+            cut = clean.find(b"\n")
+        out = clean[cut + 2:] if cut >= 0 else clean
+        if base:
+            i = out.rfind(base)
+            if i >= 0:
+                out = out[:i]
+        return out.decode("ascii", "replace").strip()
+    finally:
+        if s:
+            try:
+                s.close()
+            except Exception:
+                pass
+
+
 def is_telnet_device(device: dict) -> bool:
     """True si el dispositivo usa telnet (protocolo explícito o puerto 23)."""
+    transport = _cli_channel(device)
+    if transport == "telnet":
+        return True
+    if transport == "ssh":
+        return False
     proto = str(device.get("protocol") or "").lower()
     if proto == "telnet":
         return True
@@ -139,6 +292,8 @@ def is_telnet_device(device: dict) -> bool:
 def is_legacy_device(device: dict) -> bool:
     """True si el dispositivo debe usar el motor netmiko."""
     if device.get("netmiko_device_type"):
+        return True
+    if _cli_channel(device):
         return True
     if is_telnet_device(device):
         return True
@@ -200,13 +355,13 @@ def _connect(device: dict):
         "host": device["hostname"],
         "username": username,
         "password": password,
-        "port": device.get("port", 22),
-        "timeout": 20,
-        "conn_timeout": 15,
-        "banner_timeout": 15,
-        "auth_timeout": 15,
+        "port": _effective_port(device),
+        "timeout": 12,
+        "conn_timeout": 8,
+        "banner_timeout": 8,
+        "auth_timeout": 8,
         "fast_cli": False,
-        "global_delay_factor": 2,  # equipos viejos: más lento
+        "global_delay_factor": 1,  # equipos viejos: ritmo normal
     }
 
     # Enable secret (Cisco/equipos que lo piden)
@@ -222,7 +377,23 @@ def _connect(device: dict):
                 dt, device["hostname"], conn_params["port"],
                 device.get("driver"), "telnet" if is_telnet_device(device) else "ssh")
 
-    conn = ConnectHandler(**conn_params)
+    # HP ProCurve "seem to fail more on connection than they should" (netmiko);
+    # reintenta logins intermitentes sin dejar sockets colgados.
+    import time as _time
+    last_err: Optional[Exception] = None
+    conn = None
+    for attempt in range(3):
+        try:
+            conn = ConnectHandler(**conn_params)
+            break
+        except Exception as exc:  # noqa: BLE001
+            last_err = exc
+            if attempt < 2:
+                logger.warning("[netmiko] login/connect a %s falló (intento %d): %s — reintentando",
+                               device["hostname"], attempt + 1, exc)
+                _time.sleep(1.0)
+    if conn is None:
+        raise last_err if last_err else ConnectionError(f"No se pudo conectar a {device['hostname']}")
 
     # Entrar a enable mode si el equipo lo requiere (Cisco, SG, etc.)
     if secret and hasattr(conn, "check_enable_mode"):
@@ -252,6 +423,16 @@ def _run(device: dict, command: str, read_timeout: int = 30) -> str:
 @limited
 def execute_command(device: dict, command: str) -> dict:
     """Ejecuta un comando y devuelve {output, error}."""
+    # Motor ligero (ProCurve/Aruba sin login por telnet)
+    if _noauth_family(device):
+        try:
+            output = _noauth_exec(device, command, read_timeout=30)
+            return {"output": output, "error": None}
+        except Exception as e:
+            logger.warning("[netmiko] noauth comando '%s' falló en %s: %s",
+                           command, device.get("id"), e)
+            return {"output": "", "error": str(e)}
+
     conn = None
     try:
         conn = _connect(device)
@@ -274,6 +455,22 @@ def execute_command(device: dict, command: str) -> dict:
 @limited
 def get_running_config(device: dict) -> Optional[str]:
     """Obtiene la running-config (o equivalente) por familia."""
+    # Motor ligero (ProCurve/Aruba sin login por telnet)
+    fam = _noauth_family(device)
+    if fam:
+        for cmd in _RUNNING_CMDS.get(fam, ["show running-config"]):
+            try:
+                out = _noauth_exec(device, cmd, read_timeout=40)
+            except Exception as e:
+                logger.warning("[netmiko] noauth running-config falló para %s: %s",
+                               device["id"], e)
+                continue
+            if out and "Invalid" not in out and "% Unknown" not in out:
+                logger.info("[netmiko] running-config %s via noauth telnet (%d bytes)",
+                            device["id"], len(out))
+                return out
+        return None
+
     fam = _family_device_type(device)
     if not fam:
         return None
@@ -374,6 +571,23 @@ def get_facts(device: dict) -> Optional[dict]:
 @limited
 def get_interfaces(device: dict) -> Optional[dict]:
     """Interfaces con estado vía netmiko, por familia."""
+    # Motor ligero (ProCurve/Aruba sin login por telnet)
+    fam = _noauth_family(device)
+    if fam:
+        for cmd in _INTERFACES_CMDS.get(fam, ["show interfaces brief"]):
+            try:
+                out = _noauth_exec(device, cmd, read_timeout=30)
+            except Exception as e:
+                logger.warning("[netmiko] noauth interfaces falló para %s (%s): %s",
+                               device["id"], cmd, e)
+                continue
+            parsed = _parse_interfaces(out, fam)
+            if parsed:
+                logger.info("[netmiko] interfaces %s (%s) → %d vía noauth '%s'",
+                            device["id"], fam, len(parsed), cmd)
+                return parsed
+        return None
+
     fam = _family_device_type(device)
     if not fam:
         return None
@@ -409,16 +623,35 @@ def _parse_interfaces(out: str, fam: str) -> dict:
         return interfaces
 
     if fam == "procurve":
-        # Port  Type  Status  Mode ...   /   show interfaces summary
+        # Formato ProCurve/Aruba "show interfaces brief|status":
+        #   Port  Type      | Intrusion ... Enabled Status Mode ...
+        #   1     100/1000T | No        Yes     Up     1000FDx   MDIX ...
         for line in out.splitlines():
-            m = re.match(r"^(\S+)\s+\S+\s+(Up|Down|Disabled)", line, re.IGNORECASE)
+            m = re.match(
+                r"^\s*(\d+)\s+\S+\s+\|\s+(?:No|Yes)\s+(Yes|No)\s+(Up|Down|Disabled)(?:\s+(\S+))?",
+                line, re.IGNORECASE,
+            )
+            if not m:
+                # Sin columna separador "|" (algunos firmware)
+                m = re.match(
+                    r"^\s*(\d+)\s+\S+\s+(Yes|No)\s+(Up|Down|Disabled)(?:\s+(\S+))?",
+                    line, re.IGNORECASE,
+                )
             if m:
-                name, state = m.group(1), m.group(2).lower()
-                interfaces[name] = {
+                name = m.group(1)
+                state = m.group(3).lower()
+                enabled = m.group(2).lower() == "yes"
+                speed = None
+                mode = m.group(4)
+                if mode:
+                    sm = re.search(r"(\d{2,4})(?:FD|HD)x?", mode, re.IGNORECASE)
+                    if sm:
+                        speed = int(sm.group(1))
+                interfaces[f"Port {name}"] = {
                     "is_up": state == "up",
-                    "is_enabled": state != "disabled",
+                    "is_enabled": enabled and state != "disabled",
                     "description": "",
-                    "speed": None,
+                    "speed": speed if state == "up" else None,
                     "mac_address": "",
                 }
         return interfaces
