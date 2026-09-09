@@ -3135,7 +3135,9 @@
   </div>
 
   <script>
-    const A = 'http://localhost:8082/api';
+    const A = (window.location.origin && window.location.origin !== 'null')
+      ? window.location.origin + '/api'
+      : 'http://localhost:8082/api';
     let t = '', devices = [], sel = null, aTab = 'facts', cmdH = [], bSel = new Set(), bMode = false, currentUser = null;
     let currentLang = localStorage.getItem('np_lang') || 'en';
 
