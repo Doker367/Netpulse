@@ -15,19 +15,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/topology", tags=["Topology"])
 
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 @router.get(
     "/map",
     dependencies=[Depends(JWTBearer()), Depends(requires_role("viewer"))],
 )
 def topology_map():
-    """Construye el mapa de topología desde LLDP de todos los dispositivos.
-
-    Returns:
-        {
-          "nodes": [{"id", "driver", "type", "group"}],
-          "links": [{"source", "target", "local_port", "remote_port"}]
-        }
-    """
+    """Construye el mapa de topología desde LLDP de todos los dispositivos de forma concurrente."""
     devices = inventory_svc.list_devices()
     nodes = []
     links = []
@@ -41,23 +36,36 @@ def topology_map():
             "group": d.get("group", ""),
         })
 
-        result = napalm_svc.get_lldp_neighbors(d["id"])
-        if not result.success:
-            continue
+    def _fetch_lldp(dev_id):
+        try:
+            res = napalm_svc.get_lldp_neighbors(dev_id)
+            return dev_id, res
+        except Exception:
+            return dev_id, None
 
-        neighbors = result.data or {}
-        # NAPALM format: {interface: [{'hostname':..., 'port':...}, ...]}
+    lldp_results = {}
+    if devices:
+        with ThreadPoolExecutor(max_workers=min(len(devices), 10)) as executor:
+            futures = {executor.submit(_fetch_lldp, d["id"]): d["id"] for d in devices}
+            for future in as_completed(futures):
+                dev_id, res = future.result()
+                if res and res.success:
+                    lldp_results[dev_id] = res.data or {}
+
+    for d in devices:
+        dev_id = d["id"]
+        neighbors = lldp_results.get(dev_id, {})
         for local_port, nbr_list in neighbors.items():
             for nbr in nbr_list or []:
                 remote = nbr.get("hostname", "")
                 if not remote:
                     continue
-                key = tuple(sorted([d["id"], remote]))
+                key = tuple(sorted([dev_id, remote]))
                 if key in seen_links:
                     continue
                 seen_links.add(key)
                 links.append({
-                    "source": d["id"],
+                    "source": dev_id,
                     "target": remote,
                     "local_port": local_port,
                     "remote_port": nbr.get("port", ""),

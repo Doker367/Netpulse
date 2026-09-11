@@ -11,3 +11,4 @@ pyotp
 librouteros
 nornir
 reportlab
+psutil

@@ -196,10 +196,19 @@ def rollback_device_config(device_id: str):
     dependencies=[Depends(JWTBearer()), Depends(requires_role("viewer"))],
 )
 def list_backups(device_id: str):
-    """Lista los backups disponibles para un dispositivo."""
-    import os, glob
-    pattern = str(BACKUP_DIR / f"{device_id}_*.cfg")
-    files = sorted(glob.glob(pattern), reverse=True)[:20]
+    """Lista los backups disponibles para un dispositivo.
+
+    El nombre en disco usa un ``device_id`` saneado (espacios → ``_``) y
+    puede tener extensión ``.cfg`` (config) o ``.json`` (snapshot SNMP/ROS).
+    """
+    import os
+    import glob
+
+    safe_id = "".join(c if c.isalnum() or c in "-_" else "_" for c in device_id)
+    files: list[str] = []
+    for ext in ("cfg", "json"):
+        files.extend(glob.glob(str(BACKUP_DIR / f"{safe_id}_*.{ext}")))
+    files = sorted(set(files), key=os.path.getmtime, reverse=True)[:20]
     return [
         {
             "filename": os.path.basename(f),
@@ -209,3 +218,22 @@ def list_backups(device_id: str):
         }
         for f in files
     ]
+
+
+@router.get(
+    "/{device_id}/backups/{filename}",
+    dependencies=[Depends(JWTBearer()), Depends(requires_role("viewer"))],
+)
+def download_backup(device_id: str, filename: str):
+    """Descarga un archivo de backup concreto (solo dentro de BACKUP_DIR)."""
+    import os
+
+    from fastapi import HTTPException
+    from fastapi.responses import FileResponse
+
+    safe_name = os.path.basename(filename)
+    path = (BACKUP_DIR / safe_name).resolve()
+    if BACKUP_DIR.resolve() not in path.parents or not path.is_file():
+        raise HTTPException(404, f"Backup '{safe_name}' no encontrado")
+    media = "application/json" if path.suffix == ".json" else "text/plain"
+    return FileResponse(path, filename=safe_name, media_type=media)
