@@ -16,7 +16,7 @@ from app.middleware.audit import AuditMiddleware
 from app.middleware.metrics import MetricsMiddleware
 from app.middleware.security import SecurityHeadersMiddleware
 from app.models.schemas import HealthResponse
-from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy, alerts, topology, traffic, ops, security_ext, integrations, collectors
+from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy, alerts, topology, traffic, ops, security_ext, integrations, collectors, system
 from app.services.inventory_svc import list_devices
 
 # ── Rate Limiter (definido en app/core/limiter.py) ──────────
@@ -41,12 +41,34 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"⚠️ Syslog collector no arrancó: {e}")
 
+    # Arrancar poller de métricas (host + dispositivos)
+    from app.core.settings import METRICS_ENABLED, METRICS_INTERVAL
+    if METRICS_ENABLED and METRICS_INTERVAL > 0:
+        try:
+            from app.services.collectors import metrics_poller
+            metrics_poller.start(METRICS_INTERVAL)
+            print(f"📊 Metrics poller iniciado (intervalo {METRICS_INTERVAL}s)")
+        except Exception as e:
+            print(f"⚠️ Metrics poller no arrancó: {e}")
+
     yield
 
     # Shutdown: detener collectors
     try:
         from app.services.collectors import syslog_svc
         syslog_svc.stop_syslog_collector()
+    except Exception:
+        pass
+
+    try:
+        from app.services.collectors import metrics_poller
+        metrics_poller.stop()
+    except Exception:
+        pass
+
+    try:
+        from app.services import metrics_history_svc
+        metrics_history_svc.flush()
     except Exception:
         pass
 
@@ -130,6 +152,7 @@ app.include_router(ops.router)
 app.include_router(security_ext.router)
 app.include_router(integrations.router)
 app.include_router(collectors.router)
+app.include_router(system.router)
 
 # ── Static files (Dashboard UI) ──────────────────────────────
 

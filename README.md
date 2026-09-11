@@ -94,6 +94,8 @@ NETPULSE_PORT=8082
 NAPALM_TIMEOUT=60
 NETBOX_URL=http://localhost:8000
 NETBOX_TOKEN=<tu-token>
+NETPULSE_METRICS_ENABLED=true
+NETPULSE_METRICS_INTERVAL=60
 ```
 
 ## API Endpoints principales
@@ -105,6 +107,10 @@ NETBOX_TOKEN=<tu-token>
 - `GET /api/config/{id}/raw` — configuración
 - `GET /api/metrics` — métricas Prometheus
 - `GET /api/prometheus/v1/query` — proxy Prometheus
+- `GET /api/system/host` — métricas del servidor NetPulse (CPU/RAM/disco/red/proceso)
+- `GET /api/system/devices` — recursos y latencia de todos los dispositivos
+- `GET /api/system/overview` — resumen consolidado (host + dispositivos + poller)
+- `POST /api/system/poll` — fuerza un ciclo de recolección (admin)
 
 ## Licencia
 

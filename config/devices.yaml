@@ -51,3 +51,21 @@ devices:
   protocol: snmp
   tags: []
   type: switch
+- cli_port: 23
+  cli_transport: telnet
+  credentials:
+    community: public
+    password: ''
+    username: admin
+  description: ''
+  driver: snmp
+  enable_password: ''
+  group: null
+  hostname: 192.168.1.30
+  id: enterases
+  netmiko_device_type: enterasys
+  noauth_telnet: false
+  port: 23
+  protocol: snmp
+  tags: []
+  type: router

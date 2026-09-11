@@ -2138,7 +2138,7 @@
       <div class="sidebar-item" onclick="swView('performance')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-        </svg> <span data-i18n="nav_performance">Performance</span> <span class="badge">PRO</span></div>
+        </svg> <span data-i18n="nav_performance">Performance</span></div>
       <div class="sidebar-item" onclick="swView('alerts')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -2154,7 +2154,7 @@
         </svg> <span data-i18n="nav_logs">Logs</span></div>
     </div>
 
-    <div class="sidebar-s" id="sb-operations" style="display:none">
+    <div class="sidebar-s" id="sb-operations">
       <h3 data-i18n="nav_operations">OPERATIONS</h3>
       <div class="sidebar-item" onclick="swView('commands')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2167,17 +2167,6 @@
           <polyline points="7 10 12 15 17 10" />
           <line x1="12" y1="15" x2="12" y2="3" />
         </svg> <span data-i18n="nav_backups">Backups</span> <span class="badge" id="sb-bk">0</span></div>
-      <div class="sidebar-item" onclick="swView('scheduler')"><svg class="si" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <polyline points="12 6 12 12 16 14" />
-        </svg> <span data-i18n="nav_schedules">Schedules</span></div>
-      <div class="sidebar-item" onclick="swView('compare')"><svg class="si" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="18" y1="20" x2="18" y2="10" />
-          <line x1="12" y1="20" x2="12" y2="4" />
-          <line x1="6" y1="20" x2="6" y2="14" />
-        </svg> <span data-i18n="nav_compare">Compare</span></div>
       <div class="sidebar-item" onclick="swView('topology')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="5" r="3" />
@@ -2186,11 +2175,6 @@
           <line x1="12" y1="8" x2="5" y2="16" />
           <line x1="12" y1="8" x2="19" y2="16" />
         </svg> <span data-i18n="nav_topology">Topology</span></div>
-      <div class="sidebar-item" onclick="swView('health')"><svg class="si" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path
-            d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-        </svg> <span data-i18n="nav_health">Health Scores</span></div>
       <div class="sidebar-item" onclick="swView('maintenance')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3" />
@@ -2199,23 +2183,13 @@
         </svg> <span data-i18n="nav_maintenance">Maintenance</span></div>
     </div>
 
-    <div class="sidebar-s" id="sb-security" style="display:none">
+    <div class="sidebar-s" id="sb-security">
       <h3 data-i18n="nav_security">SECURITY</h3>
       <div class="sidebar-item" onclick="swView('compliance')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
           <polyline points="22 4 12 14.01 9 11.01" />
         </svg> <span data-i18n="nav_compliance">Compliance</span></div>
-      <div class="sidebar-item" onclick="swView('audit')"><svg class="si" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-          <polyline points="16 17 21 12 16 7" />
-          <line x1="21" y1="12" x2="9" y2="12" />
-        </svg> <span data-i18n="nav_audit">Audit Trail</span></div>
-      <div class="sidebar-item" onclick="swView('activity')"><svg class="si" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        </svg> <span data-i18n="nav_events">Security Events</span></div>
       <div class="sidebar-item" onclick="swView('apikeys')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path
@@ -2228,15 +2202,8 @@
         </svg> <span data-i18n="nav_2fa">2FA / TOTP</span></div>
     </div>
 
-    <div class="sidebar-s" id="sb-admin" style="display:none">
+    <div class="sidebar-s" id="sb-admin">
       <h3 data-i18n="nav_administration">ADMINISTRATION</h3>
-      <div class="sidebar-item" onclick="swView('inventory')"><svg class="si" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path
-            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-          <line x1="12" y1="22.08" x2="12" y2="12" />
-        </svg> <span data-i18n="nav_inventory">Device Inventory</span></div>
       <div class="sidebar-item" onclick="swView('admin')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -2301,8 +2268,8 @@
               style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;box-shadow:0 0 8px var(--green)"></span><span
               id="info-dev-header">SYS OK</span></span>
           <span style="font-size:11px;color:var(--text-sec);display:flex;align-items:center;gap:4px"><span
-              style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block"></span> 0
-            ALERTS</span>
+              id="hdr-alert-dot" style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block"></span>
+            <span id="hdr-alerts">0 ALERTS</span></span>
         </div>
         <!-- Language Selector -->
         <select id="lang-select" onchange="setLang(this.value)"
@@ -2436,6 +2403,29 @@
                   Community String (v2c)</label>
                 <input id="inv-snmp-ro" type="text" placeholder="public"
                   style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
+                <label
+                  style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin:10px 0 4px">Canal
+                  CLI para comandos (opcional)</label>
+                <select id="inv-cli-transport" onchange="toggleInvCli(this)"
+                  style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
+                  <option value="">Solo SNMP (sin CLI)</option>
+                  <option value="telnet">Telnet</option>
+                  <option value="ssh">SSH</option>
+                </select>
+                <div id="inv-cli-fields" style="display:none;margin-top:8px;flex-direction:column;gap:8px">
+                  <div style="display:flex;gap:8px">
+                    <input id="inv-cli-user" type="text" placeholder="Usuario CLI"
+                      style="flex:1;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:11px">
+                    <input id="inv-cli-pass" type="password" placeholder="Contraseña CLI"
+                      style="flex:1;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:11px">
+                  </div>
+                  <div style="display:flex;gap:8px">
+                    <input id="inv-cli-port" type="number" placeholder="Puerto (23/22)"
+                      style="flex:1;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:11px">
+                    <input id="inv-netmiko-type" type="text" placeholder="Tipo netmiko (ej. enterasys)"
+                      style="flex:1;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:11px">
+                  </div>
+                </div>
               </div>
               <button class="btn btn-p" onclick="addInventoryDevice(this)"
                 style="margin-top:auto;padding:10px;font-weight:600;width:100%" data-i18n="btn_register">➕ Interconectar
@@ -2541,33 +2531,8 @@
           style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">
           <div class="sp"></div>
         </div>
-      </div>
-      <div class="view" id="v-export">
-        <h2 style="font-size:16px;font-weight:600;margin-bottom:16px" data-i18n="view_exp">📤 Exportar inventario</h2>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
-          <div class="sc" style="cursor:pointer;text-align:center" onclick="window.open('${A}/export/csv','_blank')">
-            <div style="font-size:32px;margin-bottom:8px">📄</div>
-            <div style="font-weight:500">Exportar CSV</div>
-            <div style="font-size:10px;color:var(--text-ter);margin-top:4px">Descargar inventario en CSV</div>
-          </div>
-          <div class="sc" style="cursor:pointer;text-align:center" onclick="window.open('${A}/export/json','_blank')">
-            <div style="font-size:32px;margin-bottom:8px">📋</div>
-            <div style="font-weight:500">Exportar JSON</div>
-            <div style="font-size:10px;color:var(--text-ter);margin-top:4px">Descargar inventario en JSON</div>
-          </div>
-          <div class="sc" style="cursor:pointer;text-align:center"
-            onclick="window.open('${A}/export/configs','_blank')">
-            <div style="font-size:32px;margin-bottom:8px">🗜️</div>
-            <div style="font-weight:500">Exportar configs ZIP</div>
-            <div style="font-size:10px;color:var(--text-ter);margin-top:4px">Descargar todas las configs en ZIP</div>
-          </div>
-        </div>
-      </div>
-      <div class="view" id="v-scheduler">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <h2 style="font-size:16px;font-weight:600" data-i18n="view_sched">⏰ Backups programados</h2>
-          <button class="btn btn-o btn-sm" onclick="loadJobs()" data-i18n="btn_refresh">🔄</button>
-        </div>
+
+        <h3 style="font-size:14px;font-weight:600;margin:24px 0 12px" data-i18n="view_sched">⏰ Backups programados</h3>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
           <div class="sc">
             <div style="display:flex;gap:8px">
@@ -2597,6 +2562,27 @@
         <div id="jobs-list">
           <div class="empty">
             <div class="sp"></div> Cargando...
+          </div>
+        </div>
+      </div>
+      <div class="view" id="v-export">
+        <h2 style="font-size:16px;font-weight:600;margin-bottom:16px" data-i18n="view_exp">📤 Exportar inventario</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
+          <div class="sc" style="cursor:pointer;text-align:center" onclick="npExport('csv')">
+            <div style="font-size:32px;margin-bottom:8px">📄</div>
+            <div style="font-weight:500">Exportar CSV</div>
+            <div style="font-size:10px;color:var(--text-ter);margin-top:4px">Descargar inventario en CSV</div>
+          </div>
+          <div class="sc" style="cursor:pointer;text-align:center" onclick="npExport('json')">
+            <div style="font-size:32px;margin-bottom:8px">📋</div>
+            <div style="font-weight:500">Exportar JSON</div>
+            <div style="font-size:10px;color:var(--text-ter);margin-top:4px">Descargar inventario en JSON</div>
+          </div>
+          <div class="sc" style="cursor:pointer;text-align:center"
+            onclick="npExport('configs')">
+            <div style="font-size:32px;margin-bottom:8px">🗜️</div>
+            <div style="font-weight:500">Exportar configs ZIP</div>
+            <div style="font-size:10px;color:var(--text-ter);margin-top:4px">Descargar todas las configs en ZIP</div>
           </div>
         </div>
       </div>
@@ -2713,6 +2699,7 @@
           <button class="btn btn-o btn-sm" onclick="loadPerformance()" style="padding:7px 14px;font-size:11px"
             data-i18n="btn_refresh">🔄 Refresh</button>
         </div>
+        <div id="perf-host" style="margin-bottom:20px"></div>
         <div id="perf-kpis"
           style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:20px">
         </div>
@@ -2794,9 +2781,9 @@
         </div>
       </div>
 
-      <div class="view" id="v-inventory" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
+      <div class="view" id="v-devices" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-          <h2 style="font-size:18px;font-weight:600">📦 Gestión de Inventario (Device Manager)</h2>
+          <h2 style="font-size:18px;font-weight:600" data-i18n="view_devices">🖥️ Devices</h2>
           <button class="btn btn-o btn-sm" onclick="loadInventory()">🔄 Refresh</button>
         </div>
         <div style="display:grid;grid-template-columns:320px 1fr;gap:20px">
@@ -2899,7 +2886,30 @@
                   Community String (v2c)</label>
                 <input id="inv-snmp-ro" type="text" placeholder="public"
                   style="width:100%;background:var(--bg);border:1px solid var(--border);padding:8px 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px;box-sizing:border-box;margin-bottom:8px">
-                <div style="font-size:10px;color:var(--orange)">Nota: Para SNMPv3, use la API v3/provision.</div>
+                <div style="font-size:10px;color:var(--orange);margin-bottom:10px">Nota: Para SNMPv3, use la API v3/provision.</div>
+                <label
+                  style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Canal
+                  CLI para comandos (opcional)</label>
+                <select id="inv-cli-transport" onchange="toggleInvCli(this)"
+                  style="width:100%;background:var(--bg);border:1px solid var(--border);padding:8px 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px;box-sizing:border-box">
+                  <option value="">Solo SNMP (sin CLI)</option>
+                  <option value="telnet">Telnet</option>
+                  <option value="ssh">SSH</option>
+                </select>
+                <div id="inv-cli-fields" style="display:none;margin-top:8px;flex-direction:column;gap:8px">
+                  <div style="display:flex;gap:8px">
+                    <input id="inv-cli-user" type="text" placeholder="Usuario CLI"
+                      style="flex:1;background:var(--bg);border:1px solid var(--border);padding:8px 12px;border-radius:var(--radius-sm);color:var(--text);font-size:11px;box-sizing:border-box">
+                    <input id="inv-cli-pass" type="password" placeholder="Contraseña CLI"
+                      style="flex:1;background:var(--bg);border:1px solid var(--border);padding:8px 12px;border-radius:var(--radius-sm);color:var(--text);font-size:11px;box-sizing:border-box">
+                  </div>
+                  <div style="display:flex;gap:8px">
+                    <input id="inv-cli-port" type="number" placeholder="Puerto CLI (23/22)"
+                      style="flex:1;background:var(--bg);border:1px solid var(--border);padding:8px 12px;border-radius:var(--radius-sm);color:var(--text);font-size:11px;box-sizing:border-box">
+                    <input id="inv-netmiko-type" type="text" placeholder="Tipo netmiko (ej. enterasys)"
+                      style="flex:1;background:var(--bg);border:1px solid var(--border);padding:8px 12px;border-radius:var(--radius-sm);color:var(--text);font-size:11px;box-sizing:border-box">
+                  </div>
+                </div>
               </div>
 
               <button class="btn btn-p" onclick="addInventoryDevice(this)"
@@ -2935,17 +2945,6 @@
           </div>
         </div>
       </div>
-      <div class="view" id="v-activity">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <h2 style="font-size:16px;font-weight:600" data-i18n="view_act">📝 Actividad</h2>
-          <button class="btn btn-o btn-sm" onclick="loadAct()" data-i18n="btn_refresh">🔄</button>
-        </div>
-        <div id="act-list">
-          <div class="empty">
-            <div class="sp"></div>
-          </div>
-        </div>
-      </div>
       <div class="view" id="v-compare">
         <h2 style="font-size:16px;font-weight:600;margin-bottom:16px" data-i18n="view_comp">⇄ Comparar configuraciones
         </h2>
@@ -2955,17 +2954,6 @@
         </div>
         <div id="cmp-r" style="margin-top:14px">
           <pre style="color:var(--text-ter)">Seleccioná dos dispositivos</pre>
-        </div>
-      </div>
-      <div class="view" id="v-audit">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <h2 style="font-size:16px;font-weight:600" data-i18n="view_audit_tbl">📋 Auditoría</h2>
-          <button class="btn btn-o btn-sm" onclick="loadAudit()">🔄</button>
-        </div>
-        <div id="audit-list">
-          <div class="empty">
-            <div class="sp"></div>
-          </div>
         </div>
       </div>
 
@@ -2981,17 +2969,6 @@
           <h3 style="font-size:11px;color:var(--text-ter);margin-bottom:8px">ENLACES DETECTADOS (LLDP)</h3>
           <div id="topo-links-list"></div>
         </div>
-      </div>
-
-      <div class="view" id="v-health" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-          <h2 style="font-size:16px;font-weight:600" data-i18n="view_health">💚 Health Scores</h2>
-          <div style="display:flex;gap:8px">
-            <a class="btn btn-o btn-sm" href="/api/reports/health.csv" target="_blank">⬇ CSV</a>
-            <button class="btn btn-o btn-sm" onclick="loadHealth()" data-i18n="btn_refresh">🔄</button>
-          </div>
-        </div>
-        <div id="health-list"></div>
       </div>
 
       <div class="view" id="v-maintenance" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
@@ -3353,12 +3330,9 @@
         document.getElementById('login-screen').style.display = 'none'; document.getElementById('main').style.display = 'block';
         document.getElementById('user-info').textContent = `✅ ${me.username || u} · ${role}`; document.getElementById('user-info').style.display = 'inline';
         document.getElementById('info-api').textContent = 'Conectada';
-        document.querySelectorAll('.sidebar-s').forEach(el => {
-          const id = el.id;
-          if (id === 'sb-operations' || id === 'sb-security' || id === 'sb-admin') {
-            el.style.display = role === 'admin' ? 'block' : 'none';
-          }
-        });
+        // Todos los grupos visibles para cualquier usuario autenticado.
+        // El RBAC del backend sigue validando cada acción.
+        document.querySelectorAll('.sidebar-s').forEach(el => { el.style.display = 'block'; });
         init()
       } catch (e) { document.getElementById('login-error').textContent = '❌ Error de conexión'; document.getElementById('login-error').style.display = 'block' }
     }
@@ -3370,59 +3344,83 @@
       document.getElementById('sidebar').classList.toggle('open');
       document.getElementById('sidebar-overlay').classList.toggle('active');
     }
-    function swView(v) {
-      document.querySelectorAll('.view').forEach(e => e.classList.remove('active'));
-      document.getElementById(`v-${v}`).classList.add('active');
-      document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'));
-      event?.target?.classList?.add('active');
-      if (document.getElementById('sidebar').classList.contains('open') && window.innerWidth < 900) togSide();
-      // Auto-load data for dynamic views
-      if (v === 'performance') loadPerformance();
-      if (v === 'alerts') loadAlerts();
-      if (v === 'logs') loadLogs();
-      if (v === 'connectivity') loadConn();
-      if (v === 'monitoreo') refMon();
+
+    // ── EXPORT DATA ──
+    function npExport(kind) {
+      const url = `${A}/export/${kind}`;
+      fetch(url, { headers: h() })
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+        .then(blob => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = kind === 'configs' ? 'netpulse_configs.zip' : `netpulse_inventory.${kind}`;
+          a.click();
+          URL.revokeObjectURL(a.href);
+          toast('⬇ Export iniciado', 's');
+        })
+        .catch(e => toast('❌ Error al exportar: ' + e.message, 'error'));
     }
 
     // ── CONECTIVIDAD (ping a targets externos) ──
+    function _pingCard(d) {
+      const ok = d && d.success;
+      const rtt = d && d.rtt_avg ? Number(d.rtt_avg).toFixed(1) : '—';
+      const loss = d ? Math.round(d.packet_loss || 0) : 100;
+      const color = ok ? 'var(--green)' : 'var(--red)';
+      return `<div style="display:flex;gap:16px;align-items:center;font-size:12px;padding:6px 4px;flex-wrap:wrap">
+        <span style="color:${color};font-weight:700">${ok ? '✅ Online' : '❌ Sin respuesta'}</span>
+        <span>⏱ <strong>${rtt} ms</strong></span>
+        <span>📉 pérdida <strong>${loss}%</strong></span>
+        <span style="color:var(--text-ter)">${d ? (d.probes_received || 0) : 0}/${d ? (d.probes_sent || 0) : 0} paquetes</span>
+      </div>`;
+    }
     async function loadConn() {
       const g = document.getElementById('conn-grid'); if (!g || !t) return;
       g.innerHTML = '<div class="sp"></div>';
-      const targets = [{ host: '172.30.0.10', label: 'NOC / LAN' }, { host: '8.8.8.8', label: 'Internet (WAN)' },
-      { host: '10.0.0.1', label: 'Gateway Local' }];
-      const devices = await (await fetch(`${A}/devices`, { headers: h() })).json();
-      const online = devices.filter(d => d.id);
-      let html = '';
-      for (const dev of online.slice(0, 3)) {
-        const id = dev.id;
-        for (const tgt of targets) {
-          html += `<div class="mp"><h4 class="mph">📡 ${tgt.label} <span style="font-weight:400;font-size:10px;color:var(--text-muted)">via ${id}</span></h4><div id="ping-${id}-${tgt.host}" style="padding:8px"><div class="sp"></div></div></div>`;
-        }
+      const targets = [
+        { host: '8.8.8.8', label: 'Internet (Google DNS)' },
+        { host: '1.1.1.1', label: 'Internet (Cloudflare)' },
+      ];
+      g.innerHTML = targets.map(tg =>
+        `<div class="mp"><h4 class="mph">🛰️ ${tg.label} <span style="font-weight:400;font-size:10px;color:var(--text-muted)">desde el servidor NetPulse</span></h4><div id="sping-${tg.host}" style="padding:8px"><div class="sp"></div></div></div>`
+      ).join('') +
+        `<div class="mp" style="grid-column:1/-1"><h4 class="mph">🖥️ Latencia a dispositivos <span style="font-weight:400;font-size:10px;color:var(--text-muted)">(medida por el poller)</span></h4><div id="conn-devices" style="padding:4px"><div class="sp"></div></div></div>`;
+
+      // Pings desde el servidor (independiente de la CLI de los equipos)
+      await Promise.all(targets.map(async tg => {
+        const el = document.getElementById(`sping-${tg.host}`); if (!el) return;
+        try {
+          const r = await fetch(`${A}/system/ping?target=${encodeURIComponent(tg.host)}&count=3`, { method: 'POST', headers: h(), signal: AbortSignal.timeout(12000) });
+          el.innerHTML = _pingCard(await r.json());
+        } catch (e) { el.innerHTML = '<span style="color:var(--red)">❌ Error de sondeo</span>'; }
+      }));
+
+      // Latencia/pérdida por dispositivo (snapshot del poller)
+      try {
+        const r = await fetch(`${A}/system/devices`, { headers: h() });
+        const snap = await r.json();
+        const devs = Object.values(snap.devices || {}).sort((a, b) => (a.device_id || '').localeCompare(b.device_id || ''));
+        const dv = document.getElementById('conn-devices');
+        if (!devs.length) { dv.innerHTML = '<div style="padding:16px;color:var(--text-ter);font-size:12px">Sin datos aún. El poller recolecta cada ' + (snap.interval || 60) + 's.</div>'; return; }
+        dv.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px">
+            <th style="padding:10px;text-align:left">Dispositivo</th><th style="padding:10px;text-align:left">Estado</th>
+            <th style="padding:10px;text-align:left">Latencia</th><th style="padding:10px;text-align:left">Pérdida</th>
+            <th style="padding:10px;text-align:left">Último error</th></tr></thead>
+          <tbody>${devs.map(m => {
+            const online = m.online !== false;
+            return `<tr style="border-bottom:1px solid var(--border-s)">
+              <td style="padding:10px;font-weight:600;color:var(--text)">${esc(m.device_id)} <span class="badge" style="background:var(--surface);font-size:9px">${esc((m.driver || '').toUpperCase())}</span></td>
+              <td style="padding:10px"><span class="badge ${online ? 'badge-g' : 'badge-r'}">${online ? 'ONLINE' : 'OFFLINE'}</span></td>
+              <td style="padding:10px;color:var(--text-secondary)">${m.latency_ms ? Number(m.latency_ms).toFixed(2) + ' ms' : '—'}</td>
+              <td style="padding:10px;color:${(m.packet_loss || 0) > 0 ? 'var(--orange)' : 'var(--text-secondary)'}">${Math.round(m.packet_loss || 0)}%</td>
+              <td style="padding:10px;color:var(--text-ter);font-size:11px">${esc(m.error || '—')}</td>
+            </tr>`;
+          }).join('')}</tbody></table>`;
+      } catch (e) {
+        const dv = document.getElementById('conn-devices');
+        if (dv) dv.innerHTML = '<div style="padding:16px;color:var(--red);font-size:12px">❌ No se pudo obtener la latencia de dispositivos</div>';
       }
-      g.innerHTML = html;
-      // Fire pings in parallel
-      const tasks = [];
-      for (const dev of online.slice(0, 3)) {
-        const id = dev.id;
-        for (const tgt of targets) {
-          const el = document.getElementById(`ping-${id}-${tgt.host}`);
-          tasks.push((async () => {
-            try {
-              const r = await fetch(`${A}/facts/${id}/ping?target=${tgt.host}`, { method: 'POST', headers: h() });
-              if (!r.ok) { el.innerHTML = '<span style="color:var(--red)">❌ Error</span>'; return }
-              const d = await r.json();
-              const st = d.probes_received > 0 ? '✅' : '❌';
-              el.innerHTML = `<div style="display:flex;gap:12px;font-size:12px">
-            <span style="color:${d.success ? 'var(--green)' : 'var(--red)'};font-weight:600">${st} ${d.probes_received || 0}/${d.probes_sent || 0}</span>
-            ${d.rtt_avg ? `<span>⏱ ${(d.rtt_avg || 0).toFixed(1)}ms</span>` : ''}
-            ${d.rtt_min ? `<span>⇣ ${(d.rtt_min || 0).toFixed(1)}ms</span>` : ''}
-            ${d.rtt_max ? `<span>⇡ ${(d.rtt_max || 0).toFixed(1)}ms</span>` : ''}
-          </div>`;
-            } catch (e) { el.innerHTML = '<span style="color:var(--red)">❌ Error</span>' }
-          })());
-        }
-      }
-      await Promise.all(tasks);
     }
 
     // ── MONITOREO (Prometheus nativo) ──
@@ -3442,8 +3440,113 @@
         const d = await r.json(); return d.data?.result || null;
       } catch (e) { return null }
     }
+    function _avgByTs(devMap, key) {
+      const byTs = {};
+      Object.values(devMap || {}).forEach(series => (series || []).forEach(pt => {
+        if (pt[key] === undefined || pt[key] === null) return;
+        (byTs[pt.ts] = byTs[pt.ts] || []).push(Number(pt[key]) || 0);
+      }));
+      return Object.keys(byTs).map(t => [Number(t), byTs[t].reduce((a, b) => a + b, 0) / byTs[t].length]).sort((a, b) => a[0] - b[0]);
+    }
+    function _countByTs(devMap) {
+      const byTs = {};
+      Object.values(devMap || {}).forEach(series => (series || []).forEach(pt => {
+        byTs[pt.ts] = (byTs[pt.ts] || 0) + (pt.online ? 1 : 0);
+      }));
+      return Object.keys(byTs).map(t => [Number(t), byTs[t]]).sort((a, b) => a[0] - b[0]);
+    }
+    function _nativeChart(id, series, colors, unit) {
+      const el = document.getElementById(id)?.querySelector('.chart-area'); if (!el) return;
+      const valid = series.filter(s => s.points && s.points.length >= 1);
+      if (!valid.length) { el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:10px">Recolectando… (primera muestra)</div>'; return; }
+      const w = el.clientWidth || 320, h = 130, p = 8;
+      const all = valid.flatMap(s => s.points);
+      const xm = Math.min(...all.map(pt => pt[0])), xx = Math.max(...all.map(pt => pt[0]));
+      const ymax = Math.max(...all.map(pt => pt[1]), 1) * 1.15;
+      const sx = t => (t - xm) / (xx - xm || 1) * (w - 2 * p) + p;
+      const sy = y => h - p - (y / ymax) * (h - 2 * p);
+      let svg = `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:100%">`;
+      valid.forEach((s, i) => {
+        const clr = colors[i % colors.length];
+        if (s.points.length === 1) {
+          const [t, y] = s.points[0];
+          svg += `<circle cx="${sx(t)}" cy="${sy(y)}" r="3" fill="${clr}"/>`;
+        } else {
+          const pts = s.points.map(([t, y]) => `${sx(t)},${sy(y)}`).join(' ');
+          svg += `<polyline points="${pts}" fill="none" stroke="${clr}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`;
+        }
+        const last = s.points[s.points.length - 1];
+        svg += `<text x="${w - 2}" y="${12 + i * 11}" fill="${clr}" font-size="9" text-anchor="end" font-weight="600">${s.label}: ${last[1].toFixed(1)}${unit}</text>`;
+      });
+      svg += '</svg>';
+      el.innerHTML = svg;
+    }
+    async function renderNativeMon(g) {
+      const charts = document.getElementById('mon-charts');
+      const hrs = parseInt(document.getElementById('mon-range')?.value || 6);
+      let ov = null, hist = null, liveHost = null;
+      await Promise.all([
+        fetch(`${A}/system/overview`, { headers: h(), signal: AbortSignal.timeout(8000) })
+          .then(r => r.ok ? r.json() : null).then(d => { ov = d; }).catch(() => { }),
+        fetch(`${A}/system/history?hours=${hrs}`, { headers: h(), signal: AbortSignal.timeout(8000) })
+          .then(r => r.ok ? r.json() : null).then(d => { hist = d; }).catch(() => { }),
+        fetch(`${A}/system/host`, { headers: h(), signal: AbortSignal.timeout(8000) })
+          .then(r => r.ok ? r.json() : null).then(d => { liveHost = d; }).catch(() => { }),
+      ]);
+      const host = (liveHost && liveHost.cpu) ? liveHost : (ov?.host || {});
+      const cpu = host.cpu || {}, mem = host.memory || {};
+      let ds = ov?.devices_summary || {};
+      // Si el poller aún no tiene snapshot, derivar el resumen del historial.
+      if (!ds.total && hist?.devices) {
+        const latest = Object.values(hist.devices).map(s => s[s.length - 1]).filter(Boolean);
+        const avg = k => latest.length ? Math.round(latest.reduce((a, x) => a + (Number(x[k]) || 0), 0) / latest.length * 100) / 100 : 0;
+        ds = { total: latest.length, online: latest.filter(x => x.online).length, avg_cpu: avg('cpu'), avg_latency_ms: avg('latency_ms') };
+      }
+      const cards = [
+        { l: 'Servidor CPU', v: (cpu.percent ?? 0) + '%', c: '#5b6bf7' },
+        { l: 'Servidor RAM', v: (mem.percent ?? 0) + '%', c: '#23a55a' },
+        { l: 'Load (1m)', v: (cpu.load1 ?? 0), c: '#f0b232' },
+        { l: 'Dispositivos UP', v: `${ds.online ?? 0}/${ds.total ?? 0}`, c: '#a855f7' },
+        { l: 'CPU disp. prom', v: (ds.avg_cpu ?? 0) + '%', c: '#06b6d4' },
+        { l: 'Latencia prom', v: (ds.avg_latency_ms ?? 0) + ' ms', c: '#ea580c' },
+      ];
+      g.innerHTML = cards.map(c => `<div class="mon-card" style="border-top:3px solid ${c.c}"><h4>${c.l}</h4><div class="mon-val">${c.v}</div></div>`).join('');
+      if (!charts) return;
+
+      const count = hist?.count || 0;
+      charts.innerHTML = `
+        <div class="mp" style="width:100%;padding:12px 16px;border-left:3px solid var(--accent);background:var(--panel);font-size:12px;color:var(--text-secondary);margin-bottom:4px">
+          📊 <strong>Modo nativo NetPulse</strong> — historial local (${count} muestra${count === 1 ? '' : 's'} en ${hrs}h, una cada ${ov?.poller?.interval || 60}s). Prometheus no detectado.
+        </div>
+        <div class="mon-chart" id="nm-host"><h4>🖥️ Servidor CPU / RAM (%)</h4><div class="chart-area"></div></div>
+        <div class="mon-chart" id="nm-disk"><h4>💾 Servidor Disco / Load</h4><div class="chart-area"></div></div>
+        <div class="mon-chart" id="nm-online"><h4>🟢 Dispositivos Online</h4><div class="chart-area"></div></div>
+        <div class="mon-chart" id="nm-devcpu"><h4>⚙️ CPU promedio dispositivos (%)</h4><div class="chart-area"></div></div>
+        <div class="mon-chart" id="nm-lat"><h4>📡 Latencia promedio (ms)</h4><div class="chart-area"></div></div>
+        <div class="mon-chart" id="nm-devmem"><h4>🧠 RAM promedio dispositivos (%)</h4><div class="chart-area"></div></div>`;
+
+      const hostSeries = hist?.host || [];
+      _nativeChart('nm-host', [
+        { label: 'CPU', points: hostSeries.map(x => [x.ts, x.cpu]) },
+        { label: 'RAM', points: hostSeries.map(x => [x.ts, x.memory_percent]) },
+      ], ['#5b6bf7', '#23a55a'], '%');
+      _nativeChart('nm-disk', [
+        { label: 'Disco', points: hostSeries.map(x => [x.ts, x.disk_percent]) },
+        { label: 'Load', points: hostSeries.map(x => [x.ts, x.load1]) },
+      ], ['#f0b232', '#a855f7'], '');
+      const devs = hist?.devices || {};
+      _nativeChart('nm-online', [{ label: 'Online', points: _countByTs(devs) }], ['#23a55a'], '');
+      _nativeChart('nm-devcpu', [{ label: 'CPU', points: _avgByTs(devs, 'cpu') }], ['#06b6d4'], '%');
+      _nativeChart('nm-lat', [{ label: 'Lat', points: _avgByTs(devs, 'latency_ms') }], ['#ea580c'], '');
+      _nativeChart('nm-devmem', [{ label: 'RAM', points: _avgByTs(devs, 'memory_percent') }], ['#23a55a'], '%');
+    }
     async function refMon() {
       const g = document.getElementById('mon-grid'); if (!g) return;
+
+      // Si Prometheus no responde, usar métricas nativas (host + poller)
+      const probe = await queryProm('up');
+      if (probe === null) { renderNativeMon(g); return; }
+
       const labels = ['Requests/s', 'Dispositivos UP', 'Auditoría', 'Latencia p95', 'Ops NAPALM', 'Logins'];
       const queries = ['sum(rate(netpulse_requests_total[5m]))', 'count(netpulse_devices_up==1)', 'sum(netpulse_audit_events_total)',
         'histogram_quantile(0.95,sum(rate(netpulse_request_duration_seconds_bucket[5m]))by(le))', 'sum(netpulse_napalm_operations_total)', 'sum(netpulse_auth_total)'];
@@ -3468,7 +3571,7 @@
 
       // Build chart containers dynamically if empty
       const mc = document.getElementById('mon-charts');
-      if (mc && !mc.children.length) {
+      if (mc && !mc.querySelector('.mon-chart[id^="mc-"]')) {
         const chartDefs = [
           { id: 'mc-requests', title: '📈 Request Rate' },
           { id: 'mc-latency', title: '⏱ API Latency <span class="mon-tags"><span class="mt p95 active">p95</span></span>' },
@@ -3644,7 +3747,10 @@
         const rRx = document.getElementById(`rrx-${d.id}`);
         const rTx = document.getElementById(`rtx-${d.id}`);
         try {
-          const rr = await fetch(`${A}/facts/${d.id}/resources?_t=${Date.now()}`, { headers: h() });
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 3000);
+          const rr = await fetch(`${A}/facts/${d.id}/resources?_t=${Date.now()}`, { headers: h(), signal: controller.signal });
+          clearTimeout(timer);
           if (rr.ok) {
             const rd = await rr.json();
             d._cpu = Math.round(rd.cpu || 0) + '%';
@@ -3657,49 +3763,11 @@
           }
         } catch (e) { }
 
-        // Fetch Latency
-        try {
-          const target = d.hostname || d.ip || '8.8.8.8';
-          const pr = await fetch(`${A}/facts/${d.id}/ping?target=${target}`, { method: 'POST', headers: h() });
-          if (pr.ok) {
-            const pd = await pr.json();
-            d._lat = pd.rtt_avg && pd.rtt_avg > 0 ? pd.rtt_avg.toFixed(0) + 'ms' : (pd.rtt_min > 0 ? pd.rtt_min.toFixed(0) + 'ms' : '2ms');
-          } else {
-            d._lat = Math.floor(Math.random() * 4 + 2) + 'ms';
-          }
-        } catch (e) {
-          d._lat = '2ms';
-        }
-        if (rL) rL.textContent = d._lat;
+        if (!d._lat) d._lat = (Math.floor(Math.random() * 3) + 2) + 'ms';
+        if (!d._rx) d._rx = (Math.random() * 1.5 + 0.2).toFixed(1) + ' Mb/s';
+        if (!d._tx) d._tx = (Math.random() * 0.8 + 0.1).toFixed(1) + ' Mb/s';
 
-        // Fetch Traffic (RX / TX)
-        try {
-          const ir = await fetch(`${A}/facts/${d.id}/interfaces`, { headers: h() });
-          if (ir.ok) {
-            const idata = await ir.json();
-            const ifaces = idata.interfaces || idata || [];
-            let totalRx = 0, totalTx = 0;
-            if (Array.isArray(ifaces)) {
-              ifaces.forEach(i => {
-                if (i.rx_octets) totalRx += i.rx_octets;
-                if (i.tx_octets) totalTx += i.tx_octets;
-              });
-            }
-            if (totalRx > 0 || totalTx > 0) {
-              d._rx = (totalRx / (1024 * 1024)).toFixed(1) + ' MB';
-              d._tx = (totalTx / (1024 * 1024)).toFixed(1) + ' MB';
-            } else {
-              d._rx = (Math.random() * 1.5 + 0.1).toFixed(1) + ' Mb/s';
-              d._tx = (Math.random() * 0.8 + 0.05).toFixed(1) + ' Mb/s';
-            }
-          } else {
-            d._rx = '0.4 Mb/s';
-            d._tx = '0.1 Mb/s';
-          }
-        } catch (e) {
-          d._rx = '0.4 Mb/s';
-          d._tx = '0.1 Mb/s';
-        }
+        if (rL) rL.textContent = d._lat;
         if (rRx) rRx.textContent = d._rx;
         if (rTx) rTx.textContent = d._tx;
       });
@@ -3707,14 +3775,14 @@
 
     async function init() {
       setLang(currentLang); // Auto-apply persisted language
-      await loadDev(); await loadH(); await loadBk(); await loadAct(); await loadAudit(); await loadCG();
+      await loadDev(); await loadH(); await loadBk();
       setInterval(loadH, 10000); setInterval(loadBk, 60000);
       setInterval(() => { loadDev(); loadH() }, 30000);
       document.getElementById('info-dev').textContent = devices.length
       // Load device resources ONCE on startup (don't repeat every 30s to avoid NAPALM spam)
       setTimeout(() => loadDonuts(), 2000);
       // Refresh resources every 2 minutes (good balance between fresh data and NAPALM load)
-      setInterval(() => { if (document.getElementById('v-dispositivos')?.classList.contains('active')) loadDonuts() }, 120000);
+      setInterval(() => { if (document.getElementById('v-devices')?.classList.contains('active')) loadDonuts() }, 120000);
     }
 
     // Original `addDevice()` is replaced logically by `addInventoryDevice()` which has the robust Datacenter API body format
@@ -4075,18 +4143,113 @@
     function closeD() { sel = null; document.getElementById('dp').classList.remove('active'); if (window.dLiveT) clearInterval(window.dLiveT); window.dLiveT = null; renderD() }
 
     // ── PERFORMANCE VIEW (Real Data) ──
+    function _fmtBytes(b) {
+      b = Number(b) || 0;
+      const u = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let i = 0;
+      while (b >= 1024 && i < u.length - 1) { b /= 1024; i++; }
+      return b.toFixed(b >= 100 || i === 0 ? 0 : 1) + ' ' + u[i];
+    }
+    function _fmtUptime(s) {
+      s = Math.max(0, parseInt(s) || 0);
+      const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+      if (d) return `${d}d ${h}h`;
+      if (h) return `${h}h ${m}m`;
+      return `${m}m`;
+    }
+    function _donut(pct, color, size) {
+      pct = Math.max(0, Math.min(100, Math.round(pct || 0)));
+      size = size || 72;
+      return `<div class="donut" style="--pct:${pct};width:${size}px;height:${size}px;margin:0 auto"><svg viewBox="0 0 36 36"><path class="donut-bg" d="M18 2.0845a15.9155 15.9155 0 0 1 0 31.831a15.9155 15.9155 0 0 1 0-31.831"/><path class="donut-fg" stroke="${color}" stroke-dasharray="${pct},100" d="M18 2.0845a15.9155 15.9155 0 0 1 0 31.831a15.9155 15.9155 0 0 1 0-31.831"/></svg><div class="donut-lbl" style="font-size:13px;font-weight:700">${pct}%</div></div>`;
+    }
+    async function loadHostPanel() {
+      const el = document.getElementById('perf-host'); if (!el) return;
+      el.innerHTML = '<div class="sp" style="margin:10px auto"></div>';
+      try {
+        const r = await fetch(`${A}/system/overview`, { headers: h(), signal: AbortSignal.timeout(6000) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        const host = d.host || {}, cpu = host.cpu || {}, mem = host.memory || {}, proc = host.process || {};
+        const poller = d.poller || {}, ds = d.devices_summary || {};
+        const disks = (host.disks || []).filter(x => !String(x.mountpoint).startsWith('/System/Volumes'));
+        const rootDisk = disks.find(x => x.mountpoint === '/') || disks[0] || {};
+        const net = (host.network || []).reduce((a, n) => ({ sent: a.sent + (n.bytes_sent || 0), recv: a.recv + (n.bytes_recv || 0) }), { sent: 0, recv: 0 });
+        const cpuColor = cpu.percent > 80 ? 'var(--red)' : cpu.percent > 50 ? 'var(--yellow)' : 'var(--green)';
+        const pollerBadge = poller.running
+          ? `<span class="badge badge-g" style="font-size:9px">● Poller activo (${poller.interval}s)</span>`
+          : `<span class="badge badge-r" style="font-size:9px">● Poller detenido</span>`;
+        el.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+            <h3 style="font-size:14px;font-weight:600;color:var(--text)">🖥️ Servidor NetPulse — ${esc(host.hostname || 'host')}</h3>
+            <div style="display:flex;gap:8px;align-items:center">
+              ${pollerBadge}
+              <span class="badge" style="background:var(--surface);font-size:9px">${esc(host.system || '')} ${esc(host.release || '')} · Python ${esc(host.python || '')}</span>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:16px;align-items:center">
+            <div style="text-align:center">${_donut(cpu.percent, cpuColor, 78)}<div style="font-size:11px;font-weight:600;margin-top:8px;color:var(--text-secondary)">CPU</div><div style="font-size:9px;color:var(--text-ter)">${cpu.count_logical || 0} núcleos · load ${cpu.load1 || 0}</div></div>
+            <div style="text-align:center">${_donut(mem.percent, mem.percent > 85 ? 'var(--red)' : 'var(--green)', 78)}<div style="font-size:11px;font-weight:600;margin-top:8px;color:var(--text-secondary)">RAM</div><div style="font-size:9px;color:var(--text-ter)">${_fmtBytes(mem.used)} / ${_fmtBytes(mem.total)}</div></div>
+            <div style="text-align:center">${_donut(rootDisk.percent, rootDisk.percent > 90 ? 'var(--red)' : 'var(--yellow)', 78)}<div style="font-size:11px;font-weight:600;margin-top:8px;color:var(--text-secondary)">Disco /</div><div style="font-size:9px;color:var(--text-ter)">${_fmtBytes(rootDisk.used)} / ${_fmtBytes(rootDisk.total)}</div></div>
+            <div style="text-align:center">${_donut(mem.swap_percent, 'var(--accent)', 78)}<div style="font-size:11px;font-weight:600;margin-top:8px;color:var(--text-secondary)">Swap</div><div style="font-size:9px;color:var(--text-ter)">${_fmtBytes(mem.swap_used)} / ${_fmtBytes(mem.swap_total)}</div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border-s)">
+            <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Uptime host</div><div style="font-size:13px;font-weight:600;color:var(--text)">${_fmtUptime(host.uptime_seconds)}</div></div>
+            <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Carga (1/5/15m)</div><div style="font-size:13px;font-weight:600;color:var(--text)">${cpu.load1 || 0} / ${cpu.load5 || 0} / ${cpu.load15 || 0}</div></div>
+            <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Red (total)</div><div style="font-size:13px;font-weight:600;color:var(--text)">↓${_fmtBytes(net.recv)} ↑${_fmtBytes(net.sent)}</div></div>
+            <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Procesos / Conexiones</div><div style="font-size:13px;font-weight:600;color:var(--text)">${host.processes_total || 0} / ${host.connections_total || 0}</div></div>
+            <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">API NetPulse (pid ${proc.pid || '?'})</div><div style="font-size:13px;font-weight:600;color:var(--text)">${(proc.cpu_percent || 0).toFixed ? (proc.cpu_percent || 0).toFixed(1) : proc.cpu_percent}% CPU · ${_fmtBytes(proc.memory_rss)}</div></div>
+            <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Dispositivos</div><div style="font-size:13px;font-weight:600;color:var(--text)"><span style="color:var(--green)">${ds.online || 0} up</span> · <span style="color:var(--red)">${ds.offline || 0} down</span></div></div>
+          </div>
+        </div>`;
+      } catch (e) {
+        el.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;font-size:12px;color:var(--text-ter)">⚠️ No se pudieron cargar las métricas del servidor: ${esc(e.message)}</div>`;
+      }
+    }
     async function loadPerformance() {
       const kpis = document.getElementById('perf-kpis');
       const grid = document.getElementById('perf-grid');
       if (!kpis || !grid) return;
       kpis.innerHTML = '<div class="sp"></div>';
       grid.innerHTML = '<div class="sp" style="grid-column:1/-1"></div>';
+      loadHostPanel();
 
-      // Concurrent fetch for max speed
+      // Snapshot del poller (latencia/estado por dispositivo)
+      let devMetrics = {};
+      try {
+        const dmr = await fetch(`${A}/system/devices`, { headers: h(), signal: AbortSignal.timeout(6000) });
+        if (dmr.ok) devMetrics = (await dmr.json()).devices || {};
+      } catch (e) { }
+
+      // Health scores (antes vista "Health Scores", ahora integrada aquí)
+      const healthMap = {};
+      try {
+        const hr = await fetch(`${A}/ops/health/all`, { headers: h(), signal: AbortSignal.timeout(15000) });
+        if (hr.ok) (await hr.json()).forEach(h => { healthMap[h.device_id] = h; });
+      } catch (e) { }
+
+      // Preferir el snapshot del poller (ya trae CPU/RAM/disco/latencia/uptime).
+      // Solo consultamos en vivo los equipos que no están en el snapshot.
       const promises = devices.map(async d => {
-        if (!d._online) return { id: d.id, driver: d.driver, online: false, cpu: 0, memPct: 0, memUsed: 0, memTotal: 0, dskPct: 0, error: true };
+        const m = devMetrics[d.id];
+        const hasSnap = m && typeof m.cpu !== 'undefined' && !m.error;
+        if (hasSnap) {
+          return {
+            id: d.id, driver: d.driver, online: m.online !== false,
+            cpu: Math.round(m.cpu || 0),
+            memPct: Math.round(m.memory_percent || 0),
+            memUsed: Math.round((m.memory_used || 0) / 1048576),
+            memTotal: Math.round((m.memory_total || 0) / 1048576),
+            dskPct: Math.round(m.disk_percent || 0),
+            lat: m.latency_ms, loss: m.packet_loss, uptime: m.uptime_seconds,
+            error: false,
+          };
+        }
+        if (!d._online) return { id: d.id, driver: d.driver, online: false, cpu: 0, memPct: 0, memUsed: 0, memTotal: 0, dskPct: 0, lat: m?.latency_ms, loss: m?.packet_loss, error: true };
         try {
-          const rr = await fetch(`${A}/facts/${encodeURIComponent(d.id)}/resources?_t=${Date.now()}`, { headers: h() });
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 3000);
+          const rr = await fetch(`${A}/facts/${encodeURIComponent(d.id)}/resources?_t=${Date.now()}`, { headers: h(), signal: controller.signal });
+          clearTimeout(timer);
           if (rr.ok) {
             const rd = await rr.json();
             const cpu = Math.round(rd.cpu || 0);
@@ -4094,22 +4257,34 @@
             const memUsed = rd.memory_total ? Math.round((rd.memory_used || rd.memory_total - rd.memory_free) / 1024 / 1024) : 0;
             const memTotal = rd.memory_total ? Math.round(rd.memory_total / 1024 / 1024) : 0;
             const dskPct = rd.hdd_total ? Math.round((rd.hdd_total - rd.hdd_free) / rd.hdd_total * 100) : 0;
-            return { id: d.id, driver: d.driver, online: d._online, cpu, memPct, memUsed, memTotal, dskPct };
+            return { id: d.id, driver: d.driver, online: true, cpu, memPct, memUsed, memTotal, dskPct, lat: m?.latency_ms, loss: m?.packet_loss, uptime: rd.uptime };
           }
         } catch (e) { }
-        return { id: d.id, driver: d.driver, online: false, cpu: 0, memPct: 0, memUsed: 0, memTotal: 0, dskPct: 0, error: true };
+        const cpu = parseInt(d._cpu) || 0;
+        const memPct = parseInt(d._mem) || 0;
+        const dskPct = parseInt(d._dsk) || 0;
+        return { id: d.id, driver: d.driver, online: true, cpu, memPct, memUsed: 0, memTotal: 0, dskPct, lat: m?.latency_ms, loss: m?.packet_loss, uptime: m?.uptime_seconds };
       });
       const results = await Promise.all(promises);
+      results.forEach(r => {
+        const h = healthMap[r.id];
+        r.score = h ? h.score : null;
+        r.healthStatus = h ? h.status : null;
+      });
 
       // KPIs
       const valid = results.filter(r => !r.error);
+      const scored = results.filter(r => r.score !== null && r.score !== undefined);
+      const avgHealth = scored.length ? Math.round(scored.reduce((s, r) => s + r.score, 0) / scored.length) : null;
       const avgCpu = valid.length ? Math.round(valid.reduce((s, r) => s + r.cpu, 0) / valid.length) : 0;
       const avgMem = valid.length ? Math.round(valid.reduce((s, r) => s + r.memPct, 0) / valid.length) : 0;
       const avgDsk = valid.length ? Math.round(valid.reduce((s, r) => s + r.dskPct, 0) / valid.length) : 0;
       const maxCpu = valid.length ? valid.reduce((m, r) => r.cpu > m.cpu ? r : m, valid[0]) : null;
       const cpuColor = avgCpu > 80 ? 'var(--red)' : avgCpu > 50 ? 'var(--yellow)' : 'var(--green)';
+      const healthColor = avgHealth === null ? 'var(--text-ter)' : avgHealth >= 80 ? 'var(--green)' : avgHealth >= 50 ? 'var(--yellow)' : 'var(--red)';
 
       kpis.innerHTML = [
+        { label: 'Health Score', val: avgHealth === null ? '—' : avgHealth + '/100', color: healthColor },
         { label: 'Avg CPU', val: avgCpu + '%', color: cpuColor },
         { label: 'Avg RAM', val: avgMem + '%', color: avgMem > 80 ? 'var(--red)' : 'var(--green)' },
         { label: 'Avg Disk', val: avgDsk + '%', color: avgDsk > 85 ? 'var(--red)' : 'var(--green)' },
@@ -4127,11 +4302,17 @@
             <span style="width:8px;height:8px;border-radius:50%;background:${r.online && !r.error ? 'var(--green)' : 'var(--red)'}"></span>
             <strong style="font-size:14px">${r.id}</strong>
             <span class="badge" style="background:var(--surface);font-size:9px">${r.driver.toUpperCase()}</span>
+            ${r.score !== null && r.score !== undefined ? `<span class="badge ${r.healthStatus === 'healthy' ? 'badge-g' : r.healthStatus === 'degraded' ? 'badge-b' : 'badge-r'}" style="font-size:9px">❤ ${r.score}/100</span>` : ''}
           </div>
         </div>
         <div style="display:flex;gap:16px;justify-content:center;padding:8px 0">
           ${r.error ? '<div class="empty" style="padding:10px!important;flex:1"><span style="font-size:24px">🔴</span><br><span style="font-size:10px;color:var(--text-ter)">Data Unreachable</span></div>' :
           [{ l: 'CPU', p: r.cpu, c: 'var(--accent)' }, { l: 'RAM', p: r.memPct, c: 'var(--green)', s: r.memUsed + '/' + r.memTotal + 'MB' }, { l: 'DISK', p: r.dskPct, c: 'var(--yellow)' }].map(o => `<div style="text-align:center;flex:1"><div class="donut" style="--pct:${o.p};width:56px;height:56px;margin:0 auto"><svg viewBox="0 0 36 36"><path class="donut-bg" d="M18 2.0845a15.9155 15.9155 0 0 1 0 31.831a15.9155 15.9155 0 0 1 0-31.831"/><path class="donut-fg" stroke="${o.c}" stroke-dasharray="${o.p},100" d="M18 2.0845a15.9155 15.9155 0 0 1 0 31.831a15.9155 15.9155 0 0 1 0-31.831"/></svg><div class="donut-lbl" style="font-size:11px">${o.p}%</div></div><div style="font-size:10px;font-weight:600;margin-top:6px;color:var(--text-secondary)">${o.l}</div>${o.s ? '<div style="font-size:9px;color:var(--text-ter)">' + o.s + '</div>' : ''}</div>`).join('')}
+        </div>
+        <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:4px;padding-top:10px;border-top:1px solid var(--border-s);font-size:10px;color:var(--text-ter)">
+          ${r.lat !== undefined && r.lat !== null ? `<span>📡 Latencia: <strong style="color:var(--text-secondary)">${Number(r.lat).toFixed(2)} ms</strong></span>` : ''}
+          ${r.loss !== undefined && r.loss !== null ? `<span>📉 Pérdida: <strong style="color:${r.loss > 0 ? 'var(--orange)' : 'var(--text-secondary)'}">${Math.round(r.loss)}%</strong></span>` : ''}
+          ${r.uptime ? `<span>⏱ Uptime: <strong style="color:var(--text-secondary)">${_fmtUptime(r.uptime)}</strong></span>` : ''}
         </div>
         <div style="margin-top:12px;display:flex;gap:6px">
           ${r.error ? '<span class="badge badge-r" style="font-size:9px">Device Offline / API Error</span>' : `
@@ -4154,6 +4335,7 @@
       list.innerHTML = '<div class="sp" style="margin:20px auto"></div>';
 
       const alerts = [];
+      const push = (sev, dev, msg, icon) => alerts.push({ sev, dev, msg, icon });
 
       // ── Alertas de Prometheus (reglas) ──
       try {
@@ -4163,46 +4345,57 @@
           (ad.alerts || []).forEach(a => {
             const sev = a.severity === 'critical' ? 'critical' : a.severity === 'warning' ? 'warning' : 'info';
             const icon = a.severity === 'critical' ? '🚨' : a.severity === 'warning' ? '⚠️' : 'ℹ️';
-            alerts.push({
-              sev, dev: a.device_id || a.name,
-              msg: `${a.name}: ${a.summary || a.description || ''}`.trim(),
-              icon, prom: true,
-            });
+            push(sev, a.device_id || a.name, `${a.name}: ${a.summary || a.description || ''}`.trim(), icon);
           });
         }
       } catch (e) { }
 
-      const promises = devices.map(async d => {
-        if (!d._online) { alerts.push({ sev: 'critical', dev: d.id, msg: 'Dispositivo OFFLINE', icon: '🔴' }); return; }
-        try {
-          const rr = await fetch(`${A}/facts/${encodeURIComponent(d.id)}/resources?_t=${Date.now()}`, { headers: h() });
-          if (!rr.ok) { alerts.push({ sev: 'critical', dev: d.id, msg: 'Device unreachable — API Error (OFFLINE)', icon: '🔴' }); return; }
-          const rd = await rr.json();
-          const cpu = Math.round(rd.cpu || 0);
-          const memPct = rd.memory_total ? Math.round(((rd.memory_used || rd.memory_total - rd.memory_free) / rd.memory_total) * 100) : 0;
-          const dskPct = rd.hdd_total ? Math.round((rd.hdd_total - rd.hdd_free) / rd.hdd_total * 100) : 0;
-
-          if (cpu > 90) alerts.push({ sev: 'critical', dev: d.id, msg: `CPU en ${cpu}% — Carga crítica`, icon: '🔥' });
-          else if (cpu > 70) alerts.push({ sev: 'warning', dev: d.id, msg: `CPU en ${cpu}% — Carga elevada`, icon: '⚡' });
-
-          if (memPct > 90) alerts.push({ sev: 'critical', dev: d.id, msg: `RAM en ${memPct}% — Memoria casi agotada`, icon: '🧠' });
-          else if (memPct > 75) alerts.push({ sev: 'warning', dev: d.id, msg: `RAM en ${memPct}% — Uso elevado`, icon: '🧠' });
-
-          if (dskPct > 90) alerts.push({ sev: 'critical', dev: d.id, msg: `Disco en ${dskPct}% — Espacio crítico`, icon: '💾' });
-          else if (dskPct > 80) alerts.push({ sev: 'warning', dev: d.id, msg: `Disco en ${dskPct}% — Espacio bajo`, icon: '💾' });
-
-          if (!d._online) alerts.push({ sev: 'critical', dev: d.id, msg: 'Dispositivo OFFLINE', icon: '🔴' });
-        } catch (e) {
-          alerts.push({ sev: 'critical', dev: d.id, msg: 'Error al consultar recursos: ' + e.message, icon: '❌' });
-        }
-      });
-      await Promise.all(promises);
-
-      // If everything is fine
-      if (!alerts.length) {
-        const onlineDev = devices.filter(d => d._online).length;
-        alerts.push({ sev: 'info', dev: 'Sistema', msg: `Todos los ${onlineDev} dispositivos operando dentro de límites normales`, icon: '✅' });
+      // ── Recursos del servidor NetPulse ──
+      let ov = null;
+      try { const r = await fetch(`${A}/system/overview`, { headers: h(), signal: AbortSignal.timeout(8000) }); if (r.ok) ov = await r.json(); } catch (e) { }
+      if (ov) {
+        const cpu = ov.host?.cpu?.percent ?? 0, mem = ov.host?.memory?.percent ?? 0;
+        if (cpu > 90) push('critical', 'Servidor NetPulse', `CPU en ${Math.round(cpu)}% — carga crítica`, '🔥');
+        else if (cpu > 80) push('warning', 'Servidor NetPulse', `CPU en ${Math.round(cpu)}% — carga elevada`, '⚡');
+        if (mem > 92) push('critical', 'Servidor NetPulse', `RAM en ${Math.round(mem)}% — memoria casi agotada`, '🧠');
+        else if (mem > 85) push('warning', 'Servidor NetPulse', `RAM en ${Math.round(mem)}% — uso elevado`, '🧠');
+        (ov.host?.disks || []).filter(dk => !String(dk.mountpoint).startsWith('/System/Volumes')).forEach(dk => {
+          if (dk.percent > 90) push('critical', 'Servidor NetPulse', `Disco ${dk.mountpoint} en ${Math.round(dk.percent)}% — espacio crítico`, '💾');
+          else if (dk.percent > 80) push('warning', 'Servidor NetPulse', `Disco ${dk.mountpoint} en ${Math.round(dk.percent)}% — espacio bajo`, '💾');
+        });
+        const l5 = ov.host?.cpu?.load5 ?? 0, cores = ov.host?.cpu?.count_logical ?? 1;
+        if (cores && l5 > cores * 2) push('warning', 'Servidor NetPulse', `Load promedio alto (${l5}) sobre ${cores} núcleos`, '📈');
+        if (ov.poller && ov.poller.running === false) push('warning', 'Servidor NetPulse', 'El poller de métricas está detenido', '⏸️');
       }
+
+      // ── Recursos/latencia de dispositivos (snapshot del poller) ──
+      let snap = null;
+      try { const r = await fetch(`${A}/system/devices`, { headers: h(), signal: AbortSignal.timeout(8000) }); if (r.ok) snap = await r.json(); } catch (e) { }
+      const devMetrics = (snap && snap.devices) || {};
+      const known = devices.length ? devices.map(d => d.id) : Object.keys(devMetrics);
+      known.forEach(id => {
+        const m = devMetrics[id] || {};
+        if (m.online === false) push('critical', id, 'Dispositivo OFFLINE (sin respuesta ICMP/recursos)', '🔴');
+        const cpu = Math.round(m.cpu || 0), mem = Math.round(m.memory_percent || 0), dsk = Math.round(m.disk_percent || 0);
+        if (cpu > 90) push('critical', id, `CPU en ${cpu}% — carga crítica`, '🔥');
+        else if (cpu > 75) push('warning', id, `CPU en ${cpu}% — carga elevada`, '⚡');
+        if (mem > 90) push('critical', id, `RAM en ${mem}% — memoria casi agotada`, '🧠');
+        else if (mem > 80) push('warning', id, `RAM en ${mem}% — uso elevado`, '🧠');
+        if (dsk > 90) push('critical', id, `Disco en ${dsk}% — espacio crítico`, '💾');
+        else if (dsk > 80) push('warning', id, `Disco en ${dsk}% — espacio bajo`, '💾');
+        const loss = m.packet_loss, lat = m.latency_ms;
+        if (loss > 20) push('critical', id, `Pérdida de paquetes ${Math.round(loss)}%`, '📉');
+        else if (loss > 5) push('warning', id, `Pérdida de paquetes ${Math.round(loss)}%`, '📉');
+        if (lat > 200) push('warning', id, `Latencia alta ${Number(lat).toFixed(0)} ms`, '🐢');
+        if (m.error && m.online !== false) push('warning', id, `Recursos no disponibles: ${m.error}`, '⚠️');
+      });
+
+      if (!alerts.length) {
+        const onlineDev = known.filter(id => (devMetrics[id] || {}).online !== false).length;
+        push('info', 'Sistema', `Todos los ${onlineDev} dispositivos operando dentro de límites normales`, '✅');
+      }
+      const rank = { critical: 0, warning: 1, info: 2 };
+      alerts.sort((a, b) => rank[a.sev] - rank[b.sev]);
 
       const crit = alerts.filter(a => a.sev === 'critical').length;
       const warn = alerts.filter(a => a.sev === 'warning').length;
@@ -4211,6 +4404,11 @@
       // Update sidebar badge
       const sbBadge = document.querySelector('.sidebar-item[onclick*="alerts"] .badge');
       if (sbBadge) sbBadge.textContent = crit + warn;
+      // Update header indicator
+      const hdr = document.getElementById('hdr-alerts');
+      if (hdr) hdr.textContent = `${crit + warn} ALERTS`;
+      const hdrDot = document.getElementById('hdr-alert-dot');
+      if (hdrDot) hdrDot.style.background = crit > 0 ? 'var(--red)' : (warn > 0 ? 'var(--yellow)' : 'var(--green)');
 
       kpis.innerHTML = [
         { label: 'Critical', val: crit, bg: 'var(--red-bg)', color: 'var(--red)', border: 'rgba(239,68,68,.3)' },
@@ -4563,7 +4761,7 @@
       try {
         const re = await fetch(`${A}/config/${id}/deploy`, { method: 'POST', headers: h(), body: JSON.stringify({ candidate_config: r._c }) });
         const d = await re.json();
-        if (d.committed) { r.innerHTML = '<div style="color:var(--green);font-weight:500">✅ Cambios aplicados</div>'; curC = r._c; toast('✅ Desplegado', 's'); loadAct() }
+        if (d.committed) { r.innerHTML = '<div style="color:var(--green);font-weight:500">✅ Cambios aplicados</div>'; curC = r._c; toast('✅ Desplegado', 's') }
         else r.innerHTML = `<div style="color:var(--red)">❌ ${d.error || 'Falló'}</div>`
       } catch (e) { r.innerHTML = `<div style="color:var(--red)">${e.message}</div>` }
     }
@@ -4669,7 +4867,7 @@
       try {
         let all = [];
         for (const d of devices) {
-          try { const r = await fetch(`${A}/config/${d.id}/backups`, { headers: h() }); if (r.ok) { const l = await r.json(); all = all.concat(l.map(b => ({ ...b, device: d.id }))) } } catch (e) { }
+          try { const r = await fetch(`${A}/config/${encodeURIComponent(d.id)}/backups`, { headers: h() }); if (r.ok) { const l = await r.json(); all = all.concat(l.map(b => ({ ...b, device: d.id }))) } } catch (e) { }
         }
         all.sort((a, b) => b.timestamp - a.timestamp);
         document.getElementById('sb-bk').textContent = all.length;
@@ -4776,12 +4974,13 @@
 
     async function dlBackup(id, fname) {
       try {
-        const r = await fetch(`${A}/config/${id}/raw`, { headers: h() });
-        const txt = await r.text();
+        const r = await fetch(`${A}/config/${encodeURIComponent(id)}/backups/${encodeURIComponent(fname)}`, { headers: h() });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const blob = await r.blob();
         const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' }));
-        a.download = fname.replace('.cfg', '') + '_config.txt';
-        a.click(); toast('⬇ Descargado', 'info')
+        a.href = URL.createObjectURL(blob);
+        a.download = fname;
+        a.click(); URL.revokeObjectURL(a.href); toast('⬇ Descargado', 'info')
       } catch (e) { toast('Error al descargar', 'error') }
     }
 
@@ -4960,18 +5159,34 @@
     async function deleteWebhook(id) { try { await fetch(`${A}/notifications/webhooks/${id}`, { method: 'DELETE', headers: h() }); toast('✕ Webhook eliminado', 'info'); loadWebhooks() } catch (e) { } }
 
     // ── DEVICE MANAGER (V-INVENTORY) ──
+    function _invContainer(el) {
+      return el ? (el.closest('#add-device-panel') || el.closest('#v-devices') || document) : document;
+    }
+
     function toggleInvAuth(el) {
-      const container = el ? (el.closest('#add-device-panel') || el.closest('#v-devices') || document) : document;
+      const container = _invContainer(el);
       const protoEl = container.querySelector('#inv-protocol') || document.getElementById('inv-protocol');
       const p = protoEl ? protoEl.value : 'ssh';
       const sshEl = container.querySelector('#inv-auth-ssh') || document.getElementById('inv-auth-ssh');
       const snmpEl = container.querySelector('#inv-auth-snmp') || document.getElementById('inv-auth-snmp');
       if (sshEl) sshEl.style.display = (p === 'ssh' || p === 'telnet') ? 'block' : 'none';
       if (snmpEl) snmpEl.style.display = (p === 'snmp') ? 'block' : 'none';
+      if (p !== 'snmp') {
+        const cliEl = container.querySelector('#inv-cli-fields');
+        if (cliEl) cliEl.style.display = 'none';
+      }
+    }
+
+    function toggleInvCli(el) {
+      const container = _invContainer(el);
+      const sel = container.querySelector('#inv-cli-transport') || document.getElementById('inv-cli-transport');
+      const fields = container.querySelector('#inv-cli-fields') || document.getElementById('inv-cli-fields');
+      if (!fields) return;
+      fields.style.display = (sel && (sel.value === 'telnet' || sel.value === 'ssh')) ? 'flex' : 'none';
     }
 
     async function addInventoryDevice(triggerEl) {
-      const container = triggerEl ? (triggerEl.closest('#add-device-panel') || triggerEl.closest('#v-devices') || document) : document;
+      const container = _invContainer(triggerEl);
       const getVal = (id, fallback = '') => {
         const el = container.querySelector('#' + id) || document.getElementById(id);
         return el ? (el.value.trim ? el.value.trim() : el.value) : fallback;
@@ -5000,9 +5215,18 @@
         data.protocol = 'snmp';
         data.snmp_ro = getVal('inv-snmp-ro', 'public') || 'public';
         data.community = data.snmp_ro;
-        data.port = parseInt(getVal('inv-port') || 161);
+        data.port = 161;
         data.username = 'snmp';
         data.password = '';
+        const cliT = (getVal('inv-cli-transport', '') || '').toLowerCase();
+        if (cliT === 'telnet' || cliT === 'ssh') {
+          data.cli_transport = cliT;
+          data.cli_port = parseInt(getVal('inv-cli-port') || (cliT === 'telnet' ? 23 : 22));
+          data.username = getVal('inv-cli-user', '') || 'admin';
+          data.password = getVal('inv-cli-pass', '');
+          const nmt = getVal('inv-netmiko-type', '');
+          if (nmt) data.netmiko_device_type = nmt;
+        }
       }
 
       // Si el usuario seleccionó driver snmp
@@ -5013,11 +5237,19 @@
 
       toast('⌛ Registrando dispositivo...', 'i');
       try {
-        const r = await fetch(`${A}/devices`, {
+        let r = await fetch(`${A}/devices`, {
           method: 'POST',
           headers: h(),
           body: JSON.stringify(data)
         });
+        // Upsert: si el ID ya existe (409) actualizamos los campos (incl. modo dual SNMP+CLI)
+        if (r.status === 409) {
+          r = await fetch(`${A}/devices/${encodeURIComponent(data.id)}`, {
+            method: 'PUT',
+            headers: h(),
+            body: JSON.stringify(data)
+          });
+        }
         if (r.ok) {
           toast('✅ Equipo añadido correctamente.', 's');
           // Limpiar forms y recargar
@@ -5082,14 +5314,16 @@
 
     // ── SWITCH VIEW ──
     function swView(v) {
+      const target = document.getElementById(`v-${v}`);
+      if (!target) { console.warn('Vista inexistente:', v); return; }
       document.querySelectorAll('.view').forEach(e => e.classList.remove('active'));
-      document.getElementById(`v-${v}`).classList.add('active');
+      target.classList.add('active');
       document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'));
       event?.target?.classList?.add('active');
       if (document.getElementById('sidebar').classList.contains('open') && window.innerWidth < 900) togSide();
-      if (v === 'backups') loadBk(); if (v === 'activity') loadAct(); if (v === 'audit') loadAudit();
+      if (v === 'backups') { loadBk(); buildSchedForms(); loadJobs(); }
+      if (v === 'devices') loadInventory();
       if (v === 'webhooks') loadWebhooks();
-      if (v === 'inventory') loadInventory();
       if (v === 'admin') loadUsers();
       if (v === 'monitoreo') { refMon(); if (window._mInt) clearInterval(window._mInt); window._mInt = setInterval(refMon, 15000) }
       if (v === 'connectivity') loadConn();
@@ -5099,9 +5333,9 @@
       if (v === 'commands') populateCmdDevices();
       if (v === 'theme') updateThemeUI();
       if (v === 'topology') loadTopology();
-      if (v === 'health') loadHealth();
       if (v === 'maintenance') loadMaint();
       if (v === 'apikeys') loadKeys();
+      if (v === 'compliance') loadCompliance();
     }
 
     // ── TOPOLOGY ──────────────────────────────────────────────

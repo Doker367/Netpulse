@@ -54,6 +54,13 @@ SYSLOG_ENABLED = os.getenv("NETPULSE_SYSLOG_ENABLED", "true").lower() == "true"
 SNMP_COMMUNITY = os.getenv("NETPULSE_SNMP_COMMUNITY", "public")
 SNMP_TIMEOUT = int(os.getenv("NETPULSE_SNMP_TIMEOUT", "5"))
 
+# ── Métricas / Poller ────────────────────────────────────────
+
+# Poller en segundo plano que recolecta recursos de dispositivos + host.
+# Intervalo en segundos; 0 deshabilita el poller automático.
+METRICS_ENABLED = os.getenv("NETPULSE_METRICS_ENABLED", "true").lower() == "true"
+METRICS_INTERVAL = int(os.getenv("NETPULSE_METRICS_INTERVAL", "60"))
+
 # ── Notificaciones (Telegram / Email / Slack) ───────────────
 
 TELEGRAM_BOT_TOKEN = os.getenv("NETPULSE_TELEGRAM_TOKEN", "")

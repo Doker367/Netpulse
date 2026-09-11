@@ -68,3 +68,95 @@ groups:
         annotations:
           summary: "Posible ataque de fuerza bruta"
           description: "Más de 1 fallo de autenticación por segundo durante 5 minutos."
+
+  - name: netpulse-host
+    rules:
+      # CPU del servidor NetPulse alta
+      - alert: HostHighCpu
+        expr: netpulse_host_cpu_percent > 85
+        for: 10m
+        labels:
+          severity: warning
+          team: netops
+        annotations:
+          summary: "CPU alta en el servidor NetPulse ({{ $value }}%)"
+          description: "El host {{ $labels.instance }} supera 85% de CPU durante 10 minutos."
+
+      # Memoria del servidor alta
+      - alert: HostHighMemory
+        expr: netpulse_host_memory_percent > 90
+        for: 10m
+        labels:
+          severity: warning
+          team: netops
+        annotations:
+          summary: "Memoria alta en el servidor NetPulse ({{ $value }}%)"
+          description: "El host supera 90% de uso de memoria durante 10 minutos."
+
+      # Disco del servidor casi lleno
+      - alert: HostDiskFull
+        expr: netpulse_host_disk_percent > 90
+        for: 15m
+        labels:
+          severity: critical
+          team: netops
+        annotations:
+          summary: "Disco lleno en {{ $labels.mountpoint }} ({{ $value }}%)"
+          description: "El punto de montaje {{ $labels.mountpoint }} supera 90% de uso."
+
+      # Load average elevado respecto a los núcleos
+      - alert: HostHighLoad
+        expr: netpulse_host_load5 > netpulse_host_cpu_count * 1.5
+        for: 15m
+        labels:
+          severity: warning
+          team: netops
+        annotations:
+          summary: "Load average elevado en el servidor NetPulse"
+          description: "El load5 supera 1.5x el número de núcleos lógicos."
+
+  - name: netpulse-device-resources
+    rules:
+      # CPU de dispositivo alta
+      - alert: DeviceHighCpu
+        expr: netpulse_device_cpu_percent > 90
+        for: 10m
+        labels:
+          severity: warning
+          team: netops
+        annotations:
+          summary: "CPU alta en {{ $labels.device_id }} ({{ $value }}%)"
+          description: "El dispositivo {{ $labels.device_id }} supera 90% de CPU."
+
+      # Memoria de dispositivo alta
+      - alert: DeviceHighMemory
+        expr: netpulse_device_memory_percent > 90
+        for: 10m
+        labels:
+          severity: warning
+          team: netops
+        annotations:
+          summary: "Memoria alta en {{ $labels.device_id }} ({{ $value }}%)"
+          description: "El dispositivo {{ $labels.device_id }} supera 90% de memoria."
+
+      # Latencia de ping alta
+      - alert: DeviceHighLatency
+        expr: netpulse_device_ping_latency_ms > 200
+        for: 10m
+        labels:
+          severity: warning
+          team: netops
+        annotations:
+          summary: "Latencia alta hacia {{ $labels.device_id }} ({{ $value }} ms)"
+          description: "El ping promedio hacia {{ $labels.device_id }} supera 200 ms."
+
+      # Pérdida de paquetes
+      - alert: DevicePacketLoss
+        expr: netpulse_device_ping_loss_percent > 20
+        for: 5m
+        labels:
+          severity: critical
+          team: netops
+        annotations:
+          summary: "Pérdida de paquetes hacia {{ $labels.device_id }} ({{ $value }}%)"
+          description: "Se pierde más del 20% del ICMP hacia {{ $labels.device_id }}."

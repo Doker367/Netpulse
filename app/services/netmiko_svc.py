@@ -23,20 +23,54 @@ from app.services.crypto_svc import decrypt
 
 logger = logging.getLogger(__name__)
 
-# ── Registro del driver telnet para Alcatel AOS (no incluido en netmiko) ──
+# ── Registro de drivers telnet no incluidos en netmiko ────────────────────
+# netmiko elige el transporte por el sufijo ``_telnet`` del device_type,
+# por lo que basta con registrar una subclase del driver SSH equivalente.
+# Ver ``BaseConnection.__init__`` (``if "_telnet" in device_type``).
+
+
+def _register_telnet_driver(name: str, base) -> None:
+    """Registra un driver telnet custom en netmiko.
+
+    Además de ``CLASS_MAPPER`` hay que añadirlo a las listas ``platforms``
+    y ``telnet_platforms``: ``ConnectHandler`` valida el device_type contra
+    esas listas (snapshot tomado en el import de ``ssh_dispatcher``).
+    """
+    from netmiko.ssh_dispatcher import CLASS_MAPPER
+    import importlib
+
+    # Ojo: ``import netmiko.ssh_dispatcher`` devolvería la función homónima
+    # reexportada por el paquete, no el módulo. Usamos importlib.
+    _sd = importlib.import_module("netmiko.ssh_dispatcher")
+
+    if name in CLASS_MAPPER:
+        return
+
+    custom = type(name.title().replace("_", ""), (base,), {"__doc__": "Custom telnet driver"})
+    CLASS_MAPPER[name] = custom
+    if name not in _sd.platforms:
+        _sd.platforms.append(name)
+        _sd.platforms.sort()
+    if name not in _sd.telnet_platforms:
+        _sd.telnet_platforms.append(name)
+        _sd.telnet_platforms.sort()
+        _sd.telnet_platforms_str = "\n" + "\n".join(_sd.telnet_platforms)
+    logger.debug("[netmiko] driver custom '%s' registrado", name)
+
 
 try:
     from netmiko.alcatel.alcatel_aos_ssh import AlcatelAosSSH
-    from netmiko.ssh_dispatcher import CLASS_MAPPER
 
-    if "alcatel_aos_telnet" not in CLASS_MAPPER:
-        class AlcatelAosTelnet(AlcatelAosSSH):
-            """Alcatel-Lucent Enterprise AOS sobre telnet (patrón oficial netmiko)."""
-
-        CLASS_MAPPER["alcatel_aos_telnet"] = AlcatelAosTelnet
-        logger.debug("[netmiko] driver custom 'alcatel_aos_telnet' registrado")
+    _register_telnet_driver("alcatel_aos_telnet", AlcatelAosSSH)
 except Exception as e:  # pragma: no cover
     logger.warning("[netmiko] No se pudo registrar alcatel_aos_telnet: %s", e)
+
+try:
+    from netmiko.enterasys.enterasys_ssh import EnterasysSSH
+
+    _register_telnet_driver("enterasys_telnet", EnterasysSSH)
+except Exception as e:  # pragma: no cover
+    logger.warning("[netmiko] No se pudo registrar enterasys_telnet: %s", e)
 
 
 # ── Mapeo driver NetPulse → device_type netmiko (ssh y telnet) ────────────
@@ -73,8 +107,10 @@ LEGACY_DRIVERS = {
 
 def _family(dt: str) -> str:
     dt = (dt or "").lower()
-    if dt.startswith(("cisco_s", "cisco_wlc", "cisco_s200")):
+    if dt.startswith("cisco_s") or dt.startswith("cisco_wlc") or dt.startswith("cisco_s200"):
         return "sg"
+    if dt.startswith("enterasys") or dt.startswith("extreme"):
+        return "enterasys"
     if dt.startswith("cisco") or dt.startswith(("iosxr", "nxos")):
         return "ios"
     if "procurve" in dt or "aruba" in dt:
@@ -99,6 +135,7 @@ _VERSION_CMDS = {
     "aos": "show system",
     "sros": "show version",
     "eos": "show version",
+    "enterasys": "show version",
 }
 
 _RUNNING_CMDS = {
@@ -109,6 +146,7 @@ _RUNNING_CMDS = {
     "aos": ["show configuration snapshot", "show running-configuration"],
     "sros": ["admin display-config", "show running-config"],
     "eos": ["show running-config"],
+    "enterasys": ["show config"],
 }
 
 _INTERFACES_CMDS = {
@@ -119,6 +157,7 @@ _INTERFACES_CMDS = {
     "aos": ["show interfaces status", "show interfaces summary"],
     "sros": ["show port", "show interfaces"],
     "eos": ["show interfaces status"],
+    "enterasys": ["show port status", "show interfaces"],
 }
 
 
@@ -654,6 +693,33 @@ def _parse_interfaces(out: str, fam: str) -> dict:
                     "speed": speed if state == "up" else None,
                     "mac_address": "",
                 }
+        return interfaces
+
+    if fam == "enterasys":
+        # Enterasys/Extreme "show port status":
+        #   fe.1.1   Alias   Up   Up   100.0M  full  BaseT RJ45
+        for line in out.splitlines():
+            m = re.match(
+                r"^\s*((?:fe|ge|tg|gi|xg|eth)\S*?)\s+.*?(Up|Down|Disabled)\s+(Up|Down|Disabled)(?:\s+(\S+))?",
+                line, re.IGNORECASE,
+            )
+            if not m:
+                continue
+            name, oper, admin, speed_raw = m.group(1), m.group(2).lower(), m.group(3).lower(), m.group(4)
+            speed = None
+            if speed_raw:
+                sm = re.match(r"([\d.]+)\s*([MG]?)", speed_raw, re.IGNORECASE)
+                if sm:
+                    val = float(sm.group(1))
+                    unit = sm.group(2).upper()
+                    speed = int(val * 1000) if unit == "G" else int(val)
+            interfaces[name] = {
+                "is_up": oper == "up",
+                "is_enabled": admin == "up" and oper != "disabled",
+                "description": "",
+                "speed": speed if oper == "up" else None,
+                "mac_address": "",
+            }
         return interfaces
 
     # IOS / SG / EOS / AOS / SROS (formato "show interfaces status" similar)
