@@ -119,7 +119,7 @@ Los switches del lab son 2 servicios del docker-compose.lab.yml:
 
   b) netpulse-arista   — Arista vEOS 4.27.3F (actúa como switch/leaf)
      SSH en 127.0.0.1:2226, eAPI HTTPS en 127.0.0.1:443
-     Credenciales: vrnetlab / ***REMOVED***
+     Credenciales: vrnetlab / <password>
      Driver NAPALM: eos (eAPI)
 
 Levantarlos solos:
@@ -135,7 +135,7 @@ Verificar:
 Probar SSH (desde el host):
 
     ssh -p 2224 admin@127.0.0.1      # FRR switch (password: admin o según config)
-    ssh -p 2226 vrnetlab@127.0.0.1   # Arista vEOS (password: ***REMOVED***)
+    ssh -p 2226 vrnetlab@127.0.0.1   # Arista vEOS (password: <password>)
 
 NOTA: hay 3 contenedores Arista adicionales que NO están en el
 compose actual y aparecen como Exited:
@@ -150,10 +150,10 @@ compose — no se levantan con los comandos de arriba.
 
 El inventario vive en config/devices.yaml. Dispositivos registrados:
 
-  arista-core-01   127.0.0.1:443    eos   vrnetlab/***REMOVED***   router Core
-  arista-core-02   127.0.0.1:9443   eos   vrnetlab/***REMOVED***   router Core   (requiere contenedor extra)
-  arista-edge-01   127.0.0.1:8443   eos   vrnetlab/***REMOVED***   router Edge   (requiere contenedor extra)
-  arista-switch-01 127.0.0.1:10443  eos   vrnetlab/***REMOVED***   switch Access (requiere contenedor extra)
+  arista-core-01   127.0.0.1:443    eos   vrnetlab/<password>   router Core
+  arista-core-02   127.0.0.1:9443   eos   vrnetlab/<password>   router Core   (requiere contenedor extra)
+  arista-edge-01   127.0.0.1:8443   eos   vrnetlab/<password>   router Edge   (requiere contenedor extra)
+  arista-switch-01 127.0.0.1:10443  eos   vrnetlab/<password>   switch Access (requiere contenedor extra)
   mikrotik-edge-01 127.0.0.1:8728   ros   admin/(vacío)         router Edge
 
 Los passwords se guardan cifrados (crypto_svc) — el archivo YAML

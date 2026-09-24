@@ -101,7 +101,7 @@ with driver('192.168.1.1', 'admin', 'password') as device:
 |-----|---------|--------|--------|-------|
 | `viewer` / `viewer123` | ✅ | ❌ | ❌ | ❌ |
 | `operator` / `operator123` | ✅ | ✅ | ❌ | ❌ |
-| `admin` / `***REMOVED***` | ✅ | ✅ | ✅ | ✅ |
+| `admin` / `<password>` | ✅ | ✅ | ✅ | ✅ |
 
 ---
 

@@ -2,14 +2,15 @@
 # superadmin: Acceso completo a todas las funciones
 # operator: Solo lectura de dispositivos, sin administración
 # Los hashes bcrypt se generan con app/core/security.hash_password().
+# Las contraseñas en claro NO se versionan: ver config/.initial_credentials
 users:
   - username: superadmin
     role: admin
     name: Super Admin
-    password_hash: $2b$12$BZ0vQFCzeH7M2Fwu/OzVG.lNM.LEjlmmw3I5cAxV7JE1sSQoCicri
+    password_hash: $2b$12$H6EzLPOGs8eZx4c6W1JAxu4UH8r0dw70FS.9FllCYt76nQpP/.yku
     plain_password: null
   - username: operator
     role: operator
     name: Operador
-    password_hash: $2b$12$uYs8XNxrmtvDULBLavIYweFHyaHIgKYUXI.vmzPDP4nNHxCYshkFW
+    password_hash: $2b$12$VfmTys/izlE9BiG27WqWheF22d69ATmuGbwky3MVIiqP5QvQOYMO6
     plain_password: null

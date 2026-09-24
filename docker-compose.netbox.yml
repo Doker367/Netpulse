@@ -7,17 +7,17 @@ services:
     hostname: netbox
     restart: unless-stopped
     environment:
-      - SUPERUSER_NAME=admin
-      - SUPERUSER_EMAIL=admin@netpulse.local
-      - SUPERUSER_PASSWORD=***REMOVED***
-      - SUPERUSER_API_TOKEN=***REMOVED***
-      - SUPERUSER_API_KEY=***REMOVED***
-      - SECRET_KEY=***REMOVED***
-      - API_TOKEN_PEPPER_1=***REMOVED***
+      - SUPERUSER_NAME=${NETBOX_SUPERUSER_NAME:-admin}
+      - SUPERUSER_EMAIL=${NETBOX_SUPERUSER_EMAIL:-admin@netpulse.local}
+      - SUPERUSER_PASSWORD=${NETBOX_SUPERUSER_PASSWORD:?define NETBOX_SUPERUSER_PASSWORD en .env}
+      - SUPERUSER_API_TOKEN=${NETBOX_API_TOKEN:?define NETBOX_API_TOKEN en .env}
+      - SUPERUSER_API_KEY=${NETBOX_API_KEY:?define NETBOX_API_KEY en .env}
+      - SECRET_KEY=${NETBOX_SECRET_KEY:?define NETBOX_SECRET_KEY en .env}
+      - API_TOKEN_PEPPER_1=${NETBOX_API_TOKEN_PEPPER_1:?define NETBOX_API_TOKEN_PEPPER_1 en .env}
       - DB_HOST=netbox-db
       - DB_NAME=netbox
       - DB_USER=netbox
-      - DB_PASSWORD=***REMOVED***
+      - DB_PASSWORD=${NETBOX_DB_PASSWORD:?define NETBOX_DB_PASSWORD en .env}
       - REDIS_HOST=netbox-redis
       - REDIS_PORT=6379
       - REDIS_DATABASE=0
@@ -52,7 +52,7 @@ services:
     environment:
       - POSTGRES_DB=netbox
       - POSTGRES_USER=netbox
-      - POSTGRES_PASSWORD=***REMOVED***
+      - POSTGRES_PASSWORD=${NETBOX_DB_PASSWORD:?define NETBOX_DB_PASSWORD en .env}
     volumes:
       - netbox-db-data:/var/lib/postgresql/data
     networks:

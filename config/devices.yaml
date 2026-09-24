@@ -14,7 +14,7 @@ devices:
   - routeros
   type: router
 - credentials:
-    password: ***REMOVED***
+    password: ''
     username: admin
   description: ''
   driver: ros
@@ -25,7 +25,7 @@ devices:
   tags: []
   type: router
 - credentials:
-    password: ***REMOVED***
+    password: ''
     username: doker
   description: MikroTik físico - API 8728
   driver: ros
@@ -38,7 +38,7 @@ devices:
 - cli_port: 23
   cli_transport: telnet
   credentials:
-    community: ***REMOVED***
+    community: ''
     password: ''
     username: manager
   description: HP ProCurve 3400cl-24G — SNMP (telemetría) + Telnet (CLI legacy)
