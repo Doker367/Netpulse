@@ -336,7 +336,7 @@ def add_lab_devices():
             "port": 443,
             "driver": "eos",
             "username": "vrnetlab",
-            "password": "***REMOVED***",
+            "password": os.getenv("NETPULSE_LAB_PASSWORD", ""),
             "type": "router",
             "group": "Core",
             "tags": ["lab", "arista", "veos"],

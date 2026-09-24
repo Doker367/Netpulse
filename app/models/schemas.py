@@ -575,7 +575,7 @@ class LoginRequest(BaseModel):
         json_schema_extra={
             "example": {
                 "username": "admin",
-                "password": "***REMOVED***",
+                "password": "********",
             }
         }
     )
@@ -587,7 +587,7 @@ class LoginRequest(BaseModel):
     password: str = Field(
         ...,
         description="Contraseña del usuario",
-        examples=["***REMOVED***"],
+        examples=["********"],
     )
 
 

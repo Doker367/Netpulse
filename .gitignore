@@ -29,6 +29,7 @@ audit/
 # Environment
 .env
 .env.*
+!.env.example
 
 # Docker volumes (persistent data)
 docker/volumes/
@@ -70,3 +71,6 @@ logs/
 # API tokens (NEVER COMMIT)
 config/.netbox_token
 config/.netbox_token.*
+
+# Credenciales iniciales rotadas (NEVER COMMIT)
+config/.initial_credentials

@@ -76,7 +76,7 @@ services:
   # ----------------------------------------------------------
   # Arista vEOS 4.27.3F — eAPI en 443, SSH en 2226
   # NAPALM driver: eos (usa eAPI HTTPS)
-  # Credenciales: vrnetlab / ***REMOVED***
+  # Credenciales: vrnetlab / (definidas con NETPULSE_LAB_PASSWORD)
   # ----------------------------------------------------------
   router-arista:
     image: cminsg/vr-veos:4.27.3F

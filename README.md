@@ -30,24 +30,27 @@ Dashboard: http://localhost:8082
 
 ## Credenciales
 
+> Las contraseñas **no se versionan**. Se guardan localmente en
+> `config/.initial_credentials` (ignorado por git) o se definen por variables
+> de entorno. Cambialas tras el primer arranque.
+
 ### API Dashboard
-- **superadmin** / `***REMOVED***` — acceso total
-- **operator** / `***REMOVED***` — solo lectura
+- **superadmin** — acceso total (contraseña en `config/.initial_credentials`)
+- **operator** — solo lectura (contraseña en `config/.initial_credentials`)
 
 ### NetBox (DCIM)
 - URL: http://localhost:8000
-- Usuario: `admin`
-- Contraseña: `***REMOVED***`
+- Usuario y contraseña: definir en `.env` (ver `.env.example`)
 
 ### Dispositivos de Laboratorio
 
-| Dispositivo     | Driver | Conexión             | Credenciales              |
-|-----------------|--------|----------------------|---------------------------|
-| MikroTik Edge   | ros    | 127.0.0.1:8728 (API)| admin / (sin contraseña)  |
-| Arista vEOS     | eos    | 127.0.0.1:443 (eAPI)| vrnetlab / ***REMOVED***     |
-| Cisco (FRR)     | ios    | 127.0.0.1:2222 (SSH)| admin / admin             |
-| Juniper (FRR)   | ios    | 127.0.0.1:2223 (SSH)| admin / admin             |
-| Switch L2 (FRR) | ios    | 127.0.0.1:2224 (SSH)| admin / admin             |
+| Dispositivo     | Driver | Conexión             | Credenciales                          |
+|-----------------|--------|----------------------|---------------------------------------|
+| MikroTik Edge   | ros    | 127.0.0.1:8728 (API)| admin / (sin contraseña)              |
+| Arista vEOS     | eos    | 127.0.0.1:443 (eAPI)| vrnetlab / `NETPULSE_LAB_PASSWORD`    |
+| Cisco (FRR)     | ios    | 127.0.0.1:2222 (SSH)| admin / admin                         |
+| Juniper (FRR)   | ios    | 127.0.0.1:2223 (SSH)| admin / admin                         |
+| Switch L2 (FRR) | ios    | 127.0.0.1:2224 (SSH)| admin / admin                         |
 
 ## Arquitectura
 

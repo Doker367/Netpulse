@@ -392,7 +392,7 @@ MATRIZ DE PERMISOS:
 Estado original:
   devices.yaml:
     credentials:
-      password: "***REMOVED***"           ← Texto plano (INSEGURO)
+      password: "<password>"             ← Texto plano (INSEGURO)
 
 Después de crypt_svc:
   devices.yaml:
@@ -537,7 +537,7 @@ Formato: `audit/audit.jsonl` (JSON Lines, append-only)
 #### Login
 ```bash
 POST /api/auth/login
-Request:  {"username": "admin", "password": "***REMOVED***"}
+Request:  {"username": "admin", "password": "<password>"}
 Response: {"access_token": "eyJ...", "token_type": "bearer"}
 ```
 
