@@ -1,0 +1,71 @@
+# ============================================================
+# NetPulse — Red señuelo: honeypots reales (Fase C)
+# ============================================================
+# Overlay AISLADO. Se une a docker-compose.lab/monitoring pero usa una
+# red propia `deception-net` con `internal: true`: los contenedores
+# señuelo NO tienen ruta a la red de gestión ni a Internet, de modo que
+# un atacante que caiga en ellos no puede pivotar.
+#
+# Los logs se escriben en ./deception/logs/<sensor>/ y el tailer de
+# NetPulse los normaliza (POST /api/deception/integrations/start).
+#
+#   docker compose -f docker-compose.deception.yml up -d --build
+# ============================================================
+
+services:
+  # ── Cowrie: honeypot SSH/Telnet (medium-interaction) ──────
+  cowrie:
+    image: cowrie/cowrie:latest
+    container_name: netpulse-cowrie
+    hostname: srv-files-01
+    restart: unless-stopped
+    networks:
+      - deception-net
+    volumes:
+      - ./docker/deception/cowrie/cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+      # Named volume (no bind mount): en macOS/Colima los bind mounts impiden
+      # a uid 999 escribir los logs. El sidecar los publica al host.
+      - cowrie-var:/cowrie/cowrie-git/var
+    # Dentro de deception-net Cowrie escucha SSH en 2222 y Telnet en 2223.
+    # No se publican puertos al host (aislamiento por defecto).
+
+  # ── Publica cowrie.json a un archivo legible por el host ───
+  cowrie-shipper:
+    image: alpine:3.20
+    container_name: netpulse-cowrie-shipper
+    restart: unless-stopped
+    depends_on:
+      - cowrie
+    networks:
+      - deception-net
+    volumes:
+      - cowrie-var:/cowrie-var:ro
+      - ./deception/logs/cowrie:/out
+    command: >
+      sh -c 'touch /out/cowrie.json;
+             while [ ! -f /cowrie-var/log/cowrie/cowrie.json ]; do sleep 1; done;
+             tail -F /cowrie-var/log/cowrie/cowrie.json >> /out/cowrie.json'
+
+  # ── OpenCanary: honeypot multi-protocolo ligero ────────────
+  opencanary:
+    build:
+      context: ./docker/deception/opencanary
+    image: netpulse/opencanary:latest
+    container_name: netpulse-opencanary
+    hostname: sw-access-01
+    restart: unless-stopped
+    networks:
+      - deception-net
+    volumes:
+      - ./deception/logs/opencanary:/var/log/opencanary
+
+networks:
+  deception-net:
+    driver: bridge
+    internal: true          # sin salida: evita pivote del atacante
+    ipam:
+      config:
+        - subnet: 172.31.66.0/24
+
+volumes:
+  cowrie-var:
