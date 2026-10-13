@@ -1,0 +1,41 @@
+# ============================================================
+# NetPulse — Capa de decisiones IA (Laya / System One)
+# ============================================================
+# Motor multilingüe (español + inglés + 100 idiomas) que responde
+# preguntas tipadas (noul/choice/score) con probabilidad y confianza.
+# NetPulse lo consume por HTTP en http://localhost:8090.
+#
+#   docker compose -f docker-compose.ai.yml up -d --build
+#
+# Nota: en Docker sobre Apple Silicon corre en CPU (sin MPS).
+# ============================================================
+
+services:
+  laya:
+    build: ./docker/laya
+    image: netpulse-laya:latest
+    container_name: netpulse-ai
+    ports:
+      - "8090:8090"
+    environment:
+      - LAYA_HOST=0.0.0.0
+      - LAYA_PORT=8090
+      - LAYA_MODELS=multilingual
+      - LAYA_DEFAULT_MODEL=multilingual
+      - LAYA_JEV_STRICT=true
+      - LAYA_PRELOAD=false
+      - LAYA_MAX_LOADED=2
+      - LAYA_THREADS=4
+      - HF_HOME=/data/hf
+    volumes:
+      - laya_hf:/data/hf
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8090/health', timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 180s
+
+volumes:
+  laya_hf:
