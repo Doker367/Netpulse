@@ -5,17 +5,44 @@ webhooks registrados en notifications_svc. También expone las
 alertas activas actuales para el dashboard.
 """
 
+import hmac
 import json
 import logging
 import urllib.request
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Header, Request
 
+from app.core.settings import ALERTMANAGER_TOKEN
 from app.middleware.auth import JWTBearer
+from app.middleware.rbac import requires_role
 from app.services import notifications_svc
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/alerts", tags=["Alerts"])
+
+
+async def alertmanager_auth(
+    request: Request,
+    x_alertmanager_token: Optional[str] = Header(default=None),
+) -> dict:
+    """Autentica el webhook de Alertmanager.
+
+    Alertmanager no envía JWT de usuario: se acepta un token de servicio en la
+    cabecera ``X-Alertmanager-Token`` (o ``Authorization: Bearer <token>``).
+    Si no hay token configurado, se exige JWT de admin (comportamiento previo).
+    """
+    supplied = x_alertmanager_token or ""
+    if not supplied:
+        auth = request.headers.get("authorization", "")
+        if auth.lower().startswith("bearer "):
+            supplied = auth[7:].strip()
+    if ALERTMANAGER_TOKEN and supplied and hmac.compare_digest(supplied, ALERTMANAGER_TOKEN):
+        return {"sub": "alertmanager", "role": "service"}
+    # Sin token o no coincide → exigir JWT admin.
+    await JWTBearer()(request)
+    await requires_role("admin")(request)
+    return {"sub": "admin", "role": "admin"}
 
 
 @router.get("/active", dependencies=[Depends(JWTBearer())])
@@ -51,7 +78,7 @@ def active_alerts():
     }
 
 
-@router.post("/webhook", dependencies=[Depends(JWTBearer())])
+@router.post("/webhook", dependencies=[Depends(alertmanager_auth)])
 async def alertmanager_webhook(request: Request):
     """Recibe un payload de Alertmanager y lo distribuye.
 

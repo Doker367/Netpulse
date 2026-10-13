@@ -236,6 +236,44 @@ netpulse_auth_total = Counter(
     ["status"],
 )
 
+# ── Deception Metrics ────────────────────────────────────────
+
+netpulse_deception_events_total = Counter(
+    "netpulse_deception_events_total",
+    "Total deception events captured from attackers",
+    ["device_id", "proto", "event_type"],
+)
+
+netpulse_deception_devices_configured = Gauge(
+    "netpulse_deception_devices_configured",
+    "Number of simulated deception devices configured",
+)
+
+netpulse_deception_devices_enabled = Gauge(
+    "netpulse_deception_devices_enabled",
+    "Number of simulated deception devices enabled",
+)
+
+netpulse_deception_alerts_total = Counter(
+    "netpulse_deception_alerts_total",
+    "Total deception alerts triggered by attacker activity",
+    ["severity", "rule"],
+)
+
+# ── AI Decision Layer Metrics (Laya) ─────────────────────────
+
+netpulse_ai_decisions_total = Counter(
+    "netpulse_ai_decisions_total",
+    "Total AI decision calls by kind and result (ok/cache/error)",
+    ["kind", "result"],
+)
+
+netpulse_deception_fp_total = Counter(
+    "netpulse_deception_fp_total",
+    "Deception events classified by the AI false-positive filter",
+    ["verdict"],
+)
+
 
 def update_device_metrics(device_id: str, driver: str, is_up: bool) -> None:
     """Actualiza el gauge netpulse_devices_up para un dispositivo.
