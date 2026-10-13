@@ -16,7 +16,7 @@ from app.middleware.audit import AuditMiddleware
 from app.middleware.metrics import MetricsMiddleware
 from app.middleware.security import SecurityHeadersMiddleware
 from app.models.schemas import HealthResponse
-from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy, alerts, topology, traffic, ops, security_ext, integrations, collectors, system
+from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy, alerts, topology, traffic, ops, security_ext, integrations, collectors, system, deception, monitoring, ai, terminal, firewall, sftp
 from app.services.inventory_svc import list_devices
 
 # ── Rate Limiter (definido en app/core/limiter.py) ──────────
@@ -51,7 +51,49 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"⚠️ Metrics poller no arrancó: {e}")
 
+    # Deception: reflejar topología señuelo en métricas (motor en Fase B)
+    from app.core.settings import DECEPTION_ENABLED
+    try:
+        from app.services import metrics_svc
+        from app.services.deception import topology_svc
+        summary = topology_svc.summary()
+        metrics_svc.netpulse_deception_devices_configured.set(summary["devices"])
+        metrics_svc.netpulse_deception_devices_enabled.set(summary["devices_enabled"])
+        state = "habilitada" if DECEPTION_ENABLED else "deshabilitada"
+        print(f"🎭 Red señuelo {state} ({summary['devices']} dispositivos, {summary['segments']} segmentos)")
+    except Exception as e:
+        print(f"⚠️ Deception no inicializó métricas: {e}")
+
+    # Arrancar el motor nativo de deception (solo si está habilitado)
+    if DECEPTION_ENABLED:
+        try:
+            from app.services.deception import engine_svc
+            report = await engine_svc.start()
+            print(f"🎭 Motor deception: {report.get('status')} "
+                  f"({report.get('started', 0)} listeners, {report.get('failed', 0)} fallos)")
+        except Exception as e:
+            print(f"⚠️ Motor deception no arrancó: {e}")
+        try:
+            from app.services.deception.integrations import tailer_svc
+            tailer_svc.start()
+            print("🎭 Tailer de honeypots reales iniciado")
+        except Exception as e:
+            print(f"⚠️ Tailer de deception no arrancó: {e}")
+
     yield
+
+    # Shutdown: detener tailer y motor de deception
+    try:
+        from app.services.deception.integrations import tailer_svc
+        tailer_svc.stop()
+    except Exception:
+        pass
+
+    try:
+        from app.services.deception import engine_svc
+        await engine_svc.stop()
+    except Exception:
+        pass
 
     # Shutdown: detener collectors
     try:
@@ -81,26 +123,11 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# ── Metrics Middleware (outermost — captures ALL requests) ──
+# ── Middleware ───────────────────────────────────────────────
+# En Starlette el ÚLTIMO middleware añadido queda como el MÁS EXTERNO.
+# Por eso MetricsMiddleware se añade al final (captura todos los requests).
 
-app.add_middleware(MetricsMiddleware)
-
-# ── Audit Middleware (second — captures ALL requests) ────────
-
-app.add_middleware(AuditMiddleware)
-
-# ── Rate Limiting Middleware ─────────────────────────────────
-
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(SlowAPIMiddleware)
-
-# ── Security Headers Middleware ──────────────────────────────
-
-app.add_middleware(SecurityHeadersMiddleware)
-
-# ── CORS Middleware ──────────────────────────────────────────
-
+# CORS (más interno)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -113,6 +140,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Security headers
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# Audit (captura todos los requests)
+app.add_middleware(AuditMiddleware)
+
+# Metrics (OUTERMOST — captura TODO, incluso lo que no llega a un endpoint)
+app.add_middleware(MetricsMiddleware)
 
 # ── Health ──────────────────────────────────────────────────
 
@@ -153,6 +194,12 @@ app.include_router(security_ext.router)
 app.include_router(integrations.router)
 app.include_router(collectors.router)
 app.include_router(system.router)
+app.include_router(deception.router)
+app.include_router(monitoring.router)
+app.include_router(ai.router)
+app.include_router(terminal.router)
+app.include_router(sftp.router)
+app.include_router(firewall.router)
 
 # ── Static files (Dashboard UI) ──────────────────────────────
 

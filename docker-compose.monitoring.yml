@@ -2,7 +2,10 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: netpulse-prometheus
-    network_mode: host
+    ports:
+      - "9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./config/prometheus-rules.yml:/etc/prometheus/rules/rules.yml:ro
@@ -14,15 +17,17 @@ services:
       - '--web.listen-address=0.0.0.0:9090'
       # Retención larga para capacity planning (90 días)
       - '--storage.tsdb.retention.time=90d'
+    networks:
+      - monitoring
     restart: unless-stopped
 
   alertmanager:
     image: prom/alertmanager:latest
     container_name: netpulse-alertmanager
-    # network_mode host: igual que Prometheus (necesita alcanzar la API
-    # del host en :8082 vía host.docker.internal no resuelve con host net;
-    # por eso el webhook apunta a 127.0.0.1:8082 en alertmanager.yml)
-    network_mode: host
+    ports:
+      - "9093:9093"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager_data:/alertmanager
@@ -30,6 +35,8 @@ services:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--storage.path=/alertmanager'
       - '--web.listen-address=0.0.0.0:9093'
+    networks:
+      - monitoring
     restart: unless-stopped
 
   loki:
@@ -61,6 +68,31 @@ services:
     depends_on:
       - loki
 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: netpulse-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Permitir incrustar dashboards en el dashboard de NetPulse (iframe)
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_COOKIE_SAMESITE: disabled
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    networks:
+      - monitoring
+    restart: unless-stopped
+    depends_on:
+      - loki
+      - prometheus
+
 networks:
   monitoring:
     driver: bridge
@@ -69,3 +101,4 @@ volumes:
   prometheus_data:
   loki_data:
   alertmanager_data:
+  grafana_data:

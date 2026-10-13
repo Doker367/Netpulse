@@ -140,7 +140,7 @@ def test_audit_retain(audit_db):
 # ── Semáforo de concurrencia ──────────────────────────────────────────────
 
 def test_limited_limita_concurrencia(monkeypatch):
-    monkeypatch.setattr(concurrency, "_semaphore", threading.BoundedSemaphore(2))
+    monkeypatch.setattr(concurrency, "_global_sem", threading.BoundedSemaphore(2))
     active = 0
     max_active = 0
     lock = threading.Lock()

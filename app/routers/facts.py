@@ -43,15 +43,24 @@ def get_facts(device_id: str):
         )
 
     f = result.data or {}
+
+    def _txt(value, default: str = "Unknown") -> str:
+        return str(value) if value not in (None, "") else default
+
+    try:
+        _uptime = float(f.get("uptime"))
+    except (TypeError, ValueError):
+        _uptime = 0.0
+
     return FactsResponse(
         device_id=device_id,
-        hostname=f.get("hostname", "Unknown"),
-        os_version=f.get("os_version", "Unknown"),
-        model=f.get("model", "Unknown"),
-        vendor=f.get("vendor", "Unknown"),
-        serial_number=f.get("serial_number", "Unknown"),
-        uptime=f.get("uptime", 0),
-        interface_count=len(f.get("interface_list", [])),
+        hostname=_txt(f.get("hostname")),
+        os_version=_txt(f.get("os_version")),
+        model=_txt(f.get("model")),
+        vendor=_txt(f.get("vendor")),
+        serial_number=_txt(f.get("serial_number")),
+        uptime=_uptime,
+        interface_count=len(f.get("interface_list", []) or []),
     )
 
 
