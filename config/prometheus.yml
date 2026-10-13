@@ -8,7 +8,7 @@ rule_files:
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: ['localhost:9093']
+        - targets: ['alertmanager:9093']
 
 scrape_configs:
   - job_name: 'prometheus'
@@ -18,5 +18,7 @@ scrape_configs:
   - job_name: 'netpulse-api'
     metrics_path: '/api/metrics'
     static_configs:
-      - targets: ['localhost:8082']
+      # host.docker.internal: la API corre en el host (macOS/Linux).
+      # En Linux añadir extra_hosts: host-gateway (ya incluido en el compose).
+      - targets: ['host.docker.internal:8082']
     scrape_interval: 15s
