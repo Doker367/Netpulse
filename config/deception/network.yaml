@@ -1,0 +1,155 @@
+# ============================================================
+# NetPulse — Red señuelo (Deception / Honeypot)
+# ============================================================
+# Define segmentos/VLANs y dispositivos simulados con su persona
+# (vendor/OS/banner) y los servicios que exponen. Los listeners que
+# atienden esos servicios los levanta el motor (Fase B/C).
+#
+# ADVERTENCIA: usar SOLO credenciales señuelo. Nunca reutilizar las
+# credenciales reales de devices.yaml. Esta red debe correr aislada.
+# ============================================================
+
+segments:
+  - id: vlan-oficina
+    vlan_id: 10
+    cidr: 10.10.0.0/24
+    gateway: 10.10.0.1
+    isolated: true
+    description: "Puestos de trabajo"
+  - id: vlan-servidores
+    vlan_id: 20
+    cidr: 10.20.0.0/24
+    gateway: 10.20.0.1
+    isolated: true
+    description: "Servidores internos (cebo de alto valor)"
+  - id: vlan-camaras
+    vlan_id: 30
+    cidr: 10.30.0.0/24
+    gateway: 10.30.0.1
+    isolated: true
+    description: "Videovigilancia IP"
+  - id: vlan-dmz
+    vlan_id: 40
+    cidr: 10.40.0.0/24
+    gateway: 10.40.0.1
+    isolated: true
+    description: "Perímetro / exposición a Internet"
+
+devices:
+  # ── Puesto de trabajo ──────────────────────────────────────
+  - id: pc-recepcion-01
+    role: pc
+    segment: vlan-oficina
+    ip: 10.10.0.21
+    persona:
+      vendor: dell
+      os: windows
+      hostname: RECEPCION-PC
+      mac: "00:1c:42:10:10:21"
+    services:
+      - { port: 22, proto: ssh, engine: native, banner: "OpenSSH_8.9" }
+      - { port: 445, proto: smb, engine: native }
+      - { port: 80, proto: http, engine: native, banner: "Microsoft-IIS/10.0" }
+    tags: [office, windows]
+    description: "PC de recepción (señuelo)"
+
+  # ── Servidores (alto valor) ────────────────────────────────
+  - id: srv-files-01
+    role: server
+    segment: vlan-servidores
+    ip: 10.20.0.10
+    persona:
+      vendor: linux
+      os: ubuntu
+      hostname: files01
+      mac: "00:1c:42:20:10:10"
+    services:
+      - { port: 22, proto: ssh, engine: cowrie, banner: "OpenSSH_8.2p1 Ubuntu" }
+      - { port: 445, proto: smb, engine: dionaea }
+      - { port: 21, proto: ftp, engine: opencanary }
+    tags: [server, files]
+    description: "Servidor de archivos SMB (cebo)"
+
+  - id: srv-db-01
+    role: server
+    segment: vlan-servidores
+    ip: 10.20.0.11
+    persona:
+      vendor: linux
+      os: debian
+      hostname: db01
+      mac: "00:1c:42:20:10:11"
+    services:
+      - { port: 22, proto: ssh, engine: cowrie, banner: "OpenSSH_8.4p1 Debian" }
+      - { port: 3306, proto: mysql, engine: dionaea }
+      - { port: 5432, proto: postgresql, engine: opencanary }
+    tags: [server, database]
+    description: "Servidor de base de datos (cebo)"
+
+  # ── Cámara IP ──────────────────────────────────────────────
+  - id: cam-entrada-01
+    role: camera
+    segment: vlan-camaras
+    ip: 10.30.0.11
+    persona:
+      vendor: hikvision
+      os: linux
+      hostname: cam-entrada
+      mac: "00:12:5a:30:00:11"
+    services:
+      - { port: 80, proto: http, engine: native, banner: "Hikvision-Webs" }
+      - { port: 554, proto: rtsp, engine: native }
+      - { port: 23, proto: telnet, engine: opencanary }
+    tags: [camera, iot]
+    description: "Cámara IP de entrada (señuelo IoT)"
+
+  # ── Switch de acceso ───────────────────────────────────────
+  - id: sw-access-01
+    role: switch
+    segment: vlan-dmz
+    ip: 10.40.0.11
+    persona:
+      vendor: cisco
+      os: ios
+      hostname: sw-access-01
+      mac: "00:1c:42:40:00:11"
+    services:
+      - { port: 22, proto: ssh, engine: native, banner: "Cisco IOS SSH 1.25" }
+      - { port: 443, proto: https, engine: native, banner: "Cisco IOS Web UI" }
+      - { port: 161, proto: snmp, engine: native }
+    tags: [switch, network]
+    description: "Switch de acceso (señuelo de red)"
+
+  # ── Firewall perimetral ────────────────────────────────────
+  - id: fw-edge-01
+    role: firewall
+    segment: vlan-dmz
+    ip: 10.40.0.1
+    persona:
+      vendor: fortinet
+      os: fortios
+      hostname: fw-edge-01
+      mac: "00:1c:42:40:00:01"
+    services:
+      - { port: 22, proto: ssh, engine: native, banner: "FortiGate-60F" }
+      - { port: 443, proto: https, engine: native, banner: "FortiGate SSL-VPN" }
+      - { port: 161, proto: snmp, engine: native }
+    tags: [firewall, perimeter]
+    description: "Firewall perimetral (señuelo de borde)"
+
+  # ── Router de núcleo ───────────────────────────────────────
+  - id: router-core-01
+    role: router
+    segment: vlan-dmz
+    ip: 10.40.0.2
+    persona:
+      vendor: mikrotik
+      os: routeros
+      hostname: router-core-01
+      mac: "00:1c:42:40:00:02"
+    services:
+      - { port: 22, proto: ssh, engine: native, banner: "MikroTik RouterOS 7.11" }
+      - { port: 8291, proto: https, engine: native, banner: "MikroTik Winbox" }
+      - { port: 161, proto: snmp, engine: native }
+    tags: [router, network]
+    description: "Router de núcleo (señuelo de red)"

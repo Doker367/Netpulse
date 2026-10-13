@@ -4,6 +4,7 @@ CRUD endpoints para gestionar el inventario de dispositivos.
 """
 
 import asyncio
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -14,6 +15,14 @@ from app.models.schemas import DeviceCreate, DeviceResponse, DeviceUpdate
 from app.services import inventory_svc
 
 router = APIRouter(prefix="/api/devices", tags=["Devices"])
+
+# ── Caché/histéresis del health ──────────────────────────────
+# Evita parpadeos: un equipo solo pasa a OFFLINE tras N fallos
+# consecutivos y los resultados se reutilizan durante TTL segundos.
+_HEALTH_TTL = 8.0
+_HEALTH_FAILS_TO_OFFLINE = 2
+_health_cache: dict[str, tuple[float, bool]] = {}
+_health_fails: dict[str, int] = {}
 
 
 # ── Device Health Check (fast TCP probe, no NAPALM) ──────────
@@ -30,6 +39,8 @@ async def device_health(
     Returns ``{device_id: online_bool, ...}`` for all devices,
     or a single device if ``?device_id=`` is provided.
 
+    Aplica caché corta + histéresis para que el estado no parpadee.
+
     This endpoint is **public** (no auth required).
     """
     devices = inventory_svc.list_devices()
@@ -39,16 +50,38 @@ async def device_health(
         if not devices:
             raise HTTPException(404, f"Dispositivo '{device_id}' no encontrado")
 
-    # Run checks concurrently in parallel
-    dev_ids = [d["id"] for d in devices]
-    probe_results = await asyncio.gather(
-        *(_probe_device(d, timeout=2.5) for d in devices),
-        return_exceptions=True,
-    )
-    return {
-        dev_id: (res is True)
-        for dev_id, res in zip(dev_ids, probe_results)
-    }
+    now = time.monotonic()
+    result: dict[str, bool] = {}
+    to_probe = []
+    for d in devices:
+        did = d["id"]
+        cached = _health_cache.get(did)
+        if cached and now - cached[0] < _HEALTH_TTL:
+            result[did] = cached[1]
+        else:
+            to_probe.append(d)
+
+    if to_probe:
+        probes = await asyncio.gather(
+            *(_probe_device(d, timeout=2.5) for d in to_probe),
+            return_exceptions=True,
+        )
+        for d, res in zip(to_probe, probes):
+            did = d["id"]
+            if res is True:
+                _health_fails[did] = 0
+                online = True
+            else:
+                _health_fails[did] = _health_fails.get(did, 0) + 1
+                if _health_fails[did] >= _HEALTH_FAILS_TO_OFFLINE:
+                    online = False
+                else:
+                    # Primer fallo: mantener el último estado conocido
+                    online = _health_cache.get(did, (0.0, False))[1]
+            _health_cache[did] = (now, online)
+            result[did] = online
+
+    return result
 
 
 async def _probe_device(dev: dict, timeout: float = 2.5) -> bool:
@@ -60,8 +93,8 @@ async def _probe_device(dev: dict, timeout: float = 2.5) -> bool:
     driver = (dev.get("driver") or "").lower()
 
     if protocol == "snmp" or driver == "snmp" or port == 161:
-        # 1. ICMP Ping probe
-        ping_args = ["ping", "-c", "1", "-t", "2", host] if sys.platform == "darwin" else ["ping", "-c", "1", "-W", "2", host]
+        # 1. ICMP Ping probe (2 paquetes: tolera 1 perdido y evita falsos OFFLINE)
+        ping_args = ["ping", "-c", "2", "-t", "2", host] if sys.platform == "darwin" else ["ping", "-c", "2", "-W", "2", host]
         try:
             proc = await asyncio.create_subprocess_exec(
                 *ping_args,
@@ -74,21 +107,9 @@ async def _probe_device(dev: dict, timeout: float = 2.5) -> bool:
         except Exception:
             pass
 
-        # 2. SNMP sysUpTime query
-        try:
-            from app.services.collectors import snmp_svc
-            creds = dev.get("credentials") or {}
-            community = dev.get("community") or creds.get("community") or dev.get("snmp_ro") or "public"
-            loop = asyncio.get_running_loop()
-            metrics = await loop.run_in_executor(
-                None,
-                lambda: snmp_svc.poll_device_snmp(host, community=community, timeout=2, driver=driver)
-            )
-            if metrics:
-                return True
-        except Exception:
-            pass
-
+        # Para el health (rápido) el ICMP es suficiente. No consultamos SNMP
+        # aquí: si el equipo no responde a ping, se considera offline y así
+        # evitamos esperas de varios segundos por los timeouts SNMP.
         return False
 
     return await _tcp_check(host, port, timeout=timeout)

@@ -712,6 +712,25 @@ def _execute_mikrotik_interfaces(device: dict) -> NapalmResult:
         return result
 
 
+def _icmp_reachable(host: str, timeout: int = 2) -> bool:
+    """Comprobación ICMP rápida para no esperar timeouts SNMP si el equipo no está."""
+    import platform
+    import subprocess
+
+    if not host:
+        return False
+    if platform.system() == "Windows":
+        cmd = ["ping", "-n", "1", "-w", "1000", host]
+    elif platform.system() == "Darwin":
+        cmd = ["ping", "-c", "1", "-t", "1", host]
+    else:
+        cmd = ["ping", "-c", "1", "-W", "1", host]
+    try:
+        return subprocess.run(cmd, capture_output=True, timeout=timeout).returncode == 0
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
 def _execute_snmp_facts(device: dict) -> NapalmResult:
     """Obtiene facts de dispositivo SNMPv2c."""
     result = NapalmResult(device["id"])
@@ -722,7 +741,14 @@ def _execute_snmp_facts(device: dict) -> NapalmResult:
         community = creds.get("community") or device.get("community") or device.get("snmp_ro") or "public"
         host = device.get("hostname", "")
         driver = device.get("driver", "")
-        snmp_data = snmp_svc.poll_device_snmp(host, community=community, timeout=4, driver=driver)
+
+        # Pre-chequeo: si el host ni responde a ICMP, no tiene sentido esperar
+        # los timeouts de SNMP (evitaba esperas de ~40 s en equipos caídos).
+        if not _icmp_reachable(host):
+            result.set_error("connection_error", f"{host} no responde (ICMP)")
+            return result
+
+        snmp_data = snmp_svc.poll_device_snmp(host, community=community, timeout=3, driver=driver)
 
         uptime_raw = str(snmp_data.get("uptime", "0"))
         uptime_sec = 0
@@ -802,13 +828,14 @@ def _netmiko_facts(device: dict) -> NapalmResult:
         if not facts:
             result.set_error("driver_error", f"netmiko facts falló para {device_id}")
             return result
-        # interface_list para FactsResponse.interface_count
+        # Normalizar tipos (el schema exige str/float, no None)
+        for _k in ("hostname", "vendor", "model", "os_version", "serial_number"):
+            if not facts.get(_k):
+                facts[_k] = "Unknown"
         try:
-            ifaces = netmiko_svc.get_interfaces(device)
-            if ifaces:
-                facts["interface_list"] = list(ifaces.keys())
-        except Exception:
-            pass
+            facts["uptime"] = float(str(facts.get("uptime")).split()[0])
+        except (TypeError, ValueError):
+            facts["uptime"] = 0.0
         facts.setdefault("interface_list", [])
         result.data = facts
         result.success = True
@@ -899,6 +926,15 @@ def get_facts(device_id: str) -> NapalmResult:
 
     # Dispositivos SNMP
     if d.get("protocol") == "snmp" or d.get("driver") == "snmp":
+        # Modo dual (SNMP + CLI): probar CLI primero — es más rápido y rico
+        # que SNMP cuando el equipo expone telnet/ssh.
+        if _dual_cli(d):
+            cli_result = _netmiko_facts(d)
+            if cli_result.success:
+                logger.info("[%s] get_facts → OK via CLI dual (netmiko)", device_id)
+                return cli_result
+            logger.info("[%s] CLI dual falló (%s) — usando facts SNMP",
+                        device_id, cli_result.error)
         return _execute_snmp_facts(d)
 
     # MikroTik RouterOS 7.22 workaround
@@ -1852,11 +1888,22 @@ def get_resources(device_id: str) -> NapalmResult:
         result.set_error("driver_error", f"Device {device_id} not found")
         return result
     if d.get("protocol") == "snmp" or d.get("driver") == "snmp":
+        # Modo dual (SNMP + CLI): preferir CLI (más rápido que SNMP con timeouts).
+        if _dual_cli(d):
+            cli_res = netmiko_svc.get_resources(d)
+            if cli_res:
+                cli_res.setdefault("_note", "Datos vía CLI dual (netmiko)")
+                result.data = cli_res
+                result.success = True
+                return result
+        if not _icmp_reachable(d.get("hostname", "")):
+            result.set_error("connection_error", f"{d.get('hostname')} no responde (ICMP)")
+            return result
         try:
             from app.services.collectors import snmp_svc
             creds = d.get("credentials") or {}
             community = creds.get("community") or d.get("community") or d.get("snmp_ro") or "public"
-            snmp_data = snmp_svc.poll_device_snmp(d["hostname"], community=community, timeout=3, driver=d.get("driver", ""))
+            snmp_data = snmp_svc.poll_device_snmp(d["hostname"], community=community, timeout=2, driver=d.get("driver", ""))
 
             # Safe CPU parsing
             cpu_raw = snmp_data.get("cpu", 0)

@@ -1,0 +1,93 @@
+{
+  "uid": "netpulse-deception",
+  "title": "NetPulse — Deception & Red",
+  "tags": ["netpulse", "deception"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Eventos de deception (total)",
+      "datasource": { "type": "prometheus", "uid": "netpulse-prom" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "sum(netpulse_deception_events_total)" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "area" }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Alertas disparadas",
+      "datasource": { "type": "prometheus", "uid": "netpulse-prom" },
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "sum(netpulse_deception_alerts_total)" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "area" }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Dispositivos señuelo configurados",
+      "datasource": { "type": "prometheus", "uid": "netpulse-prom" },
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "netpulse_deception_devices_configured" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Dispositivos señuelo activos",
+      "datasource": { "type": "prometheus", "uid": "netpulse-prom" },
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "netpulse_deception_devices_enabled" }
+      ],
+      "options": { "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Eventos por tipo (rate 5m)",
+      "datasource": { "type": "prometheus", "uid": "netpulse-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (event_type) (rate(netpulse_deception_events_total[5m]))"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Alertas por severidad (rate 5m)",
+      "datasource": { "type": "prometheus", "uid": "netpulse-prom" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (severity) (rate(netpulse_deception_alerts_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "logs",
+      "title": "Logs de deception (Loki)",
+      "datasource": { "type": "loki", "uid": "netpulse-loki" },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 13 },
+      "targets": [
+        { "refId": "A", "expr": "{container=\"deception\"}" }
+      ]
+    }
+  ]
+}

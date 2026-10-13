@@ -13,11 +13,13 @@ El ICMP se lanza con 1 paquete y timeout corto para no penalizar el ciclo.
 """
 
 import logging
+import os
 import platform
 import re
 import subprocess
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -171,15 +173,19 @@ def poll_all() -> dict:
     _record_history(host, {})
 
     devices: dict = {}
-    for device in inventory_svc.list_devices():
-        dev_id = device.get("id")
-        if not dev_id:
-            continue
-        try:
-            devices[dev_id] = collect_device(dev_id)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("[poller] %s falló: %s", dev_id, exc)
-            devices[dev_id] = {"device_id": dev_id, "error": str(exc)}
+    dev_list = [d for d in inventory_svc.list_devices() if d.get("id")]
+    # Sondeo en paralelo (por dispositivo); con el semáforo por dispositivo
+    # de concurrency.py, un equipo lento no bloquea a los demás.
+    workers = max(1, int(os.getenv("NETPULSE_POLL_WORKERS", "8")))
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="poll") as pool:
+        futures = {pool.submit(collect_device, d["id"]): d["id"] for d in dev_list}
+        for fut in as_completed(futures):
+            dev_id = futures[fut]
+            try:
+                devices[dev_id] = fut.result()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("[poller] %s falló: %s", dev_id, exc)
+                devices[dev_id] = {"device_id": dev_id, "error": str(exc)}
 
     with _lock:
         _state["last_run"] = datetime.now(timezone.utc).isoformat()

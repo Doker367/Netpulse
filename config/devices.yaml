@@ -69,3 +69,83 @@ devices:
   protocol: snmp
   tags: []
   type: router
+- cli_port: null
+  cli_transport: null
+  credentials:
+    community: public
+    password: gAAAAABqxTTfB8-RREWZrZANbThrIEiW02r4OS0HzB8Gp4f3kYfXsquqkfuPP7kwoHpV9mPON0shF8HMLsXWp7q5ornxXm0bRw==
+    username: admin
+  description: Cisco Core Router (FRRouting)
+  driver: ios
+  group: Core
+  hostname: 127.0.0.1
+  id: cisco-core-01
+  netmiko_device_type: null
+  noauth_telnet: false
+  port: 2222
+  protocol: ssh
+  tags:
+  - lab
+  - cisco
+  - frr
+  type: router
+- cli_port: null
+  cli_transport: null
+  credentials:
+    community: public
+    password: gAAAAABqxTTf8r5jp-J0dfoESHp8y2Erg-Q39WXygBzoESActvv9YSMOiK-l7IYJ9-AYytcN8S4gM236FpdlWnthx3STF3LDWQ==
+    username: admin
+  description: Juniper Edge Router (FRRouting)
+  driver: ios
+  group: Edge
+  hostname: 127.0.0.1
+  id: juniper-edge-01
+  netmiko_device_type: null
+  noauth_telnet: false
+  port: 2223
+  protocol: ssh
+  tags:
+  - lab
+  - juniper
+  - frr
+  type: router
+- cli_port: null
+  cli_transport: null
+  credentials:
+    community: public
+    password: gAAAAABqxTTfttoKfeX10t7J69wT4rLbCbUJz7D32Ke5LIj6-lc9McadSY0FtDf6IyTMBzzWFwGtt3HFJJNCz_0FZm60MLgUkQ==
+    username: admin
+  description: Access Switch (FRRouting)
+  driver: ios
+  group: Access
+  hostname: 127.0.0.1
+  id: switch-access-01
+  netmiko_device_type: null
+  noauth_telnet: false
+  port: 2224
+  protocol: ssh
+  tags:
+  - lab
+  - switch
+  - frr
+  type: switch
+- cli_port: null
+  cli_transport: null
+  credentials:
+    community: public
+    password: gAAAAABqxTTfXQR7SIOsQ496Sp7lujWEutt8ps5gWTX1kheGZ88-w7P7o4ku4XdHq2XIrqhjFhApUoQuLEeR_BAEYdsaUApFENN0NT4AnaLDINwN02fAvZgYTkeoCwI0lmcHFx-EAcwm
+    username: vrnetlab
+  description: Arista Core Router (vEOS 4.27.3F)
+  driver: eos
+  group: Core
+  hostname: 127.0.0.1
+  id: arista-core-01
+  netmiko_device_type: null
+  noauth_telnet: false
+  port: 443
+  protocol: ssh
+  tags:
+  - lab
+  - arista
+  - veos
+  type: router

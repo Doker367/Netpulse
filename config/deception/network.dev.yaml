@@ -1,0 +1,62 @@
+# ============================================================
+# NetPulse — Red señuelo (DEV) — puertos altos, sin root
+# ============================================================
+# Variante de laboratorio para macOS: todos los dispositivos se atan a
+# 127.0.0.1 con puertos distintos (evita colisiones y puertos <1024).
+#   NETPULSE_DECEPTION_NETWORK_FILE=config/deception/network.dev.yaml
+#   NETPULSE_DECEPTION_BIND_HOST=127.0.0.1
+# ============================================================
+
+segments:
+  - id: vlan-dev
+    vlan_id: 10
+    cidr: 127.0.0.1/32
+    isolated: true
+    description: "Segmento de desarrollo (loopback)"
+
+devices:
+  - id: pc-dev-01
+    role: pc
+    segment: vlan-dev
+    ip: 127.0.0.1
+    persona: { vendor: dell, os: windows, hostname: DEV-PC }
+    services:
+      - { port: 2201, proto: ssh, engine: native, banner: "OpenSSH_8.9" }
+      - { port: 8001, proto: http, engine: native, banner: "Microsoft-IIS/10.0" }
+
+  - id: srv-dev-01
+    role: server
+    segment: vlan-dev
+    ip: 127.0.0.1
+    persona: { vendor: linux, os: ubuntu, hostname: devsrv }
+    services:
+      - { port: 2202, proto: ssh, engine: native, banner: "OpenSSH_8.2p1 Ubuntu" }
+
+  - id: cam-dev-01
+    role: camera
+    segment: vlan-dev
+    ip: 127.0.0.1
+    persona: { vendor: hikvision, os: linux, hostname: cam-dev }
+    services:
+      - { port: 8002, proto: http, engine: native, banner: "Hikvision-Webs" }
+      - { port: 5540, proto: rtsp, engine: native }
+      - { port: 2301, proto: telnet, engine: native }
+
+  - id: sw-dev-01
+    role: switch
+    segment: vlan-dev
+    ip: 127.0.0.1
+    persona: { vendor: cisco, os: ios, hostname: sw-dev-01 }
+    services:
+      - { port: 1222, proto: ssh, engine: native, banner: "Cisco IOS SSH 1.25" }
+      - { port: 1232, proto: telnet, engine: native }
+      - { port: 8003, proto: http, engine: native, banner: "Cisco IOS Web UI" }
+      - { port: 1161, proto: snmp, engine: native }
+
+  - id: fw-dev-01
+    role: firewall
+    segment: vlan-dev
+    ip: 127.0.0.1
+    persona: { vendor: fortinet, os: fortios, hostname: fw-dev-01 }
+    services:
+      - { port: 2203, proto: ssh, engine: native, banner: "FortiGate-60F" }

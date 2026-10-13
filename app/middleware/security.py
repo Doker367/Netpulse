@@ -53,4 +53,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if "server" in headers:
             del headers["server"]
 
+        # No cachear el HTML/JS del dashboard (evita servir JS viejo tras
+        # una actualización y que el usuario tenga que forzar recarga).
+        if request.url.path in ("/", "/favicon.svg"):
+            headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            headers["Pragma"] = "no-cache"
+            headers["Expires"] = "0"
+
         return response

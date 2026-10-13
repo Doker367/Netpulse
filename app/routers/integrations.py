@@ -11,14 +11,13 @@ from fastapi.responses import PlainTextResponse
 
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import requires_role
-from app.services.integrations import loki_proxy, netbox_sync
+from app.services.integrations import loki_proxy
 from app.services.reports import csv_report
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["Integrations"])
 
 AUTH = [Depends(JWTBearer()), Depends(requires_role("viewer"))]
-ADMIN = [Depends(JWTBearer()), Depends(requires_role("admin"))]
 
 
 # ── Loki Log Viewer ──────────────────────────────────────────
@@ -42,19 +41,9 @@ def logs_labels():
 
 
 # ── NetBox Sync ──────────────────────────────────────────────
-
-@router.get("/netbox/devices", dependencies=AUTH)
-def netbox_devices():
-    """Lista dispositivos desde NetBox (fuente de verdad)."""
-    return netbox_sync.fetch_netbox_devices()
-
-
-@router.post("/netbox/sync", dependencies=ADMIN)
-def netbox_sync_inventory():
-    """Sincroniza dispositivos de NetBox hacia el inventario local."""
-    added, errors = netbox_sync.sync_netbox_to_inventory()
-    return {"added": added, "errors": errors}
-
+# Las rutas /netbox/* viven en app/routers/netbox.py (canónicas y con más
+# funcionalidad: devices, sites, IPAM, VLANs, sync/push). Aquí se
+# duplicaban y nunca se ejecutaban por shadowing, así que se eliminaron.
 
 # ── CSV Reports ──────────────────────────────────────────────
 
