@@ -2,6 +2,7 @@ fastapi
 uvicorn[standard]
 slowapi
 napalm
+napalm-ros
 netmiko
 prometheus-client
 python-jose[cryptography]
@@ -12,3 +13,7 @@ librouteros
 nornir
 reportlab
 psutil
+paramiko
+geoip2
+maxminddb-geolite2
+boto3

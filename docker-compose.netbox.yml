@@ -38,7 +38,7 @@ services:
       netbox-redis:
         condition: service_started
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8080/login/"]
       interval: 15s
       timeout: 5s
       retries: 10

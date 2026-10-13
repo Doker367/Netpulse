@@ -26,6 +26,12 @@ backups/*
 # Audit logs (pueden contener IPs/usernames)
 audit/
 
+# Deception telemetry (eventos de atacantes)
+/deception/
+
+# Binarios del data plane en Go
+deception-engine/bin/
+
 # Environment
 .env
 .env.*
@@ -54,7 +60,8 @@ config/maintenance_windows.json
 config/api_keys.json
 config/drift_history/
 config/baselines/
-reports/
+# Solo la carpeta de reportes en la raíz (evita ignorar app/services/reports/)
+/reports/
 
 # Secretos locales (no commitear)
 config/alertmanager.yml
@@ -74,3 +81,6 @@ config/.netbox_token.*
 
 # Credenciales iniciales rotadas (NEVER COMMIT)
 config/.initial_credentials
+
+# Deception: host keys persistentes (secretos locales)
+config/deception/keys/

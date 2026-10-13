@@ -17,7 +17,8 @@ services:
   # NAPALM driver: ios (usa CLI Cisco-like de FRR)
   # ----------------------------------------------------------
   router-cisco:
-    image: frrouting/frr:latest
+    build: ./docker/frr
+    image: netpulse-frr-cisco:latest
     container_name: netpulse-cisco
     hostname: cisco-core-01
     privileged: true
@@ -39,7 +40,8 @@ services:
   # diferente personalidad. Juniper real requiere vJunOS)
   # ----------------------------------------------------------
   router-juniper:
-    image: frrouting/frr:latest
+    build: ./docker/frr
+    image: netpulse-frr-juniper:latest
     container_name: netpulse-juniper
     hostname: juniper-edge-01
     privileged: true
@@ -82,6 +84,13 @@ services:
     image: cminsg/vr-veos:4.27.3F
     container_name: netpulse-arista
     hostname: arista-core-01
+    # vEOS es x86_64 y arranca QEMU dentro del contenedor: necesita un host
+    # x86_64 con virtualización. En Apple Silicon (arm64) no arranca
+    # ("Unable to connect to qemu monitor"). Por eso queda tras un profile;
+    # actívalo solo en hosts compatibles:
+    #   docker compose -f docker-compose.lab.yml --profile arista up -d
+    profiles: ["arista"]
+    platform: linux/amd64
     privileged: true
     ports:
       - "2226:22"     # SSH
@@ -94,7 +103,8 @@ services:
   # Switch Capa 2 — FRRouting con bridge
   # ----------------------------------------------------------
   switch-l2:
-    image: frrouting/frr:latest
+    build: ./docker/frr
+    image: netpulse-frr-switch:latest
     container_name: netpulse-switch
     hostname: switch-access-01
     privileged: true
