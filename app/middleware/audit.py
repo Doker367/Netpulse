@@ -70,7 +70,7 @@ class AuditMiddleware:
             # Escribir fuera del event loop (SQLite en executor, sin bloquear)
             _log_async(
                 action=f"api_{method.lower()}",
-                username="anonymous",
+                username=_get_username(scope),
                 details=details,
                 ip_address=client_ip,
                 success=success,
@@ -99,6 +99,22 @@ def _safe_log(**kwargs) -> None:
         log_event(**kwargs)
     except Exception:
         pass
+
+
+def _get_username(scope: dict) -> str:
+    """Usuario autenticado del request (o 'anonymous').
+
+    ``JWTBearer`` guarda el payload en ``request.state.user``, que Starlette
+    respalda en ``scope["state"]``; como este middleware envuelve al app,
+    tras la petición el scope ya contiene el usuario real.
+    """
+    state = scope.get("state") or {}
+    user = state.get("user") if isinstance(state, dict) else None
+    if isinstance(user, dict):
+        sub = user.get("sub")
+        if sub:
+            return str(sub)
+    return "anonymous"
 
 
 def _get_client_ip(scope: dict) -> str:

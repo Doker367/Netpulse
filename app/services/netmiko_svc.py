@@ -216,97 +216,138 @@ def _noauth_family(device: dict) -> Optional[str]:
     return None
 
 
-def _noauth_login(device: dict, timeout: float = 12.0):
-    """Abre sesión telnet y deja el shell listo. Devuelve (socket, prompt_bytes)."""
+def _noauth_login(device: dict, timeout: float = 6.0):
+    """Abre sesión telnet y deja el shell listo. Devuelve (socket, prompt_bytes).
+
+    Lee el banner con un tope corto y exige un prompt real ("#" o ">") en
+    lugar de esperar 12 s a "Press any key to continue" (que estos equipos
+    no siempre envían). Reintenta una vez si no hay prompt.
+    """
     import socket as _socket
-    s = _socket.create_connection(
-        (device["hostname"], _effective_port(device)), timeout=8
-    )
-    s.settimeout(0.25)
-    buf = b""
-    t0 = time.monotonic()
-    while b"Press any key to continue" not in buf and time.monotonic() - t0 < timeout:
+
+    def _read_until_prompt(s, limit: float):
+        buf = b""
+        t0 = time.monotonic()
+        while time.monotonic() - t0 < limit:
+            try:
+                d = s.recv(4096)
+            except _socket.timeout:
+                continue
+            if not d:
+                break
+            buf += d
+            text = _noauth_clean(buf)
+            lines = [ln for ln in re.split(rb"[\r\n]+", text) if ln.strip()]
+            if lines:
+                last = lines[-1].strip()
+                if last.endswith((b"#", b">")):
+                    return buf, last
+        return buf, b""
+
+    last_err: Optional[Exception] = None
+    for _ in range(2):
+        s = None
         try:
-            d = s.recv(4096)
-            if d:
-                buf += d
-        except _socket.timeout:
+            s = _socket.create_connection(
+                (device["hostname"], _effective_port(device)), timeout=4
+            )
+        except OSError as exc:
+            last_err = exc
+            time.sleep(0.4)
             continue
-    s.sendall(b"\r")
-    buf = b""
-    t0 = time.monotonic()
-    while time.monotonic() - t0 < timeout:
-        try:
-            d = s.recv(4096)
-            if d:
-                buf += d
-                if b"#" in buf:
+        s.settimeout(0.25)
+        # Banner con tope corto (no bloquear esperando "Press any key").
+        t0 = time.monotonic()
+        quiet = t0
+        buf = b""
+        while time.monotonic() - t0 < 3.0:
+            try:
+                d = s.recv(4096)
+                if d:
+                    buf += d
+                    quiet = time.monotonic()
+                else:
                     break
+            except _socket.timeout:
+                if buf and time.monotonic() - quiet > 0.6:
+                    break
+        # Despertar el prompt
+        s.sendall(b"\r")
+        _, base = _read_until_prompt(s, timeout)
+        if base:
+            return s, base
+        try:
+            s.close()
+        except OSError:
+            pass
+        time.sleep(0.4)
+
+    if last_err:
+        raise last_err
+    raise OSError("el equipo no devolvió prompt telnet")
+
+
+def _noauth_drain(s, limit: float = 1.0) -> None:
+    """Descarta lo que haya en el socket hasta que se calle o venza el tope."""
+    import socket as _socket
+    t0 = time.monotonic()
+    while time.monotonic() - t0 < limit:
+        try:
+            if not s.recv(4096):
+                return
         except _socket.timeout:
-            continue
-    text = _noauth_clean(buf)
-    idx = max(text.rfind(b"\n"), text.rfind(b"\r"))
-    base = text[idx + 1:].strip() if idx >= 0 else text.strip()
-    if not base:
-        base = b"#"
-    return s, base
+            return
 
 
 def _noauth_exec(device: dict, command: str, read_timeout: float = 25.0) -> str:
     """Ejecuta un comando por telnet ligero y devuelve la salida limpia."""
-    import socket as _socket
     s = None
     try:
         s, base = _noauth_login(device)
         # Desactivar paginación (equivalente a netmiko disable_paging)
         s.sendall(b"no page\r")
-        t0 = time.monotonic()
-        while time.monotonic() - t0 < 2.0:
-            try:
-                d = s.recv(4096)
-                if d and b"# " in d or (d and base in d):
-                    break
-            except _socket.timeout:
-                break
+        _noauth_drain(s, 1.0)
 
         s.sendall(command.encode("utf-8", "replace") + b"\r")
         buf = b""
         t0 = time.monotonic()
-        last = time.monotonic()
+        last = t0
         while time.monotonic() - t0 < read_timeout:
             try:
-                d = s.recv(4096)
+                d = s.recv(8192)
                 if d:
                     buf += d
                     last = time.monotonic()
-            except _socket.timeout:
+            except Exception:
                 pass
             t = _noauth_clean(buf)
             # Avanzar paginación "-- MORE --"
-            if b"MORE" in t[-100:] and time.monotonic() - last > 0.15:
+            if b"-- MORE --" in t[-80:] or t[-8:].rstrip().endswith(b"MORE"):
                 s.sendall(b" ")
                 last = time.monotonic()
-            if base and (t.endswith(base) or base in t[-len(base) - 60:]):
-                if time.monotonic() - last > 0.25:
-                    break
+                continue
+            if buf and base and t.rstrip().endswith(base) and time.monotonic() - last > 0.3:
+                break
+            if buf and time.monotonic() - last > 1.5:
+                break
+
         clean = _noauth_clean(buf)
         # Quitar el eco del comando (hasta el primer salto de línea)
-        cut = clean.find(b"\n\r")
-        if cut < 0:
-            cut = clean.find(b"\r\n")
-        if cut < 0:
-            cut = clean.find(b"\n")
-        out = clean[cut + 2:] if cut >= 0 else clean
+        for sep in (b"\n\r", b"\r\n", b"\n", b"\r"):
+            cut = clean.find(sep)
+            if cut >= 0:
+                clean = clean[cut + len(sep):]
+                break
         if base:
-            i = out.rfind(base)
+            i = clean.rfind(base)
             if i >= 0:
-                out = out[:i]
-        return out.decode("ascii", "replace").strip()
+                clean = clean[:i]
+        return clean.decode("ascii", "replace").strip()
     finally:
         if s:
             try:
                 s.close()
-            except Exception:
+            except OSError:
                 pass
 
 
@@ -525,23 +566,33 @@ def get_running_config(device: dict) -> Optional[str]:
 @limited
 def get_facts(device: dict) -> Optional[dict]:
     """Facts básicos vía netmiko (show version / display version / show system)."""
-    fam = _family_device_type(device)
+    noauth_fam = _noauth_family(device)
+    fam = noauth_fam or _family_device_type(device)
     if not fam:
         return None
     cmd = _VERSION_CMDS.get(fam, "show version")
-    conn = None
-    try:
-        conn = _connect(device)
-        out = conn.send_command(cmd, read_timeout=30)
-    except Exception as e:
-        logger.warning("[netmiko] facts falló para %s: %s", device["id"], e)
-        return None
-    finally:
-        if conn:
-            try:
-                conn.disconnect()
-            except Exception:
-                pass
+
+    if noauth_fam:
+        # Motor ligero telnet (ProCurve/Aruba sin login): rápido y sin SSH.
+        try:
+            out = _noauth_exec(device, cmd, read_timeout=20)
+        except Exception as e:
+            logger.warning("[netmiko] facts (noauth) falló para %s: %s", device["id"], e)
+            return None
+    else:
+        conn = None
+        try:
+            conn = _connect(device)
+            out = conn.send_command(cmd, read_timeout=30)
+        except Exception as e:
+            logger.warning("[netmiko] facts falló para %s: %s", device["id"], e)
+            return None
+        finally:
+            if conn:
+                try:
+                    conn.disconnect()
+                except Exception:
+                    pass
 
     if not out:
         return None
@@ -742,9 +793,46 @@ def _parse_interfaces(out: str, fam: str) -> dict:
 
 # ── Recursos del sistema ─────────────────────────────────────────────────
 
+_RESOURCES_CMDS = {
+    "procurve": "show system",
+    "comware": "display memory",
+    "aos": "show system",
+    "sros": "show system",
+}
+
+
+def _noauth_resources(device: dict) -> Optional[dict]:
+    """Recursos vía telnet ligero (ProCurve/Aruba). Devuelve dict o None."""
+    fam = _noauth_family(device)
+    cmd = _RESOURCES_CMDS.get(fam, "show system")
+    try:
+        out = _noauth_exec(device, cmd, read_timeout=15)
+    except Exception as e:
+        logger.warning("[netmiko] resources (noauth) falló para %s: %s", device["id"], e)
+        return None
+    if not out:
+        return None
+    resources = {"cpu": 0, "memory_total": 0, "memory_used": 0,
+                 "hdd_total": 0, "hdd_free": 0}
+    # ProCurve: "Memory  - Total: 25,165,824  Free: 19,234,816"
+    mt = re.search(r"Total\s*:?\s*([\d,]+)", out)
+    mf = re.search(r"Free\s*:?\s*([\d,]+)", out)
+    if mt:
+        resources["memory_total"] = int(mt.group(1).replace(",", ""))
+    if mf and resources["memory_total"]:
+        resources["memory_used"] = max(0, resources["memory_total"] - int(mf.group(1).replace(",", "")))
+    resources["_note"] = "Datos vía telnet noauth (netmiko)"
+    logger.info("[netmiko] resources (noauth) %s → %s", device["id"], resources)
+    return resources
+
+
 @limited
 def get_resources(device: dict) -> Optional[dict]:
     """Recursos del sistema vía netmiko (show system / memory)."""
+    # Motor ligero noauth (ProCurve/Aruba): rápido, evita SSH/SNMP.
+    if _noauth_family(device):
+        return _noauth_resources(device)
+
     conn = None
     out = ""
     try:

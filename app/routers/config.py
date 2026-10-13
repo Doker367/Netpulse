@@ -4,6 +4,7 @@ Endpoints para backup, diff, y restauración de configuraciones.
 """
 
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
@@ -12,9 +13,29 @@ from app.middleware.auth import JWTBearer
 from app.middleware.rbac import requires_role
 from app.core.settings import BACKUP_DIR
 from app.models.schemas import ConfigBackup, ConfigDiff, ConfigDiffRequest, ConfigDeployRequest, ConfigDeployResponse, ConfigDryRunResponse, ConfigRollbackResponse
-from app.services import napalm_svc
+from app.services import backup_offsite_svc, napalm_svc
 
 router = APIRouter(prefix="/api/config", tags=["Config"])
+
+
+# ── Backup offsite (S3/MinIO o SFTP) ────────────────────────
+
+@router.get(
+    "/offsite/status",
+    dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
+)
+def offsite_status():
+    """Estado del destino de backup offsite."""
+    return backup_offsite_svc.status()
+
+
+@router.post(
+    "/offsite/export",
+    dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
+)
+def offsite_export(device_id: Optional[str] = None):
+    """Exporta los backups locales al destino offsite (todos o uno)."""
+    return backup_offsite_svc.export_all(device_id)
 
 
 @router.get(
@@ -218,6 +239,63 @@ def list_backups(device_id: str):
         }
         for f in files
     ]
+
+
+@router.get(
+    "/{device_id}/backups/diff",
+    dependencies=[Depends(JWTBearer()), Depends(requires_role("viewer"))],
+)
+def diff_backups(device_id: str, a: str, b: str):
+    """Diff lado a lado entre dos backups del mismo dispositivo.
+
+    Devuelve filas alineadas (``equal``/``add``/``del``/``change``) para el
+    visor side-by-side y estadísticas de añadidas/eliminadas.
+    """
+    import difflib
+    import os
+
+    from fastapi import HTTPException
+
+    def _read(filename: str) -> list[str]:
+        safe = os.path.basename(filename)
+        path = (BACKUP_DIR / safe).resolve()
+        if BACKUP_DIR.resolve() not in path.parents or not path.is_file():
+            raise HTTPException(404, f"Backup '{safe}' no encontrado")
+        return path.read_text(encoding="utf-8", errors="replace").splitlines()
+
+    la, lb = _read(a), _read(b)
+    rows: list[dict] = []
+    added = removed = 0
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(a=la, b=lb).get_opcodes():
+        if tag == "equal":
+            for k in range(i2 - i1):
+                rows.append({"type": "equal", "a": la[i1 + k], "b": lb[j1 + k]})
+        elif tag == "delete":
+            for k in range(i1, i2):
+                rows.append({"type": "del", "a": la[k], "b": None})
+                removed += 1
+        elif tag == "insert":
+            for k in range(j1, j2):
+                rows.append({"type": "add", "a": None, "b": lb[k]})
+                added += 1
+        else:  # replace
+            n = max(i2 - i1, j2 - j1)
+            for k in range(n):
+                av = la[i1 + k] if i1 + k < i2 else None
+                bv = lb[j1 + k] if j1 + k < j2 else None
+                rows.append({"type": "change", "a": av, "b": bv})
+                if av is not None:
+                    removed += 1
+                if bv is not None:
+                    added += 1
+
+    return {
+        "device_id": device_id,
+        "a": {"filename": os.path.basename(a), "lines": len(la)},
+        "b": {"filename": os.path.basename(b), "lines": len(lb)},
+        "rows": rows,
+        "stats": {"added": added, "removed": removed, "total": len(rows)},
+    }
 
 
 @router.get(

@@ -45,7 +45,10 @@ def list_audit_events(
     }
 
 
-@router.get("/stats")
+@router.get(
+    "/stats",
+    dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
+)
 def audit_stats():
     """Get audit log statistics (total events, file size)."""
     return get_audit_stats()
