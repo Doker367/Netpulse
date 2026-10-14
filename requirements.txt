@@ -17,3 +17,4 @@ paramiko
 geoip2
 maxminddb-geolite2
 boto3
+python-multipart

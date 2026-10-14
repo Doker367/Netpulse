@@ -73,6 +73,35 @@ def _icmp_ping(host: str, timeout: int = 2) -> tuple[float, float]:
     return (float(m.group(1)), 0.0) if m else (0.0, 0.0)
 
 
+def _probe_latency(device: dict, timeout: float = 1.5) -> tuple[float, float]:
+    """Sondea la conectividad y mide latencia/pérdida real según el protocolo.
+
+    Devuelve (latency_ms, loss_pct).
+    """
+    if not device:
+        return 0.0, 100.0
+    host = device.get("hostname", "")
+    port = int(device.get("port", 22))
+    protocol = (device.get("protocol") or "ssh").lower()
+    driver = (device.get("driver") or "").lower()
+
+    if protocol == "snmp" or driver == "snmp" or port == 161:
+        return _icmp_ping(host, timeout=int(timeout))
+
+    # Fast TCP check para dispositivos SSH / API (evita falso ping localhost en contenedores)
+    import socket
+    start = time.monotonic()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(timeout)
+    try:
+        sock.connect((host, port))
+        sock.close()
+        rtt = round((time.monotonic() - start) * 1000, 1)
+        return max(0.1, rtt), 0.0
+    except Exception:
+        return 0.0, 100.0
+
+
 def _metrics_from_resources(data: dict) -> dict:
     """Normaliza el dict de get_resources a un resumen plano."""
     if not isinstance(data, dict):
@@ -117,16 +146,15 @@ def collect_device(device_id: str) -> dict:
     """
     device = inventory_svc.get_device(device_id)
     driver = (device or {}).get("driver", "")
-    host = (device or {}).get("hostname", "")
 
-    latency_ms, loss_pct = _icmp_ping(host)
-    metrics_svc.update_device_ping(device_id, driver, latency_ms, loss_pct)
+    latency_ms, loss_pct = _probe_latency(device)
+    metrics_svc.update_device_ping(device_id, driver, latency_ms if loss_pct < 100 else 0.0, loss_pct)
 
     summary = {
         "device_id": device_id,
         "driver": driver,
         "online": loss_pct < 100,
-        "latency_ms": latency_ms,
+        "latency_ms": latency_ms if loss_pct < 100 else None,
         "packet_loss": loss_pct,
         "cpu": 0.0,
         "memory_percent": 0.0,
@@ -143,12 +171,18 @@ def collect_device(device_id: str) -> dict:
         metrics_svc.update_device_metrics(device_id, driver, False)
         return summary
 
+    if not summary["online"]:
+        summary["error"] = "Dispositivo inalcanzable"
+        now = time.time()
+        metrics_svc.mark_device_poll(device_id, driver, False, now)
+        metrics_svc.update_device_metrics(device_id, driver, False)
+        return summary
+
     result = napalm_svc.get_resources(device_id)
     now = time.time()
     if result.success and isinstance(result.data, dict):
         normalized = _metrics_from_resources(result.data)
         summary.update(normalized)
-        # Si se obtuvieron recursos, el equipo está operativo aunque ICMP esté bloqueado.
         summary["online"] = True
         metrics_svc.update_device_resources(device_id, driver, result.data)
         metrics_svc.mark_device_poll(device_id, driver, True, now)

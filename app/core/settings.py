@@ -53,6 +53,14 @@ DECEPTION_SSH_HOST_KEY = Path(
     os.getenv("NETPULSE_DECEPTION_SSH_HOST_KEY",
               str(DECEPTION_KEYS_DIR / "ssh_host_rsa_key"))
 )
+
+# ── Máquinas señuelo (VMs con QEMU, arrancables desde ISO) ───
+VMS_ENABLED = os.getenv("NETPULSE_VMS_ENABLED", "true").lower() == "true"
+VMS_DIR = Path(os.getenv("NETPULSE_VMS_DIR", str(DECEPTION_DATA_DIR / "vms")))
+VMS_ISO_DIR = Path(os.getenv("NETPULSE_VMS_ISO_DIR", str(DECEPTION_DIR / "isos")))
+VMS_REGISTRY = Path(os.getenv("NETPULSE_VMS_REGISTRY", str(DECEPTION_DIR / "vms.json")))
+VMS_VNC_BASE_PORT = int(os.getenv("NETPULSE_VMS_VNC_BASE_PORT", "5900"))
+VMS_SERIAL_BASE_PORT = int(os.getenv("NETPULSE_VMS_SERIAL_BASE_PORT", "45000"))
 # Interfaz del bridge de deception (nunca la de gestión); usada por el
 # motor en modo paquete. Solo se acepta si NO coincide con la de gestión.
 DECEPTION_IFACE = os.getenv("NETPULSE_DECEPTION_IFACE", "deception0")
