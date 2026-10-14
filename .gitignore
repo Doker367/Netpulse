@@ -84,3 +84,6 @@ config/.initial_credentials
 
 # Deception: host keys persistentes (secretos locales)
 config/deception/keys/
+# Deception: VMs e ISOs (grandes, datos locales)
+config/deception/isos/
+config/deception/vms.json
