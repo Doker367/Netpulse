@@ -1698,7 +1698,50 @@ def _execute_ros_commands(device_id: str, commands: list[str], device: dict) -> 
     return result
 
 
-def run_commands(device_id: str, commands: list[str]) -> NapalmResult:
+_SAVE_COMMANDS = {
+    "ios": "write memory",
+    "eos": "write memory",
+    "procurve": "write memory",
+    "hpe": "write memory",
+    "comware": "save force",
+    "nxos": "copy running-config startup-config",
+    "iosxr": "copy running-config startup-config",
+    "ros": "/system backup save name=netpulse",
+}
+
+
+def save_config(device_id: str) -> NapalmResult:
+    """Guarda la running-config a la memoria persistente (NVRAM/flash).
+
+    Elige el comando de guardado según el driver y lo ejecuta sin el filtro
+    de comandos de solo-lectura (es una operación de escritura interna y
+    auditada por el router que la invoca).
+    """
+    d = _find_device(device_id)
+    if not d:
+        r = NapalmResult(device_id)
+        r.set_error("driver_error", f"Device {device_id} not found")
+        return r
+
+    driver = str(d.get("driver", "")).lower()
+    if driver == "junos":
+        r = NapalmResult(device_id)
+        r.data = [{"command": "commit", "output": "JunOS persiste la config al confirmar el commit.",
+                   "error": None}]
+        r.success = True
+        return r
+
+    cmd = _SAVE_COMMANDS.get(driver)
+    if not cmd:
+        if (d.get("protocol") == "snmp" or d.get("driver") == "snmp") and not _dual_cli(d):
+            r = NapalmResult(device_id)
+            r.set_error("command_error", "Guardado de config no soportado vía SNMP")
+            return r
+        cmd = "write memory"
+    return run_commands(device_id, [cmd], validate=False)
+
+
+def run_commands(device_id: str, commands: list[str], validate: bool = True) -> NapalmResult:
     """Ejecuta comandos CLI en el dispositivo vía NAPALM.
 
     Usa NAPALM's cli() que ejecuta comandos arbitrarios vía SSH/API.
@@ -1708,6 +1751,8 @@ def run_commands(device_id: str, commands: list[str]) -> NapalmResult:
     Args:
         device_id: ID del dispositivo en inventario.
         commands: Lista de comandos a ejecutar (solo lectura/diagnóstico).
+        validate: Si True (default) aplica el filtro de seguridad. Solo los
+            flujos internos de confianza (p. ej. guardar config) lo desactivan.
 
     Returns:
         NapalmResult con data = [
@@ -1727,12 +1772,13 @@ def run_commands(device_id: str, commands: list[str]) -> NapalmResult:
         return r
 
     # Validate commands
-    is_valid, error_msg = _validate_commands(commands, d.get("driver", ""))
-    if not is_valid:
-        r = NapalmResult(device_id)
-        r.set_error("command_error", error_msg)
-        logger.warning("[%s] run_commands: BLOQUEADO — %s", device_id, error_msg)
-        return r
+    if validate:
+        is_valid, error_msg = _validate_commands(commands, d.get("driver", ""))
+        if not is_valid:
+            r = NapalmResult(device_id)
+            r.set_error("command_error", error_msg)
+            logger.warning("[%s] run_commands: BLOQUEADO — %s", device_id, error_msg)
+            return r
 
     logger.info("[%s] run_commands: ejecutando %d comandos — %s",
                 device_id, len(commands), commands[:3])
@@ -1941,16 +1987,15 @@ def get_resources(device_id: str) -> NapalmResult:
             }
             result.success = True
             return result
-        except Exception:
-            result.data = {"cpu": 0, "memory_total": 0, "memory_used": 0, "hdd_total": 0, "hdd_free": 0}
-            result.success = True
+        except Exception as exc:
+            result.set_error("connection_error", f"SNMP poll falló: {exc}")
             return result
     if d.get("driver") == "ros":
         try:
             from librouteros import connect
             creds = d.get("credentials", {})
             api = connect(username=creds.get("username","admin"), password=creds.get("password",""),
-                         host=d["hostname"], port=d.get("port",8728), timeout=10.0)
+                         host=d["hostname"], port=d.get("port",8728), timeout=2.5)
             sys_res = list(api("/system/resource/print"))
             if sys_res:
                 r = dict(sys_res[0])
@@ -1976,9 +2021,10 @@ def get_resources(device_id: str) -> NapalmResult:
                 }
                 result.success = True
             api.close()
-        except Exception:
-            result.data = {"cpu": 0, "memory_total": 0, "memory_used": 0, "hdd_total": 0, "hdd_free": 0}
-            result.success = True
+            return result
+        except Exception as exc:
+            result.set_error("connection_error", f"MikroTik API falló: {exc}")
+            return result
     elif d.get("driver") == "eos":
         try:
             driver_cls = get_network_driver("eos")
@@ -2004,13 +2050,13 @@ def get_resources(device_id: str) -> NapalmResult:
                     "uptime": f.get("uptime", ""),
                 }
                 result.success = True
-        except Exception:
-            # EOS resources no disponible (SSL legacy) — return defaults
-            result.data = {"cpu": 0, "memory_total": 0, "memory_used": 0, "hdd_total": 0, "hdd_free": 0}
-            result.success = True
+                return result
+        except Exception as exc:
+            result.set_error("connection_error", f"EOS connection falló: {exc}")
+            return result
     else:
-        # Intentar NAPALM get_environment (no soportado por todos) y luego netmiko
-        napalm_ok = False
+        # Intentar NAPALM get_environment y luego netmiko
+        connected = False
         try:
             if not netmiko_svc.is_legacy_device(d):
                 driver_cls = get_network_driver(_resolve_driver(d["driver"]))
@@ -2018,7 +2064,11 @@ def get_resources(device_id: str) -> NapalmResult:
                 with driver_cls(hostname=d["hostname"], username=d["credentials"]["username"],
                               password=d["credentials"]["password"], optional_args=opts) as dev:
                     dev.open()
-                    env = dev.get_environment()
+                    connected = True
+                    try:
+                        env = dev.get_environment()
+                    except (NotImplementedError, Exception):
+                        env = {}
                     dev.close()
                 cpu = env.get("cpu", 0) or 0
                 if isinstance(cpu, dict):
@@ -2033,24 +2083,29 @@ def get_resources(device_id: str) -> NapalmResult:
                     "hdd_free": 0,
                 }
                 result.success = True
-                napalm_ok = True
+                return result
         except Exception as e:
             logger.info("[%s] get_environment NAPALM no disponible (%s) — netmiko fallback", device_id, str(e)[:60])
 
         # Fallback netmiko para legacy (telnet o drivers antiguos)
-        if not napalm_ok and netmiko_svc.is_legacy_device(d):
+        if netmiko_svc.is_legacy_device(d):
             logger.info("[%s] intentando resources vía netmiko...", device_id)
             resources = netmiko_svc.get_resources(d)
             if resources:
                 result.data = resources
                 result.data["_note"] = "Datos vía netmiko (fallback legacy)"
                 result.success = True
+                return result
             else:
-                result.data = {"cpu": 0, "memory_total": 0, "memory_used": 0, "hdd_total": 0, "hdd_free": 0}
-                result.success = True
-        elif not napalm_ok:
+                result.set_error("connection_error", f"Netmiko failed for {device_id}")
+                return result
+        elif connected:
             result.data = {"cpu": 0, "memory_total": 0, "memory_used": 0, "hdd_total": 0, "hdd_free": 0}
             result.success = True
+            return result
+        else:
+            result.set_error("connection_error", f"Conexión falló para {device_id}")
+            return result
     return result
 
 
