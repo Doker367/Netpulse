@@ -38,6 +38,21 @@ def offsite_export(device_id: Optional[str] = None):
     return backup_offsite_svc.export_all(device_id)
 
 
+@router.post(
+    "/{device_id}/save",
+    dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
+)
+def save_config(device_id: str):
+    """Guarda la running-config a persistente (write memory / save)."""
+    result = napalm_svc.save_config(device_id)
+    return {
+        "device_id": device_id,
+        "success": result.success,
+        "output": (result.data or [{}])[0].get("output", "") if isinstance(result.data, list) else "",
+        "error": result.error,
+    }
+
+
 @router.get(
     "/{device_id}",
     response_model=ConfigBackup,

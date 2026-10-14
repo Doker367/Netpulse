@@ -4,6 +4,7 @@ Vista de topología de red basada en LLDP + tabla de interfaces.
 """
 
 import logging
+import os
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -16,42 +17,70 @@ router = APIRouter(prefix="/api/topology", tags=["Topology"])
 
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeout
+
+# Presupuesto máximo para recolectar LLDP (equipos caídos no deben colgar la vista).
+LLDP_DEADLINE = float(os.getenv("NETPULSE_TOPOLOGY_TIMEOUT", "12"))
+
+# Drivers que soportan LLDP vía NAPALM.
+_LLDP_DRIVERS = {"ios", "eos", "junos", "nxos", "iosxr", "ros"}
+
+
+def _lldp_capable(device: dict) -> bool:
+    """Solo intentamos LLDP en equipos que lo soportan y no son solo-SNMP."""
+    driver = str(device.get("driver", "")).lower()
+    proto = str(device.get("protocol", "")).lower()
+    if driver == "snmp" or (proto == "snmp" and not device.get("cli_transport")):
+        return False
+    return driver in _LLDP_DRIVERS
+
 
 @router.get(
     "/map",
     dependencies=[Depends(JWTBearer()), Depends(requires_role("viewer"))],
 )
 def topology_map():
-    """Construye el mapa de topología desde LLDP de todos los dispositivos de forma concurrente."""
-    devices = inventory_svc.list_devices()
-    nodes = []
-    links = []
-    seen_links = set()
+    """Construye el mapa de topología desde LLDP (concurrente y acotado).
 
-    for d in devices:
-        nodes.append({
+    Solo consulta LLDP en equipos que lo soportan y con un presupuesto de
+    tiempo global, para que un equipo caído no congele la vista.
+    """
+    devices = inventory_svc.list_devices()
+    nodes = [
+        {
             "id": d["id"],
             "driver": d.get("driver", "?"),
             "type": d.get("type", "router"),
             "group": d.get("group", ""),
-        })
+        }
+        for d in devices
+    ]
 
     def _fetch_lldp(dev_id):
         try:
-            res = napalm_svc.get_lldp_neighbors(dev_id)
-            return dev_id, res
-        except Exception:
+            return dev_id, napalm_svc.get_lldp_neighbors(dev_id)
+        except Exception:  # noqa: BLE001
             return dev_id, None
 
-    lldp_results = {}
-    if devices:
-        with ThreadPoolExecutor(max_workers=min(len(devices), 10)) as executor:
-            futures = {executor.submit(_fetch_lldp, d["id"]): d["id"] for d in devices}
-            for future in as_completed(futures):
-                dev_id, res = future.result()
-                if res and res.success:
-                    lldp_results[dev_id] = res.data or {}
+    candidates = [d for d in devices if _lldp_capable(d)]
+    lldp_results: dict = {}
+    if candidates:
+        executor = ThreadPoolExecutor(max_workers=min(len(candidates), 10))
+        try:
+            futures = {executor.submit(_fetch_lldp, d["id"]): d["id"] for d in candidates}
+            try:
+                for future in as_completed(futures, timeout=LLDP_DEADLINE):
+                    dev_id, res = future.result()
+                    if res and res.success:
+                        lldp_results[dev_id] = res.data or {}
+            except FuturesTimeout:
+                logger.info("[topology] LLDP sin respuesta en %ss; devuelvo nodos igual", LLDP_DEADLINE)
+        finally:
+            # No esperamos a los threads en curso (equipos caídos): la vista no debe colgarse.
+            executor.shutdown(wait=False, cancel_futures=True)
 
+    links = []
+    seen_links = set()
     for d in devices:
         dev_id = d["id"]
         neighbors = lldp_results.get(dev_id, {})
