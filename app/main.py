@@ -16,7 +16,7 @@ from app.middleware.audit import AuditMiddleware
 from app.middleware.metrics import MetricsMiddleware
 from app.middleware.security import SecurityHeadersMiddleware
 from app.models.schemas import HealthResponse
-from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy, alerts, topology, traffic, ops, security_ext, integrations, collectors, system, deception, monitoring, ai, terminal, firewall, sftp
+from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy, alerts, topology, traffic, ops, security_ext, integrations, collectors, system, deception, monitoring, ai, terminal, firewall, sftp, vms
 from app.services.inventory_svc import list_devices
 
 # ── Rate Limiter (definido en app/core/limiter.py) ──────────
@@ -199,6 +199,7 @@ app.include_router(monitoring.router)
 app.include_router(ai.router)
 app.include_router(terminal.router)
 app.include_router(sftp.router)
+app.include_router(vms.router)
 app.include_router(firewall.router)
 
 # ── Static files (Dashboard UI) ──────────────────────────────

@@ -2438,6 +2438,12 @@
           <line x1="7" y1="8" x2="11" y2="8" />
           <line x1="7" y1="12" x2="14" y2="12" />
         </svg> <span data-i18n="nav_terminal">Console</span></div>
+      <div class="sidebar-item" onclick="swView('vms')"><svg class="si" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="12" rx="2" />
+          <line x1="8" y1="20" x2="16" y2="20" />
+          <line x1="12" y1="16" x2="12" y2="20" />
+        </svg> <span data-i18n="nav_vms">VMs</span></div>
       <div class="sidebar-item" onclick="swView('backups')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -2917,6 +2923,73 @@
           </div>
         </div>
       </div>
+      <div class="view" id="v-vms" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+          <h2 style="font-size:18px;font-weight:600" data-i18n="view_vms">🖥️ Máquinas señuelo (VMs)</h2>
+          <span id="vms-qemu" class="badge" style="background:#202124">QEMU: —</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px" class="dcn-2col">
+          <div class="sc" style="padding:16px">
+            <h3 style="font-size:11px;color:var(--text-ter);margin-bottom:10px">CREAR MÁQUINA</h3>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <input id="vm-name" placeholder="nombre (ej. decoy-win)" style="padding:7px;background:var(--panel);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text)">
+              <select id="vm-os" style="padding:7px;background:var(--panel);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text)">
+                <option value="windows">windows</option><option value="ubuntu">ubuntu</option>
+                <option value="debian">debian</option><option value="kali">kali</option><option value="linux">linux</option>
+              </select>
+              <select id="vm-arch" style="padding:7px;background:var(--panel);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text)">
+                <option value="x86_64">x86_64</option><option value="aarch64">aarch64</option>
+              </select>
+              <input id="vm-ram" type="number" value="1024" placeholder="RAM MB" style="padding:7px;background:var(--panel);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text)">
+              <input id="vm-cpus" type="number" value="1" placeholder="CPUs" style="padding:7px;background:var(--panel);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text)">
+              <select id="vm-iso" style="padding:7px;background:var(--panel);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text)"></select>
+            </div>
+            <button class="btn btn-p btn-sm" style="margin-top:10px" onclick="vmCreate()">➕ Crear máquina</button>
+          </div>
+          <div class="sc" style="padding:16px">
+            <h3 style="font-size:11px;color:var(--text-ter);margin-bottom:10px">SUBIR ISO</h3>
+            <input id="vm-iso-file" type="file" accept=".iso,.img"
+              style="font-size:12px;color:var(--text-secondary);width:100%">
+            <button class="btn btn-o btn-sm" style="margin-top:10px" onclick="vmUploadIso()">⬆ Subir ISO</button>
+            <div id="vm-iso-list" style="margin-top:10px;font-size:11px;color:var(--text-ter)"></div>
+          </div>
+        </div>
+
+        <div id="vm-list"></div>
+
+        <div id="vm-console-box" style="display:none;margin-top:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:12px">
+              <h3 style="font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px">
+                🖥️ <span id="vm-console-title">Consola de</span> <span id="vm-console-name" style="color:var(--accent-h)"></span>
+              </h3>
+              <!-- Selector de modo de consola -->
+              <div style="display:flex;background:var(--bg);border:1px solid var(--border-s);border-radius:6px;padding:2px;gap:2px">
+                <button id="vm-tab-vnc" class="btn btn-xs" style="background:var(--accent);color:#fff;border-radius:4px;font-size:11px;font-weight:600" onclick="vmSwitchTab('vnc')">🖥️ Pantalla VNC (Recomendada)</button>
+                <button id="vm-tab-serial" class="btn btn-xs" style="background:transparent;color:var(--text-sec);border-radius:4px;font-size:11px" onclick="vmSwitchTab('serial')">⌨ Terminal Serie</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button id="vm-btn-cad" class="btn btn-o btn-xs" onclick="vmSendCtrlAltDel()" title="Enviar Ctrl+Alt+Del a la máquina">Send Ctrl+Alt+Del</button>
+              <button class="btn btn-o btn-xs" onclick="vmFullscreen()" title="Pantalla completa">⛶ Pantalla completa</button>
+              <button class="btn btn-o btn-xs" onclick="vmConsoleClose()">✕ Cerrar</button>
+            </div>
+          </div>
+
+          <!-- Contenedor VNC (Pantalla interactiva en vivo) -->
+          <div id="vm-console-vnc" style="height:540px;background:#000;border:1px solid var(--border);border-radius:8px;overflow:hidden;position:relative">
+            <iframe id="vm-vnc-frame" style="width:100%;height:100%;border:none;background:#000" src="about:blank"></iframe>
+          </div>
+
+          <!-- Contenedor Serial (xterm.js para ttyS0) -->
+          <div id="vm-console-term" style="display:none;height:420px;background:#000;border:1px solid var(--border);border-radius:8px;padding:8px;overflow:hidden"></div>
+          <div id="vm-serial-hint" style="display:none;margin-top:6px;font-size:11px;color:var(--text-ter)">
+            💡 La terminal serie se conecta a COM1 (ttyS0). Si la VM arrancó desde una ISO live o Windows (VGA/tty0), usa la <strong>Pantalla VNC</strong> para ver la imagen e interactuar con el teclado/ratón.
+          </div>
+        </div>
+      </div>
+
       <div class="view" id="v-backups" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
           <h2 style="font-size:18px;font-weight:600" data-i18n="view_bk">💾 Backup Management</h2>
@@ -3516,6 +3589,14 @@
               <div id="dcn-fp"></div>
             </div>
           </div>
+        </div>
+
+        <div class="dcn-panel" style="margin-bottom:18px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <div class="dcn-section-title">Máquinas Señuelo (VMs · QEMU)</div>
+            <button class="btn btn-o btn-sm" onclick="swView('vms')">Gestionar VMs</button>
+          </div>
+          <div id="dcn-vms"></div>
         </div>
 
         <!-- Analytics Grid (Top Attackers, Top Decoys, Blocklist) -->
@@ -4455,9 +4536,23 @@
         const rL = document.getElementById(`rlat-${d.id}`);
         const rRx = document.getElementById(`rrx-${d.id}`);
         const rTx = document.getElementById(`rtx-${d.id}`);
+
+        // Si el dispositivo está apagado, limpiar métricas y no consultar facts para evitar timeouts
+        if (d._online === false) {
+          d._cpu = '—'; d._mem = '—'; d._dsk = '—';
+          d._lat = '—'; d._rx = '—'; d._tx = '—';
+          if (dC) dC.textContent = '—';
+          if (dM) dM.textContent = '—';
+          if (dD) dD.textContent = '—';
+          if (rL) rL.textContent = '—';
+          if (rRx) rRx.textContent = '—';
+          if (rTx) rTx.textContent = '—';
+          return;
+        }
+
         try {
           const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 3000);
+          const timer = setTimeout(() => controller.abort(), 2500);
           const rr = await fetch(`${A}/facts/${d.id}/resources?_t=${Date.now()}`, { headers: h(), signal: controller.signal });
           clearTimeout(timer);
           if (rr.ok) {
@@ -4472,51 +4567,82 @@
           }
         } catch (e) { }
 
-        if (!d._lat) d._lat = (Math.floor(Math.random() * 3) + 2) + 'ms';
-        if (!d._rx) d._rx = (Math.random() * 1.5 + 0.2).toFixed(1) + ' Mb/s';
-        if (!d._tx) d._tx = (Math.random() * 0.8 + 0.1).toFixed(1) + ' Mb/s';
-
-        if (rL) rL.textContent = d._lat;
-        if (rRx) rRx.textContent = d._rx;
-        if (rTx) rTx.textContent = d._tx;
+        if (rL && d._lat) rL.textContent = d._lat;
+        if (rRx && d._rx) rRx.textContent = d._rx;
+        if (rTx && d._tx) rTx.textContent = d._tx;
       });
     }
 
     async function init() {
       setLang(currentLang); // Auto-apply persisted language
-      await loadDev(); await loadH(); await loadBk();
+      await loadDev(); await loadBk();
       setInterval(loadH, 10000); setInterval(loadBk, 60000);
-      setInterval(() => { loadDev(); loadH() }, 30000);
+      setInterval(() => { loadDev(); }, 30000);
       document.getElementById('info-dev').textContent = devices.length
-      // Load device resources ONCE on startup (don't repeat every 30s to avoid NAPALM spam)
-      setTimeout(() => loadDonuts(), 2000);
-      // Refresh resources every 2 minutes (good balance between fresh data and NAPALM load)
+      // Cargar recursos de hardware tras inicio
+      setTimeout(() => loadDonuts(), 1500);
       setInterval(() => { if (document.getElementById('v-devices')?.classList.contains('active')) loadDonuts() }, 120000);
     }
-
-    // Original `addDevice()` is replaced logically by `addInventoryDevice()` which has the robust Datacenter API body format
 
     async function loadDev() {
       try {
         let newDevs = [];
-        let r = await fetch(`${A}/devices`, { headers: h() });
-        if (r.ok) {
-          const inv = await r.json();
-          if (Array.isArray(inv)) newDevs = inv.map(i => ({ id: i.id, hostname: i.host || i.ip || i.hostname, driver: i.driver || 'ios', port: i.port || 22, type: i.type || i.protocol || 'device', protocol: i.protocol || 'ssh', tags: i.tags || [] }));
+        // Cargar inventario y estado de salud en paralelo para mostrar el estado real desde el inicio
+        const [rDev, rHealth] = await Promise.allSettled([
+          fetch(`${A}/devices`, { headers: h() }),
+          fetch(`${A}/devices/health`, { headers: h() })
+        ]);
+
+        if (rDev.status === 'fulfilled' && rDev.value.ok) {
+          const inv = await rDev.value.json();
+          if (Array.isArray(inv)) newDevs = inv.map(i => ({
+            id: i.id,
+            hostname: i.host || i.ip || i.hostname,
+            driver: i.driver || 'ios',
+            port: i.port || 22,
+            type: i.type || i.protocol || 'device',
+            protocol: i.protocol || 'ssh',
+            tags: i.tags || []
+          }));
         }
-        if (!newDevs.length) {
-          r = await fetch(`${A}/devices`, { headers: h() });
-          if (r.ok) newDevs = await r.json();
+
+        let hl = {};
+        if (rHealth.status === 'fulfilled' && rHealth.value.ok) {
+          try { hl = await rHealth.value.json(); } catch (e) { }
         }
-        // Continue even if empty, so the UI can clear the last device.
-        // Preserve hardware metrics cache to prevent blinking
+
+        // Aplicar estado de salud real y latencia inmediatamente
         newDevs.forEach(nd => {
           const od = devices.find(x => x.id === nd.id);
+          if (nd.id in hl) {
+            const val = hl[nd.id];
+            if (typeof val === 'object' && val !== null) {
+              nd._online = !!val.online;
+              nd._lat = val.online ? (val.latency_ms != null ? val.latency_ms + 'ms' : '<1ms') : '—';
+              nd._rx = val.online ? (val.rx || '0.0 Mb/s') : '—';
+              nd._tx = val.online ? (val.tx || '0.0 Mb/s') : '—';
+            } else {
+              nd._online = !!val;
+              nd._lat = nd._online ? (od?._lat || '<1ms') : '—';
+              nd._rx = nd._online ? (od?._rx || '0.0 Mb/s') : '—';
+              nd._tx = nd._online ? (od?._tx || '0.0 Mb/s') : '—';
+            }
+          } else if (od) {
+            nd._online = od._online;
+            nd._lat = od._lat;
+            nd._rx = od._rx;
+            nd._tx = od._tx;
+          } else {
+            nd._online = false;
+            nd._lat = '—';
+            nd._rx = '—';
+            nd._tx = '—';
+          }
           if (od) {
-            nd._cpu = od._cpu; nd._mem = od._mem; nd._dsk = od._dsk; nd._lat = od._lat;
-            nd._online = od._online; // preservar estado online/offline para no parpadear
+            nd._cpu = od._cpu; nd._mem = od._mem; nd._dsk = od._dsk;
           }
         });
+
         devices = newDevs;
         renderD(); loadDonuts(); updStats(); buildSchedForms();
         ['cmp-a', 'cmp-b'].forEach(id => {
@@ -4524,7 +4650,7 @@
             s.innerHTML = devices.map(d => `<option value="${d.id}">${d.id}</option>`).join('');
             if (s.options.length > 1) s.selectedIndex = 1
           }
-        })
+        });
       } catch (e) { }
     }
     function buildSchedForms() {
@@ -4538,10 +4664,21 @@
     async function loadH() {
       try {
         const r = await fetch(`${A}/devices/health`); if (!r.ok) return; const hl = await r.json();
-        // Solo actualizar dispositivos presentes en la respuesta; así uno ausente
-        // no se marca OFFLINE por error (evita parpadeos).
-        for (const d of devices) if (d.id in hl) d._online = !!hl[d.id];
-        renderD(); updStats()
+        for (const d of devices) {
+          if (d.id in hl) {
+            const val = hl[d.id];
+            if (typeof val === 'object' && val !== null) {
+              d._online = !!val.online;
+              d._lat = val.online ? (val.latency_ms != null ? val.latency_ms + 'ms' : '<1ms') : '—';
+              d._rx = val.online ? (val.rx || '0.0 Mb/s') : '—';
+              d._tx = val.online ? (val.tx || '0.0 Mb/s') : '—';
+            } else {
+              d._online = !!val;
+              if (!d._online) { d._lat = '—'; d._rx = '—'; d._tx = '—'; }
+            }
+          }
+        }
+        renderD(); updStats();
       } catch (e) { }
     }
     function fDev() {
@@ -4623,24 +4760,24 @@
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;width:100%">
         <div style="background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border-s);text-align:center;">
           <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">CPU</div>
-          <div style="font-size:13px;font-weight:600;color:var(--text)" id="rcpu-${d.id}">${d._cpu || '—'}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)" id="rcpu-${d.id}">${d._online ? (d._cpu || '—') : '—'}</div>
         </div>
         <div style="background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border-s);text-align:center;">
           <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">RAM</div>
-          <div style="font-size:13px;font-weight:600;color:var(--text)" id="rmem-${d.id}">${d._mem || '—'}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)" id="rmem-${d.id}">${d._online ? (d._mem || '—') : '—'}</div>
         </div>
         <div style="background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border-s);text-align:center;">
           <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">DISK</div>
-          <div style="font-size:13px;font-weight:600;color:var(--text)" id="rdsk-${d.id}">${d._dsk || '—'}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)" id="rdsk-${d.id}">${d._online ? (d._dsk || '—') : '—'}</div>
         </div>
       </div>
       
       <div style="display:flex;justify-content:space-between;width:100%;align-items:center;background:var(--bg);padding:8px 10px;border-radius:6px;border:1px solid var(--border-s);">
         <div style="font-size:11px;color:var(--text-ter);display:flex;gap:12px;">
-          <span style="display:flex;align-items:center;gap:4px;"><svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg> <span style="color:var(--text-secondary)" id="rrx-${d.id}">—</span></span>
-          <span style="display:flex;align-items:center;gap:4px;"><svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg> <span style="color:var(--text-secondary)" id="rtx-${d.id}">—</span></span>
+          <span style="display:flex;align-items:center;gap:4px;" title="Descarga (RX)"><svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg> <span style="color:var(--text-secondary)" id="rrx-${d.id}">${d._online ? (d._rx || '0.0 Mb/s') : '—'}</span></span>
+          <span style="display:flex;align-items:center;gap:4px;" title="Subida (TX)"><svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg> <span style="color:var(--text-secondary)" id="rtx-${d.id}">${d._online ? (d._tx || '0.0 Mb/s') : '—'}</span></span>
         </div>
-        <div style="font-size:11px;color:var(--text-ter)"><span data-i18n="card_latency">Latencia:</span> <span style="color:var(--text);font-weight:600" id="rlat-${d.id}">${d._lat || '—'}</span></div>
+        <div style="font-size:11px;color:var(--text-ter)"><span data-i18n="card_latency">Latencia:</span> <span style="color:var(--text);font-weight:600" id="rlat-${d.id}">${d._online ? (d._lat || '<1ms') : '—'}</span></div>
       </div>
     </div>`).join(''); fDev();
     }
@@ -5372,7 +5509,14 @@
     }
 
     async function qaB(id) { const r = await fetch(`${A}/config/${encodeURIComponent(id)}/backup`, { method: 'POST', headers: h() }); const d = await r.json(); toast(d.success ? '✅ Backup creado' : '❌ Error', ''); loadBk() }
-    async function qaS(id) { const r = await fetch(`${A}/command/${encodeURIComponent(id)}`, { method: 'POST', headers: h(), body: JSON.stringify({ commands: ['write memory'] }) }); toast('💿 Guardado', 's') }
+    async function qaS(id) {
+      try {
+        const r = await fetch(`${A}/config/${encodeURIComponent(id)}/save`, { method: 'POST', headers: h() });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.success) { toast('💿 Configuración guardada (NVRAM)', 's'); }
+        else { toast(`❌ No se pudo guardar: ${d.error || d.detail || 'error'}`, 'error'); }
+      } catch (e) { toast('❌ Error: ' + e.message, 'error'); }
+    }
     async function qaP(id) {
       const devObj = devices.find(d => d.id === id);
       const defTarget = (devObj?.hostname && devObj.hostname !== '127.0.0.1') ? devObj.hostname : (id.includes('mikrotik') ? '8.8.8.8' : '1.1.1.1');
@@ -5449,7 +5593,7 @@
       }
       el.innerHTML = `<div class="actions" style="margin-bottom:8px">
     <button class="btn btn-o btn-sm" onclick="dlC('${id}')">⬇ Descargar</button>
-    <button class="btn btn-o btn-sm" onclick="qa('${id}','backup')">💾 Backup</button>
+    <button class="btn btn-o btn-sm" onclick="qaB('${id}')">💾 Backup</button>
     <button class="btn btn-p btn-sm" id="db" style="display:none" onclick="dep('${id}')">🚀 Desplegar</button></div>
   <textarea id="ce" style="min-height:350px;font-family:var(--fm);font-size:11px;line-height:1.6" oninput="document.getElementById('db').style.display='block';document.getElementById('ub').style.display='inline-block'">${esc(curC)}</textarea>
   <button class="btn btn-o btn-xs" id="ub" style="display:none;margin-top:4px" onclick="uc()">↩ Restaurar</button>
@@ -5478,7 +5622,22 @@
         else r.innerHTML = `<div style="color:var(--red)">❌ ${d.error || 'Falló'}</div>`
       } catch (e) { r.innerHTML = `<div style="color:var(--red)">${e.message}</div>` }
     }
-    function dlC(id) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([curC], { type: 'text/plain' })); a.download = `${id}_config.txt`; a.click() }
+    async function dlC(id) {
+      try {
+        // Si no se abrió la pestaña Config, traer la config ahora (antes descargaba vacío).
+        if (!curC) {
+          const r = await fetch(`${A}/config/${encodeURIComponent(id)}/raw`, { headers: h() });
+          curC = r.ok ? await r.text() : '';
+        }
+        const content = curC && curC.trim() ? curC : `Sin configuración disponible para ${id}`;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([content], { type: 'text/plain' }));
+        a.download = `${id}_config.txt`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        toast(content.startsWith('Sin configuración') ? '⚠️ Config no disponible' : '⬇ Descarga iniciada', content.startsWith('Sin') ? 'error' : 's');
+      } catch (e) { toast('❌ Error al exportar: ' + e.message, 'error'); }
+    }
 
     function renderCmd(id, el) {
       const uid = crypto.randomUUID?.() || Date.now();
@@ -6112,6 +6271,7 @@
         }
       }
       if (v === 'compare') bdPopulateDevices();
+      if (v === 'vms') loadVms();
     }
 
     // ── DECEPTION ─────────────────────────────────────────────
@@ -6352,7 +6512,7 @@
 
     async function loadDeception() {
       try {
-        const [st, stats, sessions, events, alerts, timeline, network, blocklist, geo, fps, aiStatus] = await Promise.all([
+        const [st, stats, sessions, events, alerts, timeline, network, blocklist, geo, fps, aiStatus, vmsD] = await Promise.all([
           fetch(`${A}/deception/engine/status`, { headers: h() }).then(r => r.json()).catch(() => ({})),
           fetch(`${A}/deception/stats`, { headers: h() }).then(r => r.json()).catch(() => ({})),
           fetch(`${A}/deception/sessions?limit=25`, { headers: h() }).then(r => r.json()).catch(() => []),
@@ -6364,10 +6524,23 @@
           fetch(`${A}/deception/geo`, { headers: h() }).then(r => r.json()).catch(() => ({})),
           fetch(`${A}/deception/false-positives?limit=15`, { headers: h() }).then(r => r.json()).catch(() => []),
           fetch(`${A}/ai/status`, { headers: h() }).then(r => r.json()).catch(() => ({})),
+          fetch(`${A}/vms`, { headers: h() }).then(r => r.json()).catch(() => ({ vms: [] })),
         ]);
         _dcnGeo = {};
         (geo.points || []).forEach(p => { _dcnGeo[p.ip] = p; });
         dcnDrawMap(geo);
+
+        // VMs señuelo (integradas con deception)
+        const vmEl = document.getElementById('dcn-vms');
+        if (vmEl) {
+          const vms = (vmsD && vmsD.vms) || [];
+          vmEl.innerHTML = vms.length ? vms.map(v => `
+            <div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+              <span class="badge" style="background:${v.running ? 'var(--green-bg)' : '#202124'}">${v.running ? 'RUNNING' : 'stopped'}</span>
+              <span style="font-size:12px;flex:1">${esc(v.name)} <span style="color:var(--text-ter);font-size:10px">${esc(v.os)} · ${esc(v.arch)}</span></span>
+              ${v.running ? `<button class="btn btn-o btn-xs" onclick="swView('vms');setTimeout(()=>vmConsole('${v.id}'),200)">⌨ Consola</button>` : ''}
+            </div>`).join('') : '<div style="color:var(--text-ter);font-size:12px">Sin VMs señuelo. Creá una en la vista VMs.</div>';
+        }
 
         const badge = document.getElementById('dcn-engine');
         if (badge) {
@@ -7473,6 +7646,193 @@
       } catch (err) {
         toast(`❌ Error descargando: ${err.message}`, 'e');
       }
+    }
+    // ── MÁQUINAS SEÑUELO (VMs con QEMU) ──
+    async function loadVms() {
+      try {
+        const r = await fetch(`${A}/vms`, { headers: h() });
+        const d = await r.json();
+        const q = d.qemu || {};
+        const badge = document.getElementById('vms-qemu');
+        if (badge) {
+          const avail = Object.entries(q).filter(([, v]) => v).map(([k]) => k).join(', ');
+          badge.textContent = 'QEMU: ' + (avail || 'no instalado');
+          badge.style.background = avail ? 'var(--green-bg)' : '#202124';
+        }
+        const isos = await fetch(`${A}/vms/isos`, { headers: h() }).then(x => x.ok ? x.json() : []).catch(() => []);
+        const sel = document.getElementById('vm-iso');
+        if (sel) sel.innerHTML = '<option value="">(sin ISO / live)</option>' + isos.map(i => `<option value="${esc(i.filename)}">${esc(i.filename)} · ${Math.round(i.size / 1048576)}MB</option>`).join('');
+        const il = document.getElementById('vm-iso-list');
+        if (il) il.innerHTML = isos.length ? isos.map(i => `• ${esc(i.filename)} (${Math.round(i.size / 1048576)}MB)`).join('<br>') : 'Sin ISOs subidas';
+        const vms = d.vms || [];
+        document.getElementById('vm-list').innerHTML = vms.length ? vms.map(v => `
+          <div class="sc" style="padding:14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <div>
+              <div style="font-weight:600">${esc(v.name)} <span class="badge" style="background:${v.running ? 'var(--green-bg)' : '#202124'}">${v.running ? 'RUNNING' : 'stopped'}</span></div>
+              <div style="font-size:11px;color:var(--text-ter);font-family:var(--mono)">${esc(v.os)} · ${esc(v.arch)} · ${v.ram_mb}MB · ${v.cpus} cpu · ISO: ${esc(v.iso || '—')} · ${esc(v.vnc || '')}</div>
+            </div>
+            <div style="display:flex;gap:6px">
+              ${v.running
+                ? `<button class="btn btn-p btn-xs" onclick="vmConsole('${v.id}')">⌨ Consola</button>
+                   <button class="btn btn-o btn-xs" onclick="vmAction('${v.id}','stop')">■ Parar</button>`
+                : `<button class="btn btn-p btn-xs" onclick="vmAction('${v.id}','start')">▶ Arrancar</button>`}
+              <button class="btn btn-o btn-xs" onclick="vmDelete('${v.id}')">🗑</button>
+            </div>
+          </div>`).join('') : '<div class="empty" style="padding:30px">Sin máquinas. Crea una y súbele una ISO.</div>';
+      } catch (e) { }
+    }
+    async function vmCreate() {
+      const body = {
+        name: document.getElementById('vm-name').value, os: document.getElementById('vm-os').value,
+        arch: document.getElementById('vm-arch').value, ram_mb: +document.getElementById('vm-ram').value || 1024,
+        cpus: +document.getElementById('vm-cpus').value || 1, iso: document.getElementById('vm-iso').value || null,
+      };
+      if (!body.name) { toast('Pon un nombre', ''); return; }
+      const r = await fetch(`${A}/vms`, { method: 'POST', headers: h(), body: JSON.stringify(body) });
+      if (r.ok) { toast('✅ Máquina creada', 's'); loadVms(); }
+      else { const d = await r.json().catch(() => ({})); toast('❌ ' + (d.detail || 'Error'), 'error'); }
+    }
+    async function vmAction(id, action) {
+      const r = await fetch(`${A}/vms/${encodeURIComponent(id)}/${action}`, { method: 'POST', headers: h() });
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) toast(action === 'start' ? `▶ Arrancada ${d.vnc || ''}` : '■ Detenida', 's');
+      else toast('❌ ' + (d.detail || 'Error'), 'error');
+      loadVms();
+    }
+    async function vmDelete(id) {
+      if (!confirm('¿Eliminar la máquina ' + id + '?')) return;
+      const r = await fetch(`${A}/vms/${encodeURIComponent(id)}`, { method: 'DELETE', headers: h() });
+      if (r.ok || r.status === 204) { toast('🗑 Eliminada', 's'); loadVms(); } else toast('❌ Error', 'error');
+    }
+    async function vmUploadIso() {
+      const inp = document.getElementById('vm-iso-file');
+      if (!inp || !inp.files.length) { toast('Selecciona una ISO', ''); return; }
+      const fd = new FormData(); fd.append('file', inp.files[0]);
+      toast('⬆ Subiendo ISO...', 'i');
+      try {
+        const r = await fetch(`${A}/vms/isos`, { method: 'POST', headers: t ? { Authorization: `Bearer ${t}` } : {}, body: fd });
+        if (r.ok) { toast('✅ ISO subida', 's'); inp.value = ''; loadVms(); }
+        else { const d = await r.json().catch(() => ({})); toast('❌ ' + (d.detail || 'Error'), 'error'); }
+      } catch (e) { toast('❌ ' + e.message, 'error'); }
+    }
+    let _vmTerm = null, _vmFit = null, _vmWs = null, _activeVmId = null, _vmMode = 'vnc';
+
+    function vmConsole(id) {
+      _activeVmId = id;
+      const box = document.getElementById('vm-console-box');
+      if (box) box.style.display = 'block';
+      const nameEl = document.getElementById('vm-console-name');
+      if (nameEl) nameEl.textContent = id;
+      vmSwitchTab('vnc');
+      box?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function vmSwitchTab(mode) {
+      _vmMode = mode;
+      const btnVnc = document.getElementById('vm-tab-vnc');
+      const btnSer = document.getElementById('vm-tab-serial');
+      const boxVnc = document.getElementById('vm-console-vnc');
+      const boxSer = document.getElementById('vm-console-term');
+      const hint = document.getElementById('vm-serial-hint');
+      const btnCad = document.getElementById('vm-btn-cad');
+
+      if (mode === 'vnc') {
+        if (btnVnc) { btnVnc.style.background = 'var(--accent)'; btnVnc.style.color = '#fff'; }
+        if (btnSer) { btnSer.style.background = 'transparent'; btnSer.style.color = 'var(--text-sec)'; }
+        if (boxVnc) boxVnc.style.display = 'block';
+        if (boxSer) boxSer.style.display = 'none';
+        if (hint) hint.style.display = 'none';
+        if (btnCad) btnCad.style.display = 'inline-block';
+
+        // Cargar VNC en iframe con noVNC
+        const frame = document.getElementById('vm-vnc-frame');
+        if (frame && _activeVmId) {
+          const vncPath = `ws/vm/${encodeURIComponent(_activeVmId)}/vnc?token=${encodeURIComponent(t)}`;
+          const vncUrl = `/static/vendor/novnc/vnc_lite.html?path=${encodeURIComponent(vncPath)}&scale=true&autoconnect=true`;
+          if (frame.dataset.vmid !== _activeVmId) {
+            frame.dataset.vmid = _activeVmId;
+            frame.src = vncUrl;
+          }
+        }
+      } else {
+        if (btnSer) { btnSer.style.background = 'var(--accent)'; btnSer.style.color = '#fff'; }
+        if (btnVnc) { btnVnc.style.background = 'transparent'; btnVnc.style.color = 'var(--text-sec)'; }
+        if (boxSer) boxSer.style.display = 'block';
+        if (boxVnc) boxVnc.style.display = 'none';
+        if (hint) hint.style.display = 'block';
+        if (btnCad) btnCad.style.display = 'none';
+
+        initVmSerial(_activeVmId);
+      }
+    }
+
+    function initVmSerial(id) {
+      if (!id || typeof Terminal === 'undefined') return;
+      if (_vmWs && _vmWs.readyState === 1 && _vmTerm) {
+        if (_vmFit) try { _vmFit.fit(); _vmTerm.focus(); } catch (e) { }
+        return;
+      }
+      if (_vmWs) { try { _vmWs.close(); } catch (e) { } _vmWs = null; }
+      const cont = document.getElementById('vm-console-term');
+      cont.innerHTML = '';
+      _vmTerm = new Terminal({
+        cursorBlink: true,
+        fontSize: 13,
+        fontFamily: 'Menlo, Consolas, monospace',
+        theme: { background: '#000000', foreground: '#e0e0e0' },
+        scrollback: 5000,
+        convertEol: true
+      });
+      _vmFit = new FitAddon.FitAddon();
+      _vmTerm.loadAddon(_vmFit);
+      _vmTerm.open(cont);
+      try { _vmFit.fit(); } catch (e) { }
+
+      const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+      _vmWs = new WebSocket(`${wsProto}://${location.host}/ws/vm/${encodeURIComponent(id)}?token=${encodeURIComponent(t)}`);
+      _vmWs.onmessage = ev => { try { _vmTerm.write(ev.data); } catch (e) { } };
+      _vmWs.onclose = () => { try { _vmTerm.write('\r\n\x1b[31m[consola serie cerrada]\x1b[0m\r\n'); } catch (e) { } };
+      _vmTerm.onData(d => {
+        try {
+          if (_vmWs && _vmWs.readyState === 1) {
+            _vmWs.send(d);
+          }
+        } catch (e) { }
+      });
+      if (window._vmRO) { try { window._vmRO.disconnect(); } catch (e) { } }
+      if (window.ResizeObserver) {
+        window._vmRO = new ResizeObserver(() => { try { _vmFit.fit(); } catch (e) { } });
+        window._vmRO.observe(cont);
+      }
+      setTimeout(() => { try { _vmFit.fit(); _vmTerm.focus(); } catch (e) { } }, 150);
+    }
+
+    function vmSendCtrlAltDel() {
+      const frame = document.getElementById('vm-vnc-frame');
+      if (frame && frame.contentWindow) {
+        try {
+          const btn = frame.contentWindow.document.getElementById('sendCtrlAltDelButton');
+          if (btn) btn.click();
+        } catch (e) { }
+      }
+    }
+
+    function vmFullscreen() {
+      const box = _vmMode === 'vnc' ? document.getElementById('vm-console-vnc') : document.getElementById('vm-console-term');
+      if (!box) return;
+      if (!document.fullscreenElement) {
+        box.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    function vmConsoleClose() {
+      if (_vmWs) { try { _vmWs.close(); } catch (e) { } _vmWs = null; }
+      const frame = document.getElementById('vm-vnc-frame');
+      if (frame) { frame.src = 'about:blank'; frame.dataset.vmid = ''; }
+      document.getElementById('vm-console-box').style.display = 'none';
+      _activeVmId = null;
     }
   </script>
 
