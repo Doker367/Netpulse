@@ -90,3 +90,6 @@ config/.initial_credentials
 config/devices.yaml
 config/users.yaml
 secrets/
+
+# Runtime metrics history (host/device state, not source)
+config/metrics_history.json
