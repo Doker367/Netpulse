@@ -1,31 +1,52 @@
 # Informe de pruebas
 
-Suite propia de netpulse-noc (12 archivos):
+Suite propia de netpulse-noc (12 archivos).
 
-| Archivo | Ámbito |
+## Resultado de la última ejecución
+
+```
+cd /Users/doker/netpulse-noc
+NETPULSE_METRICS_ENABLED=false NETPULSE_SYSLOG_ENABLED=false \
+NETPULSE_FIREWALL_ENABLED=false NETPULSE_AI_ENABLED=false \
+  <python> -m pytest
+```
+
+- **93 passed, 0 failed** (4 s), intérprete del entorno de desarrollo, sin
+  instalaciones ni descargas durante la prueba.
+
+Evidencia de frontera (prueba `tests/test_noc_boundary.py`, 5/5 PASS):
+
+- 127 rutas HTTP registradas (`app.openapi()`), **ninguna** bajo
+  `/api/deception` ni `/api/vms`.
+- Único WebSocket registrado: `/ws/terminal/{device_id}` (terminal SSH real);
+  no existe `/ws/vm/*`.
+- Ausentes: `app/services/deception/`, `app/routers/deception.py`,
+  `app/models/deception.py`, `app/routers/vms.py`, `deception-engine/`,
+  `docker-compose.deception.yml`.
+- `app.core.settings` ya no expone `DECEPTION_ENABLED`, `VMS_ENABLED` ni
+  `DECEPTION_INGEST_TOKEN`.
+- Capacidades NOC presentes: `/api/devices`, `/api/facts`, `/api/config`,
+  `/api/sftp`, `/api/firewall`, `/api/netbox`, `/api/monitoring`, `/api/ai`.
+
+| Ámbito | Estado |
 |---|---|
-| `tests/test_noc_boundary.py` | Frontera: sin rutas/módulos de deception o VMs; capacidades NOC presentes; collectors off |
-| `tests/test_auth_security.py` | Auth / RBAC / usuarios |
-| `tests/test_fase1_hardening.py` | Endurecimiento (rate limit, auditoría, alertas) |
-| `tests/test_fase2.py` | Auditoría, concurrencia, inventario, NAPALM |
-| `tests/test_fase2_noc.py` | Rutas y WebSocket del NOC |
-| `tests/test_fase4_performance.py` | Rendimiento de colectores (syslog, colas) |
-| `tests/test_inventory_api.py` | CRUD de inventario |
-| `tests/test_legacy_routing.py` | Enrutado legacy NAPALM/Netmiko |
-| `tests/test_monitoring_api.py` | API de monitoring del NOC |
-| `tests/test_netmiko_svc.py` | Netmiko / CLI |
-| `tests/test_sftp_api.py` | SFTP |
-| `tests/test_ai_decision_svc.py` | Laya (motor de decisiones) |
+| Sintaxis Python (`ast.parse`, 0 errores) | PASS |
+| Suite completa de pruebas | PASS (93) |
+| Frontera sin deception/VMs | PASS |
+| Auth/RBAC, inventario, NAPALM, Netmiko, SFTP, NetBox, FortiOS | PASS (con mocks) |
+| Laya (stub/decisiones) | PASS |
+| Colectores deshabilitados por defecto | PASS |
+| SSH/Telnet/SNMP contra equipos reales | NO_EJECUTADA (prohibido por política) |
+| Backups/drift/scheduler con equipo real | NO_EJECUTADA (requiere fixtures/equipos autorizados) |
 
-| Prueba | Estado | Evidencia |
-|---|---|---|
-| Sintaxis Python completa | PASS | `ast.parse`, 0 errores |
-| Git independiente/limpio/fsck | PASS | repo propio, historial nuevo |
-| Imports/rutas backend deception/VM | PASS | retirados de main/terminal |
-| Laya backend/stub/router/tests | PASS (estático) | archivos presentes; fallback conservado |
-| Secretos/runtime por nombres versionados | PASS | sin coincidencias |
-| pytest funcional | NO_EJECUTADA | falta entorno virtual; instalar dependencias en cada repo |
-| SSH/Telnet/SNMP/NAPALM/Netmiko/HP/dual | NO_EJECUTADA | no se permite contactar equipos; requiere fixtures/mocks |
-| Backups/drift/scheduler/terminal/SFTP/FortiOS/NetBox | NO_EJECUTADA | validación dinámica con datos sintéticos |
+## Nota sobre el entorno
 
-No se realizó ninguna conexión de red ni se contactó ningún equipo real.
+No hay `.venv` en este repositorio. Puede ejecutar la suite de dos formas:
+
+1. Rápido (sin instalar nada), usando un intérprete que ya tenga las
+   dependencias del proyecto.
+2. Recomendado para el servidor: crear un entorno propio
+   (`python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt`)
+   y ejecutar `.venv/bin/python -m pytest`.
+
+No se contactó ningún equipo real ni se abrieron listeners.
