@@ -1,3 +1,3 @@
 # Seguridad
 
-Secretos separados por producto; no se versionan. Listeners, polling, QEMU, bloqueos y descubrimiento requieren aprobación operacional. Dystopia debe separar API de control y red señuelo mediante interfaz/VLAN dedicada; Cowrie/OpenCanary solo en red aislada. VNC/serial y packet mode implican exposición elevada y permanecen desactivados por defecto.
+Este repositorio administra equipos reales. Secretos, inventario, usuarios, bases de datos y backups no se versionan. Polling, scheduler, comandos, deploy, rollback, SFTP, NetBox y FortiOS deben habilitarse únicamente tras un corte autorizado. Use secretos JWT/Fernet/SSH exclusivos del NOC y preserve la Fernet de producción durante la migración.
