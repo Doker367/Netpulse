@@ -17,10 +17,10 @@ seed: ## Crea usuarios de prueba con contraseñas conocidas
 	$(PY) scripts/seed_users.py
 
 run: ## Arranca NetPulse con deception (dev, primer plano)
-	bash scripts/start_deception.sh
+	bash scripts/stop_all.sh
 
 smoke: ## Smoke test end-to-end de la red señuelo (sin Docker)
-	bash scripts/smoke_deception.sh
+	bash python -m pytest -q
 
 test: ## Corre la suite de tests
 	$(PY) -m pytest tests -q
@@ -29,7 +29,7 @@ lint: ## Lint con ruff
 	.venv/bin/ruff check app tests scripts
 
 go-build: ## Compila el data plane en Go (+ modo paquete)
-	cd deception-engine && go build -o bin/engine ./cmd/engine && \
+	cd . && go build -o bin/engine ./cmd/engine && \
 		go build -tags packet -o bin/engine-packet ./cmd/engine && echo "OK"
 
 docker-up: ## Levanta honeypots + monitoreo en Docker
@@ -40,4 +40,4 @@ down: ## Detiene todo (API, engines, Docker, Colima)
 	bash scripts/stop_all.sh
 
 clean: ## Limpia artefactos de runtime (telemetría, logs)
-	rm -rf deception/ audit/ deception-engine/bin/
+	rm -rf deception/ audit/ ./bin/

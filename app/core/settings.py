@@ -123,7 +123,7 @@ NETBOX_TOKEN = _load_netbox_token()
 LOKI_URL = os.getenv("NETPULSE_LOKI_URL", "http://localhost:3100").rstrip("/")
 SYSLOG_HOST = os.getenv("NETPULSE_SYSLOG_HOST", "0.0.0.0")
 SYSLOG_PORT = int(os.getenv("NETPULSE_SYSLOG_PORT", "514"))
-SYSLOG_ENABLED = os.getenv("NETPULSE_SYSLOG_ENABLED", "true").lower() == "true"
+SYSLOG_ENABLED = os.getenv("NETPULSE_SYSLOG_ENABLED", "false").lower() == "true"
 
 # ── SNMP ─────────────────────────────────────────────────────
 
@@ -134,7 +134,7 @@ SNMP_TIMEOUT = int(os.getenv("NETPULSE_SNMP_TIMEOUT", "5"))
 
 # Poller en segundo plano que recolecta recursos de dispositivos + host.
 # Intervalo en segundos; 0 deshabilita el poller automático.
-METRICS_ENABLED = os.getenv("NETPULSE_METRICS_ENABLED", "true").lower() == "true"
+METRICS_ENABLED = os.getenv("NETPULSE_METRICS_ENABLED", "false").lower() == "true"
 METRICS_INTERVAL = int(os.getenv("NETPULSE_METRICS_INTERVAL", "60"))
 
 # ── Notificaciones (Telegram / Email / Slack) ───────────────

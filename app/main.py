@@ -51,6 +51,8 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"⚠️ Metrics poller no arrancó: {e}")
 
+    yield
+
     # Shutdown: detener collectors
     try:
         from app.services.collectors import syslog_svc
