@@ -1,0 +1,92 @@
+# Fernet encryption key — NEVER COMMIT
+config/.fernet_key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups (generated) — nunca commitear snapshots de dispositivos
+backups/*
+
+# Audit logs (pueden contener IPs/usernames)
+audit/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Docker volumes (persistent data)
+docker/volumes/
+
+# NetBox data (persistent)
+netbox-media/
+netbox-reports/
+netbox-scripts/
+netbox-db-data/
+netbox-redis-data/
+
+# Loki/Prometheus data (persistent)
+loki_data/
+prometheus_data/
+grafana_data/
+
+# Scheduler jobs (generated)
+config/scheduler_jobs.json
+
+# Generated state files
+config/maintenance_windows.json
+config/api_keys.json
+config/drift_history/
+config/baselines/
+# Solo la carpeta de reportes en la raíz (evita ignorar app/services/reports/)
+/reports/
+
+# Secretos locales (no commitear)
+config/alertmanager.yml
+
+# Logs
+*.log
+logs/
+
+# Temp files
+/tmp/
+*.tmp
+*.bak
+
+# API tokens (NEVER COMMIT)
+config/.netbox_token
+config/.netbox_token.*
+
+# Credenciales iniciales rotadas (NEVER COMMIT)
+config/.initial_credentials
+
+
+# Runtime, databases, inventory and credentials
+/runtime/
+*.db
+*.db-wal
+*.db-shm
+*.iso
+*.img
+*.qcow2
+*.pem
+*.key
+config/devices.yaml
+config/users.yaml
+secrets/

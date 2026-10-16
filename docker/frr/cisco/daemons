@@ -1,0 +1,14 @@
+# FRR daemons — Cisco-like router
+# Habilita BGP, OSPF, y SSH (vtysh)
+
+zebra=yes
+bgpd=yes
+ospfd=yes
+staticd=yes
+watchfrr=yes
+
+# SSH access (NAPALM needs this)
+vtysh_enable=yes
+zebra_options="-A 127.0.0.1 -s 9000000"
+bgpd_options="-A 127.0.0.1"
+ospfd_options="-A 127.0.0.1"

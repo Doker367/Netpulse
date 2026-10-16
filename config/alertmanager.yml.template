@@ -1,0 +1,23 @@
+# Alertmanager — enruta alertas al webhook de NetPulse
+# COPIA este archivo a config/alertmanager.yml y pon tu token de servicio.
+# El real está en .gitignore (contiene secreto).
+route:
+  group_by: ['alertname', 'device_id']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'netpulse-webhook'
+
+receivers:
+  - name: 'netpulse-webhook'
+    webhook_configs:
+      - url: 'http://127.0.0.1:8082/api/alerts/webhook'
+        send_resolved: true
+        http_config:
+          authorization:
+            # Token de servicio compartido con NetPulse.
+            # Definir NETPULSE_ALERTMANAGER_TOKEN en .env y poner el mismo
+            # valor aquí (se envía como "Authorization: Bearer <token>").
+            # Genéralo con: openssl rand -hex 32
+            type: Bearer
+            credentials: '<NETPULSE_ALERTMANAGER_TOKEN>'
