@@ -34,6 +34,7 @@ services:
     networks:
       lab-net:
         ipv4_address: 172.30.0.10
+    restart: unless-stopped
 
   # ----------------------------------------------------------
   # Router "Juniper-like" — FRRouting (mismo software, 
@@ -57,6 +58,7 @@ services:
     networks:
       lab-net:
         ipv4_address: 172.30.0.11
+    restart: unless-stopped
 
   # ----------------------------------------------------------
   # MikroTik RouterOS 7.22 — API en 8728, SSH en 2225
@@ -74,6 +76,7 @@ services:
     networks:
       lab-net:
         ipv4_address: 172.30.0.13
+    restart: unless-stopped
 
   # ----------------------------------------------------------
   # Arista vEOS 4.27.3F — eAPI en 443, SSH en 2226
@@ -120,6 +123,7 @@ services:
     networks:
       lab-net:
         ipv4_address: 172.30.0.12
+    restart: unless-stopped
 
 networks:
   lab-net:

@@ -11,7 +11,7 @@ import re
 import urllib.error
 import urllib.request
 
-from app.core.settings import CONFIG_DIR
+from app.core.settings import CONFIG_DIR, NETBOX_TOKEN, netbox_auth_header
 from app.services import inventory_svc
 
 NETBOX_URL = "http://localhost:8000"
@@ -24,14 +24,19 @@ class NetboxError(RuntimeError):
 
 
 def _netbox_token() -> str | None:
-    """Lee el token de NetBox desde config/.netbox_token."""
-    if not NETBOX_TOKEN_FILE.exists():
-        return None
-    try:
-        token = NETBOX_TOKEN_FILE.read_text(encoding="utf-8").strip()
-        return token or None
-    except OSError:
-        return None
+    """Lee el token de NetBox desde config/.netbox_token o del entorno.
+
+    ``config/.netbox_token`` tiene prioridad; si no existe se usa
+    ``NETBOX_TOKEN`` (cargado desde ``.env``), para no exigir dos fuentes.
+    """
+    if NETBOX_TOKEN_FILE.exists():
+        try:
+            token = NETBOX_TOKEN_FILE.read_text(encoding="utf-8").strip()
+            if token:
+                return token
+        except OSError:
+            pass
+    return NETBOX_TOKEN.strip() or None
 
 
 def _netbox_get(path: str) -> dict:
@@ -41,7 +46,7 @@ def _netbox_get(path: str) -> dict:
         raise NetboxError("No hay token de NetBox configurado (config/.netbox_token)")
     request = urllib.request.Request(
         NETBOX_URL + path,
-        headers={"Accept": "application/json", "Authorization": f"Token {token}"},
+        headers={"Accept": "application/json", **netbox_auth_header(token)},
     )
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT) as resp:

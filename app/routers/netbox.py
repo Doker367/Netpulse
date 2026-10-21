@@ -12,7 +12,12 @@ import httpx
 import yaml
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.core.settings import NETBOX_TOKEN, NETBOX_URL, DEVICES_FILE
+from app.core.settings import (
+    NETBOX_TOKEN,
+    NETBOX_URL,
+    DEVICES_FILE,
+    netbox_auth_header,
+)
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import requires_role
 from app.models.schemas import UserRole
@@ -29,8 +34,7 @@ router = APIRouter(
 def _netbox_headers() -> dict:
     """Cabeceras para autenticación con NetBox API."""
     headers = {"Accept": "application/json"}
-    if NETBOX_TOKEN:
-        headers["Authorization"] = f"Token {NETBOX_TOKEN}"
+    headers.update(netbox_auth_header(NETBOX_TOKEN))
     return headers
 
 

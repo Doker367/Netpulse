@@ -118,6 +118,26 @@ def _load_netbox_token() -> str:
 
 NETBOX_TOKEN = _load_netbox_token()
 
+
+def netbox_auth_header(token: str | None = None) -> dict[str, str]:
+    """Cabecera ``Authorization`` correcta para la API de NetBox.
+
+    NetBox 4.x maneja dos formatos de token incompatibles entre sí:
+
+    - Token legado v1: ``Authorization: Token <40 caracteres>``
+    - Token v2 actual: ``Authorization: Bearer nbt_<key>.<token>``
+
+    El segundo es el que genera NetBox al crear un token con peppers
+    (``NETBOX_API_TOKEN_PEPPER_1``). Se elige por el prefijo ``nbt_``, de forma
+    que ambos siguen funcionando sin reconfigurar nada.
+    """
+    raw = (NETBOX_TOKEN if token is None else token).strip()
+    if not raw:
+        return {}
+    if raw.startswith("nbt_"):
+        return {"Authorization": f"Bearer {raw}"}
+    return {"Authorization": f"Token {raw}"}
+
 # ── Loki / Syslog ────────────────────────────────────────────
 
 LOKI_URL = os.getenv("NETPULSE_LOKI_URL", "http://localhost:3100").rstrip("/")

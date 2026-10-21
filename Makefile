@@ -4,7 +4,7 @@
 PY := .venv/bin/python
 PORT ?= 8082
 
-.PHONY: help venv seed run smoke test lint go-build docker-up down clean
+.PHONY: help venv seed run stop smoke test lint go-build docker-up docker-down clean
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -16,11 +16,15 @@ venv: ## Crea el venv e instala dependencias
 seed: ## Crea usuarios de prueba con contraseñas conocidas
 	$(PY) scripts/seed_users.py
 
-run: ## Arranca NetPulse con deception (dev, primer plano)
+run: ## Arranca la API NetPulse en primer plano (requiere .env)
+	@test -f .env || { echo "Falta .env: cp .env.example .env y genere secretos (ver docs/ejecucion-local.md)" >&2; exit 1; }
+	$(PY) -m uvicorn app.main:app --host 127.0.0.1 --port $(PORT)
+
+stop: ## Detiene API, contenedores y Colima
 	bash scripts/stop_all.sh
 
-smoke: ## Smoke test end-to-end de la red señuelo (sin Docker)
-	bash python -m pytest -q
+smoke: ## Comprueba que la API responde (requiere "make run" en otra terminal)
+	@curl -fsS http://127.0.0.1:$(PORT)/api/health && echo
 
 test: ## Corre la suite de tests
 	$(PY) -m pytest tests -q
@@ -32,12 +36,19 @@ go-build: ## Compila el data plane en Go (+ modo paquete)
 	cd . && go build -o bin/engine ./cmd/engine && \
 		go build -tags packet -o bin/engine-packet ./cmd/engine && echo "OK"
 
-docker-up: ## Levanta honeypots + monitoreo en Docker
-	docker compose -f docker-compose.deception.yml up -d --build
+docker-up: ## Levanta laboratorio + monitoreo + NetBox + IA (Docker)
+	docker compose -f docker-compose.lab.yml up -d --build
 	docker compose -f docker-compose.monitoring.yml up -d
+	docker compose -f docker-compose.netbox.yml up -d
+	docker compose -f docker-compose.ai.yml up -d --build
 
-down: ## Detiene todo (API, engines, Docker, Colima)
-	bash scripts/stop_all.sh
+docker-down: ## Baja todos los stacks Docker
+	docker compose -f docker-compose.ai.yml down
+	docker compose -f docker-compose.netbox.yml down
+	docker compose -f docker-compose.monitoring.yml down
+	docker compose -f docker-compose.lab.yml down
+
+down: stop ## Alias de stop
 
 clean: ## Limpia artefactos de runtime (telemetría, logs)
-	rm -rf deception/ audit/ ./bin/
+	rm -rf audit/ ./bin/
