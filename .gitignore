@@ -1,5 +1,6 @@
 # Fernet encryption key — NEVER COMMIT
 config/.fernet_key
+config/.fernet_key.*
 
 # Python
 __pycache__/
@@ -9,6 +10,8 @@ __pycache__/
 venv/
 dist/
 build/
+node_modules/
+.pnpm-store/
 
 # IDE
 .vscode/

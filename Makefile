@@ -4,7 +4,7 @@
 PY := .venv/bin/python
 PORT ?= 8082
 
-.PHONY: help venv seed run stop smoke test lint go-build docker-up docker-down clean
+.PHONY: help venv seed run stop smoke test lint ui-install ui-build ui-check go-build docker-up docker-down clean
 
 help: ## Muestra esta ayuda
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
@@ -15,6 +15,15 @@ venv: ## Crea el venv e instala dependencias
 
 seed: ## Crea usuarios de prueba con contraseñas conocidas
 	$(PY) scripts/seed_users.py
+
+ui-install: ## Instala dependencias del frontend React (Node + pnpm)
+	cd frontend && pnpm install --frozen-lockfile
+
+ui-build: ## Compila React/TypeScript para servirlo desde FastAPI
+	cd frontend && pnpm run build
+
+ui-check: ## Comprueba tipos del frontend sin generar archivos
+	cd frontend && pnpm run typecheck
 
 run: ## Arranca la API NetPulse en primer plano (requiere .env)
 	@test -f .env || { echo "Falta .env: cp .env.example .env y genere secretos (ver docs/ejecucion-local.md)" >&2; exit 1; }

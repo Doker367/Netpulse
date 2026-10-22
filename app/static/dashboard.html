@@ -36,8 +36,8 @@
       /* ── Text hierarchy ── */
       --text: #f0f2f5;
       --text-sec: #a1a5ab;
-      --text-ter: #7a7e85;
-      --text-muted: #5e6268;
+      --text-ter: #a0a6b0;
+      --text-muted: #9299a3;
 
       /* ── Identity & Accents (Indigo/Cyan) ── */
       --accent: #3b82f6;
@@ -184,9 +184,10 @@
     .sidebar-item .si {
       width: 17px;
       height: 17px;
-      margin-right: 12px;
+      margin-right: 2px;
+      flex-shrink: 0;
       vertical-align: text-bottom;
-      opacity: 0.7;
+      opacity: 0.8;
       transition: opacity 0.2s;
     }
 
@@ -404,7 +405,7 @@
     /* ── Indicadores NOC + menú de usuario ── */
     .noc-ind { display: flex; align-items: center; gap: 14px; margin-right: 16px; border-right: 1px solid var(--border); padding-right: 16px }
     .noc-ind span { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-sec) }
-    .noc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block }
+    .noc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--text-ter) }
     .noc-dot.green { background: var(--green); box-shadow: 0 0 8px var(--green) }
     .noc-dot.red { background: var(--red) }
     .usermenu { position: relative }
@@ -2040,6 +2041,7 @@
     }
 
   </style>
+  <link rel="stylesheet" href="/static/overview.css?v=2">
   <link rel="stylesheet" href="/static/vendor/xterm.css">
   <script src="/static/vendor/xterm.js"></script>
   <script src="/static/vendor/xterm-addon-fit.js"></script>
@@ -2049,17 +2051,16 @@
 
   <!-- LOGIN SCREEN -->
   <div class="login-screen" id="login-screen">
-    <div class="login-card">
-      <div class="login-logo">N</div>
+    <form class="login-card" onsubmit="event.preventDefault(); login()">
+      <div class="login-logo" aria-hidden="true">N</div>
       <h1 class="login-title">NetPulse</h1>
       <p class="login-subtitle">Centro de Operaciones de Red</p>
-      <div id="login-error" class="login-error"></div>
-      <div class="login-field"><label>Usuario</label><input id="user" placeholder="usuario" value="superadmin"></div>
-      <div class="login-field"><label>Contraseña</label><input id="pass" type="password" placeholder="••••••"
-          onkeydown="if(event.key==='Enter')login()"></div>
-      <button class="login-btn" onclick="login()">Ingresar</button>
-      <p class="login-hint">Ingresá con tus credenciales de NetPulse</p>
-    </div>
+      <div id="login-error" class="login-error" role="alert" aria-live="assertive"></div>
+      <div class="login-field"><label for="user">Usuario</label><input id="user" name="username" placeholder="Tu usuario" autocomplete="username" required autofocus></div>
+      <div class="login-field"><label for="pass">Contraseña</label><input id="pass" name="password" type="password" placeholder="Tu contraseña" autocomplete="current-password" required></div>
+      <button class="login-btn" id="login-submit" type="submit" data-i18n="login_submit">Ingresar</button>
+      <p class="login-hint">Ingresa con tu cuenta de NetPulse.</p>
+    </form>
   </div>
 
   <style>
@@ -2078,8 +2079,8 @@
       background: var(--panel);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 40px;
-      width: 340px;
+      padding: 38px;
+      width: min(400px, calc(100vw - 32px));
       text-align: center;
       box-shadow: 0 24px 80px rgba(0, 0, 0, .5)
     }
@@ -2117,21 +2118,20 @@
 
     .login-field label {
       display: block;
-      font-size: 10px;
-      color: var(--text-ter);
-      text-transform: uppercase;
-      letter-spacing: .5px;
-      margin-bottom: 4px;
-      font-weight: 500
+      font-size: 12px;
+      color: var(--text-sec);
+      margin-bottom: 6px;
+      font-weight: 600
     }
 
     .login-field input {
       width: 100%;
+      min-height: 46px;
       padding: 10px 14px;
       border-radius: 8px;
-      font-size: 13px;
+      font-size: 16px;
       background: var(--bg);
-      border: 1px solid var(--border);
+      border: 1px solid var(--border-s);
       color: var(--text);
       transition: border .15s
     }
@@ -2139,17 +2139,18 @@
     .login-field input:focus {
       border-color: var(--accent);
       outline: none;
-      box-shadow: 0 0 0 3px rgba(94, 106, 210, .1)
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, .25)
     }
 
     .login-btn {
       width: 100%;
+      min-height: 46px;
       padding: 10px;
       border-radius: 8px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-h));
+      background: #2563eb;
       color: #fff;
       border: none;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 600;
       cursor: pointer;
       margin-top: 8px;
@@ -2164,21 +2165,40 @@
       opacity: .8
     }
 
+    .login-btn:disabled {
+      opacity: .6;
+      cursor: wait
+    }
+
+    .login-btn:focus-visible,
+    .menu-btn:focus-visible,
+    .sidebar-close:focus-visible,
+    .sidebar-item:focus-visible {
+      outline: 2px solid var(--accent-h);
+      outline-offset: 2px
+    }
+
+    @media (max-width: 480px) {
+      .login-card { padding: 28px 24px }
+    }
+
     .login-error {
       display: none;
       background: var(--red-bg);
       border: 1px solid rgba(239, 68, 68, .2);
-      color: var(--red);
-      padding: 8px 12px;
+      color: #fca5a5;
+      padding: 11px 12px;
       border-radius: 6px;
-      font-size: 11px;
-      margin-bottom: 12px
+      font-size: 13px;
+      line-height: 1.45;
+      text-align: left;
+      margin-bottom: 18px
     }
 
     .login-hint {
-      font-size: 10px;
+      font-size: 12px;
       color: var(--text-ter);
-      margin-top: 12px
+      margin-top: 16px
     }
   </style>
 
@@ -2192,7 +2212,7 @@
           viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
         </svg>NetPulse <span style="font-size:9px;color:var(--text-ter);font-weight:400">NOC</span></h2>
-      <button class="sidebar-close" onclick="togSide()">✕</button>
+      <button class="sidebar-close" type="button" aria-label="Cerrar menú" onclick="togSide()">✕</button>
     </div>
 
     <div class="sidebar-s">
@@ -2237,7 +2257,7 @@
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-        </svg> <span data-i18n="nav_alerts">Alerts</span> <span class="badge" style="background:var(--red)">3</span>
+        </svg> <span data-i18n="nav_alerts">Alerts</span> <span class="badge" style="background:var(--surface);color:var(--text-sec)">—</span>
       </div>
       <div class="sidebar-item" onclick="swView('logs')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2348,7 +2368,7 @@
   <!-- MAIN -->
   <div class="main" id="main" style="display:none">
     <div class="header">
-      <button class="menu-btn" onclick="togSide()"><svg width="20" height="20" fill="none" stroke="currentColor"
+      <button class="menu-btn" type="button" aria-label="Abrir menú de navegación" aria-controls="sidebar" aria-expanded="false" onclick="togSide()"><svg width="20" height="20" fill="none" stroke="currentColor"
           viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
         </svg></button>
@@ -2367,8 +2387,8 @@
 
       <div class="auth">
         <div class="noc-ind">
-          <span><span class="noc-dot green"></span><span id="info-dev-header">SYS OK</span></span>
-          <span><span class="noc-dot red" id="hdr-alert-dot"></span><span id="hdr-alerts">0 ALERTS</span></span>
+          <span><span class="noc-dot" id="hdr-network-dot"></span><span id="info-dev-header" data-i18n="state_unknown">SIN VERIFICAR</span></span>
+          <span><span class="noc-dot" id="hdr-alert-dot"></span><span id="hdr-alerts"><span id="hdr-alert-count">—</span> <span data-i18n="nav_alerts">ALERTAS</span></span></span>
         </div>
         <select id="lang-select" onchange="setLang(this.value)"
           style="background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:8px;font-size:11px;cursor:pointer;margin-right:10px">
@@ -2400,18 +2420,27 @@
     </div>
 
     <div class="container">
-      <div class="view active" id="v-dashboard">
-        <!-- Dashboard Hero Banner -->
-        <div class="hero-banner" style="background: linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(139,92,246,0.08) 100%); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: clamp(20px, 4vw, 32px); margin-bottom: 24px; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px;">
-          <h2 style="font-size: clamp(20px, 4vw, 26px); font-weight: 700; color: var(--text); letter-spacing: -0.5px;">Panel Principal de Operaciones (NOC)</h2>
-          <p style="font-size: 14px; color: var(--text-secondary); max-width: 600px; line-height: 1.6; z-index: 1;">Monitorea, administra y automatiza tu infraestructura de red. Revisa el estado de salud, descubre alertas e interactúa con tus dispositivos en tiempo real.</p>
-          <div style="display: flex; gap: 12px; margin-top: 16px; z-index: 1; flex-wrap: wrap;">
-            <button class="btn btn-p" onclick="document.getElementById('add-device-panel').style.display='block'">➕ Nuevo Dispositivo</button>
-            <button class="btn btn-o" onclick="swView('topology')">🗺️ Ver Topología</button>
+      <div class="view active" id="v-dashboard" data-ui>
+        <section class="ops-hero" aria-labelledby="ops-state">
+          <svg class="ops-signal" viewBox="0 0 960 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+            <path d="M-20 166h214l29-36 25 73 34-135 39 183 28-85h271l29-36 25 73 34-135 39 183 28-85h220" />
+            <path d="M-20 143h214l29-36 25 73 34-135 39 183 28-85h271l29-36 25 73 34-135 39 183 28-85h220" />
+            <path d="M-20 190h214l29-36 25 73 34-135 39 183 28-85h271l29-36 25 73 34-135 39 183 28-85h220" />
+          </svg>
+          <div class="ops-lead">
+            <h1 id="ops-state" aria-live="polite">Comprobando la red</h1>
+            <p id="ops-description">Consultando el inventario y la salud de los equipos.</p>
+            <div class="ops-controls">
+              <button class="ops-action-primary" id="ops-primary" type="button" onclick="goToOverviewDevices()">Ver equipos</button>
+              <button class="ops-action-secondary" type="button" onclick="swView('topology')"><span data-i18n="ov_topology">Abrir topología</span> <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
+            </div>
           </div>
-          <div style="position: absolute; right: -20px; top: -50px; font-size: 200px; opacity: 0.05; pointer-events: none; user-select: none;">🌐</div>
-        </div>
-        <div class="stats" id="stats"></div>
+          <div class="ops-focus" aria-labelledby="ops-focus-title">
+            <div class="ops-focus-top"><h2 id="ops-focus-title" data-i18n="ov_focus">Equipos fuera de línea</h2><span id="ops-focus-count">—</span></div>
+            <div id="ops-focus-items" class="ops-focus-items"><p data-i18n="ov_loading">Verificando equipos…</p></div>
+          </div>
+        </section>
+        <div class="stats" id="stats" role="list" aria-label="Resumen de red"><p class="ops-loading" data-i18n="ov_loading_inventory">Consultando inventario…</p></div>
         <div class="bulk-bar" id="bulk-bar">
           <div class="bt" id="bulk-t">🔀 <span data-i18n="bulk_none">Sin selección</span></div>
           <div id="bulk-tags"></div>
@@ -2548,16 +2577,16 @@
           </div>
         </div>
 
-        <button class="btn btn-o btn-sm" onclick="document.getElementById('add-device-panel').style.display='block'"
-          style="margin-bottom:10px" data-i18n="btn_add_device">➕ Agregar dispositivo</button>
-        <div style="display:flex;justify-content:space-between;align-items:center;width:100%;margin-bottom:12px">
-          <div class="section-title" style="margin-bottom:0;flex:1">📡 <span data-i18n="sys_devices">Dispositivos</span>
-            <span class="line"></span>
+        <section class="ops-inventory" aria-labelledby="ops-devices-heading">
+          <div class="ops-section-bar">
+            <div><h2 id="ops-devices-heading" tabindex="-1" data-i18n="sys_devices">Dispositivos</h2><p id="ops-inventory-note" data-i18n="ov_hint">Selecciona un equipo para ver su detalle.</p></div>
+            <div class="ops-section-actions">
+              <button class="ops-action-secondary" type="button" onclick="loadDev()" aria-label="Actualizar estado de los equipos"><span data-i18n="ov_refresh">Actualizar</span> <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.5 9a7 7 0 0 1 12-2l2.5 5M18.5 15a7 7 0 0 1-12 2L4 12"/></svg></button>
+              <button class="ops-action-primary" type="button" onclick="showAddDevicePanel()"><span data-i18n="ov_add">Agregar equipo</span></button>
+            </div>
           </div>
-          <button class="btn btn-o btn-sm" onclick="loadDev()" title="Actualizar Dispositivos"
-            style="padding:6px 12px;font-size:11px;color:var(--text-secondary)">🔄 Actualizar</button>
-        </div>
-        <div class="grid" id="grid"></div>
+          <div class="grid" id="grid"></div>
+        </section>
       </div>
 
       <div class="view" id="v-commands" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
@@ -3401,7 +3430,9 @@
       ? window.location.origin + '/api'
       : 'http://localhost:8082/api';
     let t = '', devices = [], sel = null, aTab = 'facts', cmdH = [], bSel = new Set(), bMode = false, currentUser = null;
-    let currentLang = localStorage.getItem('np_lang') || 'en';
+    let alertSummary = null; // null significa fuente sin verificar, no cero alertas.
+    let overviewState = null, inventoryError = false;
+    let currentLang = localStorage.getItem('np_lang') || 'es';
 
     // ── i18n SYSTEM ──
     const I18N = {
@@ -3486,8 +3517,11 @@
     };
 
     // Dynamic extensions for deeply rendered DOM elements
-    Object.assign(I18N.en, { stat_devices: 'DEVICES', stat_online: 'ONLINE', stat_offline: 'OFFLINE', stat_avail: 'AVAILABILITY', stat_alerts: '24H ALERTS', stat_sys: 'SYSTEM STATUS', tab_ov: 'Overview', tab_if: 'Interfaces', tab_cfg: 'Config (RAM)', tab_cmd: 'Commands', btn_cmd: '💻 Command', btn_ping: '📡 Ping', btn_facts: '📋 Facts', bulk_none: 'No selection', qa_bk: '💾 Backup', qa_sv: '💿 Save RAM', qa_ping: '📡 Ping Test', qa_exp: '⬇ Export', qa_cmp: '⇄ Compare', m_loading: 'Loading metrics...' });
-    Object.assign(I18N.es, { stat_devices: 'DISPOSITIVOS', stat_online: 'EN LÍNEA', stat_offline: 'FUERA DE LÍNEA', stat_avail: 'DISPONIBILIDAD', stat_alerts: 'ALERTAS 24H', stat_sys: 'ESTADO DEL SISTEMA', tab_ov: 'General', tab_if: 'Interfaces', tab_cfg: 'Configuración (RAM)', tab_cmd: 'Comandos', btn_cmd: '💻 Comando', btn_ping: '📡 Ping', btn_facts: '📋 Informes', bulk_none: 'Sin selección', qa_bk: '💾 Backup', qa_sv: '💿 Guardar RAM', qa_ping: '📡 Ping Test', qa_exp: '⬇ Exportar', qa_cmp: '⇄ Comparar', m_loading: 'Cargando métricas...' });
+    Object.assign(I18N.en, { stat_devices: 'DEVICES', stat_online: 'ONLINE', stat_offline: 'OFFLINE', stat_avail: 'AVAILABILITY', stat_alerts: 'ACTIVE ALERTS', stat_sys: 'NETWORK STATUS', state_ok: 'OPERATIONAL', state_down: 'OFFLINE', state_degraded: 'DEGRADED', state_unknown: 'UNVERIFIED', state_empty: 'NO DATA', tab_ov: 'Overview', tab_if: 'Interfaces', tab_cfg: 'Config (RAM)', tab_cmd: 'Commands', btn_cmd: '💻 Command', btn_ping: '📡 Ping', btn_facts: '📋 Facts', bulk_none: 'No selection', qa_bk: '💾 Backup', qa_sv: '💿 Save RAM', qa_ping: '📡 Ping Test', qa_exp: '⬇ Export', qa_cmp: '⇄ Compare', m_loading: 'Loading metrics...' });
+    Object.assign(I18N.es, { stat_devices: 'DISPOSITIVOS', stat_online: 'EN LÍNEA', stat_offline: 'FUERA DE LÍNEA', stat_avail: 'DISPONIBILIDAD', stat_alerts: 'ALERTAS ACTIVAS', stat_sys: 'ESTADO DE LA RED', state_ok: 'OPERATIVA', state_down: 'CAÍDA', state_degraded: 'DEGRADADA', state_unknown: 'SIN VERIFICAR', state_empty: 'SIN DATOS', tab_ov: 'General', tab_if: 'Interfaces', tab_cfg: 'Configuración (RAM)', tab_cmd: 'Comandos', btn_cmd: '💻 Comando', btn_ping: '📡 Ping', btn_facts: '📋 Informes', bulk_none: 'Sin selección', qa_bk: '💾 Backup', qa_sv: '💿 Guardar RAM', qa_ping: '📡 Ping Test', qa_exp: '⬇ Exportar', qa_cmp: '⇄ Comparar', m_loading: 'Cargando métricas...' });
+
+    Object.assign(I18N.en, { search_placeholder: 'Search devices or IPs (Ctrl+K)', ov_focus: 'Offline devices', ov_loading: 'Checking devices…', ov_loading_inventory: 'Loading inventory…', ov_hint: 'Select a device to inspect its details.', ov_topology: 'Open topology', ov_refresh: 'Refresh', ov_add: 'Add device', ov_offline: 'Offline', ov_online: 'Online', ov_devices: 'Devices', ov_availability: 'Online share', ov_alerts: 'Active alerts', ov_detail: 'View details', ov_unverified: 'Unverified', ov_disk: 'Disk', login_submit: 'Sign in', login_busy: 'Signing in…', login_err_401: 'Incorrect username or password. Check your credentials and try again.', login_err_429: 'Too many attempts. Wait a minute before signing in again.', login_err_generic: 'Could not sign in. Check that NetPulse is available and try again.', login_err_session: 'The session could not be validated. Please try again.', login_err_conn: 'Could not connect to NetPulse. Make sure the API is running and try again.' });
+    Object.assign(I18N.es, { search_placeholder: 'Buscar equipos o IP (Ctrl+K)', ov_focus: 'Equipos fuera de línea', ov_loading: 'Verificando equipos…', ov_loading_inventory: 'Consultando inventario…', ov_hint: 'Selecciona un equipo para ver su detalle.', ov_topology: 'Abrir topología', ov_refresh: 'Actualizar', ov_add: 'Agregar equipo', ov_offline: 'Fuera de línea', ov_online: 'En línea', ov_devices: 'Dispositivos', ov_availability: 'Porcentaje en línea', ov_alerts: 'Alertas activas', ov_detail: 'Ver detalle', ov_unverified: 'Sin verificar', ov_disk: 'Disco', login_submit: 'Ingresar', login_busy: 'Ingresando…', login_err_401: 'Usuario o contraseña incorrectos. Revisa los datos e inténtalo de nuevo.', login_err_429: 'Demasiados intentos. Espera un minuto antes de volver a ingresar.', login_err_generic: 'No se pudo iniciar sesión. Comprueba que NetPulse esté disponible e inténtalo de nuevo.', login_err_session: 'No se pudo validar la sesión. Vuelve a intentarlo.', login_err_conn: 'No se pudo conectar con NetPulse. Verifica que la API esté encendida e inténtalo de nuevo.' });
 
     function setLang(lang) {
       currentLang = lang;
@@ -3498,13 +3532,17 @@
       });
       const sel = document.getElementById('lang-select');
       if (sel) sel.value = lang;
+      const search = document.getElementById('sb');
+      if (search) search.placeholder = I18N[lang]?.search_placeholder || I18N.en.search_placeholder;
+      if (overviewState) updateDashboardHero();
     }
 
     function __t(k) { return (I18N[currentLang] && I18N[currentLang][k]) || (I18N['en'] && I18N['en'][k]) || k; }
 
     function toast(m, ty = 'info', d = 3000) { const e = document.createElement('div'); e.className = `toast ${ty}`; e.textContent = m; document.body.appendChild(e); setTimeout(() => e.remove(), d) }
     function h() { return t ? { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' } }
-    function esc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
+    function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
+    function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;') }
 
     // ── Iconos SVG (sin emojis) ──────────────────────────────
     const IC = {
@@ -3621,14 +3659,35 @@
       const c = localStorage.getItem('netpulse-accent'); if (c) document.documentElement.style.setProperty('--accent', c)
     })();
 
+    let loginBusy = false;
+    function showLoginError(message) {
+      const error = document.getElementById('login-error');
+      error.textContent = message;
+      error.style.display = 'block';
+    }
     async function login() {
-      const u = document.getElementById('user').value, p = document.getElementById('pass').value;
+      if (loginBusy) return;
+      const u = document.getElementById('user').value.trim(), p = document.getElementById('pass').value;
+      const button = document.getElementById('login-submit');
+      const error = document.getElementById('login-error');
+      error.textContent = '';
+      error.style.display = 'none';
+      loginBusy = true;
+      button.disabled = true;
+      button.textContent = __t('login_busy');
       try {
         const r = await fetch(`${A}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: p }) });
-        if (!r.ok) { document.getElementById('login-error').textContent = 'Usuario o contraseña incorrectos'; document.getElementById('login-error').style.display = 'block'; return }
+        if (!r.ok) {
+          if (r.status === 401) showLoginError(__t('login_err_401'));
+          else if (r.status === 429) showLoginError(__t('login_err_429'));
+          else showLoginError(__t('login_err_generic'));
+          return;
+        }
         const d = await r.json(); t = d.access_token;
         const mr = await fetch(`${A}/auth/me`, { headers: { Authorization: `Bearer ${t}` } });
+        if (!mr.ok) { t = ''; showLoginError(__t('login_err_session')); return; }
         const me = await mr.json(); currentUser = me; const role = me.role || 'viewer';
+        document.getElementById('pass').value = '';
         document.getElementById('login-screen').style.display = 'none'; document.getElementById('main').style.display = 'block';
         const uname = me.username || u || 'user';
         document.getElementById('user-avatar').textContent = uname.slice(0, 2).toUpperCase();
@@ -3641,7 +3700,8 @@
         // El RBAC del backend sigue validando cada acción.
         document.querySelectorAll('.sidebar-s').forEach(el => { el.style.display = 'block'; });
         init()
-      } catch (e) { document.getElementById('login-error').textContent = 'Error de conexión'; document.getElementById('login-error').style.display = 'block' }
+      } catch (e) { t = ''; showLoginError(__t('login_err_conn')); }
+      finally { loginBusy = false; button.disabled = false; button.textContent = __t('login_submit'); }
     }
     function toggleUserMenu(ev) {
       ev.stopPropagation();
@@ -3657,8 +3717,12 @@
       document.getElementById('login-error').style.display = 'none'
     }
     function togSide() {
-      document.getElementById('sidebar').classList.toggle('open');
-      document.getElementById('sidebar-overlay').classList.toggle('active');
+      const open = document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebar-overlay').classList.toggle('active', open);
+      const menu = document.querySelector('.menu-btn');
+      menu.setAttribute('aria-expanded', String(open));
+      if (open) document.querySelector('.sidebar-item.active')?.focus();
+      else menu.focus();
     }
 
     // ── EXPORT DATA ──
@@ -4064,7 +4128,7 @@
         const rTx = document.getElementById(`rtx-${d.id}`);
 
         // Si el dispositivo está apagado, limpiar métricas y no consultar facts para evitar timeouts
-        if (d._online === false) {
+        if (d._online !== true) {
           d._cpu = '—'; d._mem = '—'; d._dsk = '—';
           d._lat = '—'; d._rx = '—'; d._tx = '—';
           if (dC) dC.textContent = '—';
@@ -4099,10 +4163,31 @@
       });
     }
 
+    async function refreshAlertSummary() {
+      if (!t) return;
+      try {
+        const response = await fetch(`${A}/alerts/active`, { headers: h(), signal: AbortSignal.timeout(10000) });
+        if (!response.ok) throw new Error('alertas no disponibles');
+        const result = await response.json();
+        if (result.status !== 'success') throw new Error('Prometheus no disponible');
+        alertSummary = Number(result.firing) || 0;
+      } catch (e) { alertSummary = null; }
+      const count = alertSummary === null ? '—' : String(alertSummary);
+      document.getElementById('hdr-alert-count').textContent = count;
+      const dot = document.getElementById('hdr-alert-dot');
+      dot.style.background = alertSummary === null ? 'var(--text-ter)' : alertSummary > 0 ? 'var(--red)' : 'var(--green)';
+      const badge = document.querySelector('.sidebar-item[onclick*="alerts"] .badge');
+      if (badge) { badge.textContent = count; badge.style.background = alertSummary > 0 ? 'var(--red)' : 'var(--surface)'; }
+      document.getElementById('hdr-alerts').title = alertSummary === null ? 'Prometheus no disponible; alertas sin verificar' : 'Alertas activas de Prometheus';
+      if (overviewState) updStats();
+    }
+
     async function init() {
       setLang(currentLang); // Auto-apply persisted language
+      void refreshAlertSummary();
       await loadDev(); await loadBk();
       setInterval(loadH, 10000); setInterval(loadBk, 60000);
+      setInterval(refreshAlertSummary, 45000);
       setInterval(() => { loadDev(); }, 30000);
       document.getElementById('info-dev').textContent = devices.length
       // Cargar recursos de hardware tras inicio
@@ -4120,6 +4205,7 @@
         ]);
 
         if (rDev.status === 'fulfilled' && rDev.value.ok) {
+          inventoryError = false;
           const inv = await rDev.value.json();
           if (Array.isArray(inv)) newDevs = inv.map(i => ({
             id: i.id,
@@ -4130,6 +4216,11 @@
             protocol: i.protocol || 'ssh',
             tags: i.tags || []
           }));
+        } else {
+          inventoryError = true;
+          devices.forEach(d => { d._online = null; });
+          renderD(); updStats();
+          return;
         }
 
         let hl = {};
@@ -4153,13 +4244,9 @@
               nd._rx = nd._online ? (od?._rx || '0.0 Mb/s') : '—';
               nd._tx = nd._online ? (od?._tx || '0.0 Mb/s') : '—';
             }
-          } else if (od) {
-            nd._online = od._online;
-            nd._lat = od._lat;
-            nd._rx = od._rx;
-            nd._tx = od._tx;
           } else {
-            nd._online = false;
+            // Sin respuesta de salud no equivale a equipo desconectado.
+            nd._online = null;
             nd._lat = '—';
             nd._rx = '—';
             nd._tx = '—';
@@ -4177,7 +4264,11 @@
             if (s.options.length > 1) s.selectedIndex = 1
           }
         });
-      } catch (e) { }
+      } catch (e) {
+        inventoryError = true;
+        devices.forEach(d => { d._online = null; });
+        renderD(); updStats();
+      }
     }
     function buildSchedForms() {
       const opts = '<option value="all">-- TODOS LOS DISPOSITIVOS --</option>' + devices.map(d => `<option value="${d.id}">${d.id} (${d.driver})</option>`).join('');
@@ -4189,7 +4280,7 @@
     }
     async function loadH() {
       try {
-        const r = await fetch(`${A}/devices/health`); if (!r.ok) return; const hl = await r.json();
+        const r = await fetch(`${A}/devices/health`); if (!r.ok) throw new Error('salud no disponible'); const hl = await r.json();
         for (const d of devices) {
           if (d.id in hl) {
             const val = hl[d.id];
@@ -4202,14 +4293,20 @@
               d._online = !!val;
               if (!d._online) { d._lat = '—'; d._rx = '—'; d._tx = '—'; }
             }
+          } else {
+            d._online = null;
+            d._lat = '—'; d._rx = '—'; d._tx = '—';
           }
         }
         renderD(); updStats();
-      } catch (e) { }
+      } catch (e) {
+        devices.forEach(d => { d._online = null; d._lat = '—'; d._rx = '—'; d._tx = '—'; });
+        renderD(); updStats();
+      }
     }
     function fDev() {
       const q = document.getElementById('sb').value.toLowerCase();
-      document.querySelectorAll('.dc').forEach(c => c.classList.toggle('hidden', !c.dataset.s.includes(q)))
+      document.querySelectorAll('#grid .dc').forEach(c => c.classList.toggle('hidden', !(c.dataset.s || '').toLowerCase().includes(q)))
     }
 
     function tB() {
@@ -4219,7 +4316,7 @@
     }
     function tB2(id, chk) {
       chk ? bSel.add(id) : bSel.delete(id);
-      document.querySelector(`.dc[data-id="${id}"]`).classList.toggle('bulk', chk); updB()
+      [...document.querySelectorAll('#grid .dc')].find(card => card.dataset.id === id)?.classList.toggle('bulk', chk); updB()
     }
     function updB() {
       const bar = document.getElementById('bulk-bar');
@@ -4270,88 +4367,135 @@
     function renderD() {
       const grid = document.getElementById('grid');
       grid.innerHTML = devices.map(d => `
-    <div class="dc${sel?.id === d.id ? ' selected' : ''}${bSel.has(d.id) ? ' bulk' : ''}${d._online ? ' online' : ' offline'}" style="display:flex;flex-direction:column;align-items:flex-start;position:relative;cursor:pointer" data-id="${d.id}" data-s="${d.id} ${d.driver} ${d.type} ${(d.tags || []).join(' ')}" onclick="if(!bMode)selD('${d.id}')">
-      <input type="checkbox" class="bulk-cb"${bSel.has(d.id) ? ' checked' : ''} onchange="tB2('${d.id}',this.checked)" onclick="event.stopPropagation()" style="position:absolute;top:16px;right:16px;z-index:2;">
+    <div class="dc${sel?.id === d.id ? ' selected' : ''}${bSel.has(d.id) ? ' bulk' : ''}${d._online === true ? ' online' : d._online === false ? ' offline' : ''}" style="display:flex;flex-direction:column;align-items:flex-start;position:relative;cursor:pointer" data-id="${escAttr(d.id)}" data-s="${escAttr([d.id, d.hostname, d.driver, d.type, ...(d.tags || [])].join(' '))}">
+      <input type="checkbox" class="bulk-cb"${bSel.has(d.id) ? ' checked' : ''} onchange="tB2(this.closest('.dc').dataset.id,this.checked)" onclick="event.stopPropagation()" aria-label="Seleccionar ${escAttr(d.id)}" style="position:absolute;top:16px;right:16px;z-index:2;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;width:100%;padding-right:24px;">
         <div style="display:flex;align-items:center;gap:8px">
-          <span style="width:10px;height:10px;border-radius:50%;background:${d._online ? 'var(--green)' : 'var(--red)'};box-shadow:0 0 8px ${d._online ? 'var(--green)' : 'var(--red)'}"></span>
-          <strong style="font-size:15px;color:var(--text);letter-spacing:-0.2px">${d.id}</strong>
+          <span aria-hidden="true" style="width:10px;height:10px;border-radius:50%;background:${d._online === true ? 'var(--green)' : d._online === false ? 'var(--red)' : 'var(--text-ter)'}"></span>
+          <strong style="font-size:15px;color:var(--text);letter-spacing:-0.2px">${esc(d.id)}</strong>
         </div>
+        <span class="device-status" data-i18n="${d._online === true ? 'ov_online' : d._online === false ? 'ov_offline' : 'ov_unverified'}">${__t(d._online === true ? 'ov_online' : d._online === false ? 'ov_offline' : 'ov_unverified')}</span>
       </div>
-      <div style="font-family:var(--fm);font-size:11px;color:var(--text-secondary);margin-bottom:16px;width:100%;display:flex;justify-content:space-between;align-items:center;">
-        <span style="display:flex;align-items:center;gap:4px;"><svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg> ${d.hostname}:${d.port}</span>
-        <span style="font-family:var(--ff);text-transform:uppercase;background:var(--bg);padding:2px 6px;border-radius:4px;border:1px solid var(--border-s);font-size:9px;">${d.driver}</span>
+      <div class="device-endpoint" style="font-family:var(--fm);font-size:11px;color:var(--text-secondary);margin-bottom:16px;width:100%;display:flex;justify-content:space-between;align-items:center;">
+        <span style="display:flex;align-items:center;gap:4px;"><svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg> ${esc(d.hostname)}:${esc(d.port)}</span>
+        <span style="font-family:var(--ff);text-transform:uppercase;background:var(--bg);padding:2px 6px;border-radius:4px;border:1px solid var(--border-s);font-size:9px;">${esc(d.driver)}</span>
       </div>
       
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;width:100%">
+      <div class="device-metrics" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;width:100%">
         <div style="background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border-s);text-align:center;">
           <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">CPU</div>
-          <div style="font-size:13px;font-weight:600;color:var(--text)" id="rcpu-${d.id}">${d._online ? (d._cpu || '—') : '—'}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)" id="rcpu-${escAttr(d.id)}">${d._online ? (d._cpu || '—') : '—'}</div>
         </div>
         <div style="background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border-s);text-align:center;">
           <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">RAM</div>
-          <div style="font-size:13px;font-weight:600;color:var(--text)" id="rmem-${d.id}">${d._online ? (d._mem || '—') : '—'}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)" id="rmem-${escAttr(d.id)}">${d._online ? (d._mem || '—') : '—'}</div>
         </div>
         <div style="background:var(--bg);padding:8px;border-radius:6px;border:1px solid var(--border-s);text-align:center;">
-          <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px">DISK</div>
-          <div style="font-size:13px;font-weight:600;color:var(--text)" id="rdsk-${d.id}">${d._online ? (d._dsk || '—') : '—'}</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:2px" data-i18n="ov_disk">${__t('ov_disk')}</div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)" id="rdsk-${escAttr(d.id)}">${d._online ? (d._dsk || '—') : '—'}</div>
         </div>
       </div>
       
-      <div style="display:flex;justify-content:space-between;width:100%;align-items:center;background:var(--bg);padding:8px 10px;border-radius:6px;border:1px solid var(--border-s);">
+      <div class="device-traffic" style="display:flex;justify-content:space-between;width:100%;align-items:center;background:var(--bg);padding:8px 10px;border-radius:6px;border:1px solid var(--border-s);">
         <div style="font-size:11px;color:var(--text-ter);display:flex;gap:12px;">
-          <span style="display:flex;align-items:center;gap:4px;" title="Descarga (RX)"><svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg> <span style="color:var(--text-secondary)" id="rrx-${d.id}">${d._online ? (d._rx || '0.0 Mb/s') : '—'}</span></span>
-          <span style="display:flex;align-items:center;gap:4px;" title="Subida (TX)"><svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg> <span style="color:var(--text-secondary)" id="rtx-${d.id}">${d._online ? (d._tx || '0.0 Mb/s') : '—'}</span></span>
+          <span style="display:flex;align-items:center;gap:4px;" title="Descarga (RX)"><span class="device-traffic-label">RX</span><span style="color:var(--text-secondary)" id="rrx-${escAttr(d.id)}">${d._online ? (d._rx || '0.0 Mb/s') : '—'}</span></span>
+          <span style="display:flex;align-items:center;gap:4px;" title="Subida (TX)"><span class="device-traffic-label">TX</span><span style="color:var(--text-secondary)" id="rtx-${escAttr(d.id)}">${d._online ? (d._tx || '0.0 Mb/s') : '—'}</span></span>
         </div>
-        <div style="font-size:11px;color:var(--text-ter)"><span data-i18n="card_latency">Latencia:</span> <span style="color:var(--text);font-weight:600" id="rlat-${d.id}">${d._online ? (d._lat || '<1ms') : '—'}</span></div>
+        <div style="font-size:11px;color:var(--text-ter)"><span data-i18n="card_latency">Latencia:</span> <span style="color:var(--text);font-weight:600" id="rlat-${escAttr(d.id)}">${d._online ? (d._lat || '<1ms') : '—'}</span></div>
       </div>
+      <button class="ops-device-open" type="button" data-i18n="ov_detail">Ver detalle</button>
     </div>`).join(''); fDev();
     }
+    document.getElementById('grid').addEventListener('click', event => {
+      if (event.target.closest('.bulk-cb')) return;
+      const card = event.target.closest('.dc');
+      if (card && (event.target.closest('.ops-device-open') || !bMode)) selD(card.dataset.id);
+    });
+    function goToOverviewDevices() {
+      if (!devices.length) { swView('devices'); return; }
+      const heading = document.getElementById('ops-devices-heading');
+      heading.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+      heading.focus({ preventScroll: true });
+    }
+    function showAddDevicePanel() {
+      const panel = document.getElementById('add-device-panel');
+      panel.style.display = 'block';
+      panel.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
+      // Los ids inv-* existen en dos formularios (panel y vista Inventario):
+      // enfocar el del panel, no el primero del DOM.
+      panel.querySelector('#inv-id')?.focus({ preventScroll: true });
+    }
+    document.getElementById('ops-focus-items').addEventListener('click', event => {
+      const button = event.target.closest('[data-device]');
+      if (button) selD(button.dataset.device);
+      else if (event.target.closest('[data-more]')) goToOverviewDevices();
+      else if (event.target.closest('[data-alerts]')) swView('alerts');
+    });
+    function updateDashboardHero() {
+      if (!overviewState) return;
+      const { networkKey, on, off, unknown } = overviewState;
+      const spanish = currentLang === 'es';
+      const headline = spanish ? {
+        state_ok: alertSummary > 0 ? 'Equipos en línea, hay alertas' : 'Red operativa', state_degraded: 'Red con incidencias',
+        state_down: 'Red fuera de línea', state_unknown: 'Estado sin verificar',
+        state_empty: 'Sin equipos registrados'
+      } : {
+        state_ok: alertSummary > 0 ? 'Devices online, alerts active' : 'Network operational', state_degraded: 'Network needs attention',
+        state_down: 'Network offline', state_unknown: 'Status unverified',
+        state_empty: 'No devices registered'
+      };
+      const description = inventoryError
+        ? (spanish ? 'No se pudo consultar el inventario. Comprueba la API y vuelve a actualizar.' : 'The inventory could not be loaded. Check the API and try again.')
+        : networkKey === 'state_unknown'
+          ? (spanish ? `${unknown} de ${devices.length} equipos sin verificación de salud.` : `${unknown} of ${devices.length} devices have no verified health status.`)
+          : networkKey === 'state_empty'
+            ? (spanish ? 'Agrega un equipo para comenzar a supervisar la red.' : 'Add a device to start monitoring the network.')
+            : networkKey === 'state_ok'
+              ? (spanish ? `${on} de ${devices.length} equipos responden.${alertSummary > 0 ? ` Prometheus reporta ${alertSummary} alertas activas.` : ''}` : `${on} of ${devices.length} devices are responding.${alertSummary > 0 ? ` Prometheus reports ${alertSummary} active alerts.` : ''}`)
+              : (spanish ? `${off} de ${devices.length} equipos no responden.` : `${off} of ${devices.length} devices are not responding.`);
+      document.getElementById('ops-state').textContent = headline[networkKey];
+      document.getElementById('ops-description').textContent = description;
+      document.getElementById('ops-primary').textContent = networkKey === 'state_empty'
+        ? (spanish ? 'Abrir inventario' : 'Open inventory')
+        : off ? (spanish ? 'Revisar equipos' : 'Review devices')
+          : (spanish ? 'Ver equipos' : 'View devices');
+      document.querySelector('#v-dashboard .ops-hero').dataset.networkState = networkKey;
+      const affected = devices.filter(device => device._online === false);
+      const count = document.getElementById('ops-focus-count');
+      count.textContent = inventoryError ? '—' : affected.length ? String(affected.length) : unknown ? '—' : '0';
+      count.style.color = !inventoryError && affected.length ? 'var(--ops-danger)' : 'var(--ops-secondary)';
+      const focus = document.getElementById('ops-focus-items');
+      if (inventoryError) {
+        focus.innerHTML = `<p>${spanish ? 'No se pudo consultar el inventario.' : 'The inventory could not be loaded.'}</p>`;
+      } else if (affected.length) {
+        focus.innerHTML = affected.slice(0, 2).map(device => `<button class="ops-focus-item" type="button" data-device="${escAttr(device.id)}"><span class="ops-focus-dot" aria-hidden="true"></span><strong>${esc(device.id)}</strong><small>${__t('ov_offline')}</small></button>`).join('')
+          + (affected.length > 2 ? `<button type="button" class="ops-focus-more" data-more>${spanish ? `Ver ${affected.length - 2} equipos más` : `View ${affected.length - 2} more devices`}</button>` : '')
+          + (unknown ? `<p>${spanish ? `${unknown} equipos más sin verificar.` : `${unknown} more devices unverified.`}</p>` : '');
+      } else if (inventoryError || unknown) {
+        focus.innerHTML = `<p>${spanish ? 'No se pudo confirmar el estado de los equipos.' : 'Device health could not be verified.'}</p>`;
+      } else if (alertSummary > 0) {
+        focus.innerHTML = `<p>${spanish ? `Sin equipos desconectados; hay ${alertSummary} alertas activas en Prometheus.` : `No offline devices; Prometheus reports ${alertSummary} active alerts.`}</p><button type="button" class="ops-focus-more" data-alerts>${spanish ? 'Ver alertas' : 'View alerts'}</button>`;
+      } else {
+        focus.innerHTML = `<p>${devices.length ? (alertSummary === null ? (spanish ? 'Sin equipos desconectados. Las alertas de Prometheus no están verificadas.' : 'No offline devices. Prometheus alerts are unverified.') : (spanish ? 'Ningún equipo fuera de línea.' : 'No devices are offline.')) : (spanish ? 'Los equipos que requieran atención aparecerán aquí.' : 'Devices needing attention will appear here.')}</p>`;
+      }
+    }
     function updStats() {
-      const on = devices.filter(d => d._online).length;
+      const on = devices.filter(d => d._online === true).length;
+      const off = devices.filter(d => d._online === false).length;
+      const unknown = devices.length - on - off;
+      const networkKey = inventoryError ? 'state_unknown' : !devices.length ? 'state_empty' : unknown ? 'state_unknown' : off === devices.length ? 'state_down' : off ? 'state_degraded' : 'state_ok';
+      const networkColor = networkKey === 'state_ok' ? 'var(--green)' : networkKey === 'state_down' ? 'var(--red)' : networkKey === 'state_degraded' ? 'var(--yellow)' : 'var(--text-ter)';
+      const header = document.getElementById('info-dev-header');
+      header.setAttribute('data-i18n', networkKey);
+      header.textContent = __t(networkKey);
+      document.getElementById('hdr-network-dot').style.background = networkColor;
       document.getElementById('stats').innerHTML = `
-    <div class="sc" style="display:flex;flex-direction:column;gap:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-        <div style="background:var(--blue-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;width:42px;height:42px;font-size:18px;">🖥️</div>
-        <div class="sv" style="font-size:24px;font-weight:700;">${devices.length}</div>
-      </div>
-      <div class="sl" data-i18n="stat_devices" style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;line-height:1.2;">DISPOSITIVOS</div>
-    </div>
-    <div class="sc" style="display:flex;flex-direction:column;gap:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-        <div style="background:var(--green-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;width:42px;height:42px;font-size:18px;">🟢</div>
-        <div class="sv g" style="font-size:24px;font-weight:700;">${on}</div>
-      </div>
-      <div class="sl" data-i18n="stat_online" style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;line-height:1.2;">EN LÍNEA</div>
-    </div>
-    <div class="sc" style="display:flex;flex-direction:column;gap:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-        <div style="background:var(--red-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;width:42px;height:42px;font-size:18px;">🔴</div>
-        <div class="sv r" style="font-size:24px;font-weight:700;">${devices.length - on}</div>
-      </div>
-      <div class="sl" data-i18n="stat_offline" style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;line-height:1.2;">FUERA DE LÍNEA</div>
-    </div>
-    <div class="sc" style="display:flex;flex-direction:column;gap:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-        <div style="background:${on == devices.length && devices.length > 0 ? 'var(--green-bg)' : 'var(--yellow-bg)'};border-radius:10px;display:flex;align-items:center;justify-content:center;width:42px;height:42px;font-size:18px;">📈</div>
-        <div class="sv" style="font-size:24px;font-weight:700;color:${on == devices.length && devices.length > 0 ? 'var(--green)' : 'var(--yellow)'}">${devices.length ? Math.round(on / devices.length * 100) : 0}%</div>
-      </div>
-      <div class="sl" data-i18n="stat_avail" style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;line-height:1.2;">DISPONIBILIDAD</div>
-    </div>
-    <div class="sc" style="display:flex;flex-direction:column;gap:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-        <div style="background:var(--orange-bg);border-radius:10px;display:flex;align-items:center;justify-content:center;width:42px;height:42px;font-size:18px;">⚠️</div>
-        <div class="sv c" style="font-size:24px;font-weight:700;">${cmdH.length || 0}</div>
-      </div>
-      <div class="sl" data-i18n="stat_alerts" style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;line-height:1.2;">ALERTAS 24H</div>
-    </div>
-    <div class="sc" style="display:flex;flex-direction:column;gap:16px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-        <div style="background:${t ? 'var(--green-bg)' : 'var(--red-bg)'};border-radius:10px;display:flex;align-items:center;justify-content:center;width:42px;height:42px;font-size:18px;">⚡</div>
-        <div class="sv" style="font-size:13px;font-weight:700;color:${t ? 'var(--green)' : 'var(--red)'};margin-top:6px">${t ? 'OPERATIONAL' : 'OFFLINE'}</div>
-      </div>
-      <div class="sl" data-i18n="stat_sys" style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;line-height:1.2;">ESTADO DEL SISTEMA</div>
-    </div>`;
+        <div class="ops-stat" role="listitem"><strong class="sv">${inventoryError || unknown ? '—' : off}</strong><span class="sl" data-i18n="ov_offline">${__t('ov_offline')}</span></div>
+        <div class="ops-stat" role="listitem"><strong class="sv g">${inventoryError || unknown ? '—' : on}</strong><span class="sl" data-i18n="ov_online">${__t('ov_online')}</span></div>
+        <div class="ops-stat" role="listitem"><strong class="sv">${inventoryError ? '—' : devices.length}</strong><span class="sl" data-i18n="ov_devices">${__t('ov_devices')}</span></div>
+        <div class="ops-stat" role="listitem"><strong class="sv">${devices.length && !unknown && !inventoryError ? Math.round(on / devices.length * 100) + '%' : '—'}</strong><span class="sl" data-i18n="ov_availability">${__t('ov_availability')}</span></div>
+        <div class="ops-stat" role="listitem"><strong class="sv c">${alertSummary === null ? '—' : alertSummary}</strong><span class="sl" data-i18n="ov_alerts">${__t('ov_alerts')}</span></div>`;
+      overviewState = { networkKey, on, off, unknown };
       setLang(currentLang);
     }
 
@@ -4371,8 +4515,9 @@
       sel = devices.find(d => d.id === id); renderD();
       document.getElementById('dp').classList.add('active');
       const d = sel;
-      document.getElementById('dt').innerHTML = `<span style="margin-right:8px">🖥️</span> ${id}`;
-      document.getElementById('dm').innerHTML = `<span class="badge" style="background:var(--surface);color:var(--text-secondary);font-family:var(--mono)">${d.driver.toUpperCase()}</span> <span class="badge" style="background:var(--surface);color:var(--text-secondary)">${d.type}</span> <span style="font-size:12px;color:var(--text-ter)">:${d.port}</span> <span style="margin-left:8px;font-size:12px;color:${d._online ? 'var(--green)' : 'var(--red)'}">${d._online ? '🟢 ONLINE' : '🔴 OFFLINE'}</span>`;
+      document.getElementById('dt').textContent = id;
+      const detailHealth = d._online === true ? 'ov_online' : d._online === false ? 'ov_offline' : 'ov_unverified';
+      document.getElementById('dm').innerHTML = `<span class="badge" style="background:var(--surface);color:var(--text-secondary)">${esc(d.driver.toUpperCase())}</span> <span class="badge" style="background:var(--surface);color:var(--text-secondary)">${esc(d.type)}</span> <span style="font-size:12px;color:var(--text-ter)">:${esc(d.port)}</span> <span data-i18n="${detailHealth}" style="margin-left:8px;font-size:12px;color:${d._online === true ? 'var(--green)' : d._online === false ? 'var(--red)' : 'var(--text-ter)'}">${__t(detailHealth)}</span>`;
 
       // Tabs Header
       document.getElementById('tabs').innerHTML = `
@@ -4711,6 +4856,7 @@
       list.innerHTML = '<div class="sp" style="margin:20px auto"></div>';
 
       const alerts = [];
+      let prometheusAvailable = false;
       const push = (sev, dev, msg, icon) => alerts.push({ sev, dev, msg, icon });
 
       // ── Alertas de Prometheus (reglas) ──
@@ -4718,6 +4864,7 @@
         const ar = await fetch(`${A}/alerts/active`, { headers: h() });
         if (ar.ok) {
           const ad = await ar.json();
+          prometheusAvailable = ad.status === 'success';
           (ad.alerts || []).forEach(a => {
             const sev = a.severity === 'critical' ? 'critical' : a.severity === 'warning' ? 'warning' : 'info';
             const icon = a.severity === 'critical' ? '🚨' : a.severity === 'warning' ? '⚠️' : 'ℹ️';
@@ -4725,6 +4872,7 @@
           });
         }
       } catch (e) { }
+      if (!prometheusAvailable) push('warning', 'Prometheus', 'No se pudieron consultar las alertas de Prometheus; su estado es desconocido', '⚠️');
 
       // ── Recursos del servidor NetPulse ──
       let ov = null;
@@ -4751,7 +4899,8 @@
       const known = devices.length ? devices.map(d => d.id) : Object.keys(devMetrics);
       known.forEach(id => {
         const m = devMetrics[id] || {};
-        if (m.online === false) push('critical', id, 'Dispositivo OFFLINE (sin respuesta ICMP/recursos)', '🔴');
+        const knownDevice = devices.find(d => d.id === id);
+        if (m.online === false || (m.online == null && knownDevice?._online === false)) push('critical', id, 'Dispositivo OFFLINE (sin respuesta ICMP/recursos)', '🔴');
         const cpu = Math.round(m.cpu || 0), mem = Math.round(m.memory_percent || 0), dsk = Math.round(m.disk_percent || 0);
         if (cpu > 90) push('critical', id, `CPU en ${cpu}% — carga crítica`, '🔥');
         else if (cpu > 75) push('warning', id, `CPU en ${cpu}% — carga elevada`, '⚡');
@@ -4767,8 +4916,12 @@
       });
 
       if (!alerts.length) {
-        const onlineDev = known.filter(id => (devMetrics[id] || {}).online !== false).length;
-        push('info', 'Sistema', `Todos los ${onlineDev} dispositivos operando dentro de límites normales`, '✅');
+        const verified = known.length > 0 && known.every(id => {
+          const state = devMetrics[id]?.online;
+          return state === true || (state == null && devices.find(d => d.id === id)?._online === true);
+        });
+        if (prometheusAvailable && verified) push('info', 'Sistema', `Los ${known.length} equipos conocidos responden y no hay alertas activas`, '✅');
+        else push('info', 'Observabilidad', 'Estado sin verificar: revisa Prometheus y la salud de los equipos', 'ℹ️');
       }
       const rank = { critical: 0, warning: 1, info: 2 };
       alerts.sort((a, b) => rank[a.sev] - rank[b.sev]);
@@ -4776,15 +4929,6 @@
       const crit = alerts.filter(a => a.sev === 'critical').length;
       const warn = alerts.filter(a => a.sev === 'warning').length;
       const info = alerts.filter(a => a.sev === 'info').length;
-
-      // Update sidebar badge
-      const sbBadge = document.querySelector('.sidebar-item[onclick*="alerts"] .badge');
-      if (sbBadge) sbBadge.textContent = crit + warn;
-      // Update header indicator
-      const hdr = document.getElementById('hdr-alerts');
-      if (hdr) hdr.textContent = `${crit + warn} ALERTS`;
-      const hdrDot = document.getElementById('hdr-alert-dot');
-      if (hdrDot) hdrDot.style.background = crit > 0 ? 'var(--red)' : (warn > 0 ? 'var(--yellow)' : 'var(--green)');
 
       kpis.innerHTML = [
         { label: 'Critical', val: crit, bg: 'var(--red-bg)', color: 'var(--red)', border: 'rgba(239,68,68,.3)' },
@@ -5760,14 +5904,31 @@
       }
     }
 
+    // La navegación del panel también funciona con teclado y lector de pantalla.
+    document.querySelectorAll('.sidebar-item[onclick]').forEach(item => {
+      item.setAttribute('role', 'button');
+      item.tabIndex = 0;
+      if (item.classList.contains('active')) item.setAttribute('aria-current', 'page');
+      item.addEventListener('keydown', e => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.click(); }
+      });
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && document.getElementById('sidebar').classList.contains('open')) togSide();
+    });
+
     // ── SWITCH VIEW ──
     function swView(v) {
       const target = document.getElementById(`v-${v}`);
       if (!target) { console.warn('Vista inexistente:', v); return; }
       document.querySelectorAll('.view').forEach(e => e.classList.remove('active'));
       target.classList.add('active');
-      document.querySelectorAll('.sidebar-item').forEach(e => e.classList.remove('active'));
-      event?.target?.classList?.add('active');
+      document.querySelectorAll('.sidebar-item').forEach(e => {
+        const active = e.getAttribute('onclick') === `swView('${v}')`;
+        e.classList.toggle('active', active);
+        if (active) e.setAttribute('aria-current', 'page');
+        else e.removeAttribute('aria-current');
+      });
       if (document.getElementById('sidebar').classList.contains('open') && window.innerWidth < 900) togSide();
       if (v === 'backups') { loadBk(); buildSchedForms(); loadJobs(); }
       if (v === 'devices') loadInventory();

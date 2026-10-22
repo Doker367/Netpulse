@@ -1,6 +1,8 @@
 """NetPulse — FastAPI Application."""
 
 from contextlib import asynccontextmanager
+import os
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse
@@ -159,14 +161,36 @@ app.include_router(sftp.router)
 app.include_router(firewall.router)
 
 # ── Static files (Dashboard UI) ──────────────────────────────
+# El dashboard HTML anterior es la portada. React permanece disponible en
+# /modern y puede activarse en / con NETPULSE_FRONTEND=react.
+_STATIC = Path(__file__).resolve().parent / "static"
+_LEGACY_DASHBOARD = _STATIC / "dashboard.html"
+_REACT_DASHBOARD = _STATIC / "react" / "index.html"
+
 
 @app.get("/", response_class=FileResponse)
 async def dashboard():
-    return FileResponse("app/static/dashboard.html")
+    if os.getenv("NETPULSE_FRONTEND", "legacy").lower() == "react" and _REACT_DASHBOARD.is_file():
+        return FileResponse(_REACT_DASHBOARD)
+    return FileResponse(_LEGACY_DASHBOARD)
+
+
+@app.get("/legacy", response_class=FileResponse)
+async def legacy_dashboard():
+    return FileResponse(_LEGACY_DASHBOARD)
+
+
+@app.get("/modern", response_class=FileResponse)
+async def modern_dashboard():
+    """Acceso estable a React incluso cuando / apunta al panel anterior."""
+    if not _REACT_DASHBOARD.is_file():
+        return FileResponse(_LEGACY_DASHBOARD)
+    return FileResponse(_REACT_DASHBOARD)
+
 
 @app.get("/favicon.svg", response_class=FileResponse)
 async def favicon():
-    return FileResponse("app/static/favicon.svg")
+    return FileResponse(_STATIC / "favicon.svg")
 
 # Mount static files directory AFTER route handlers
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
