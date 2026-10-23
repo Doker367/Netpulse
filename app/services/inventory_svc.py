@@ -98,6 +98,9 @@ def _read() -> dict:
         _last_read_error = str(e)
         logging.getLogger(__name__).error("devices.yaml inválido (%s); usando caché o vacío", e)
         return _cache_data or DEFAULT_CONFIG
+    if not isinstance(data, dict):
+        _last_read_error = "devices.yaml no contiene un objeto"
+        return _cache_data or DEFAULT_CONFIG
     _last_read_error = None
 
     # Auto-fix ROS ports for existing devices added wrongly via SSH

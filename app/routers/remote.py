@@ -63,7 +63,10 @@ def collector_auth(request: Request) -> dict[str, Any]:
         )
     site_id = info.get("site_id")
     collector_id = info.get("collector_id")
-    if not site_id or not collector_id:
+    if (
+        not isinstance(site_id, str) or not isinstance(collector_id, str)
+        or not site_id or not collector_id
+    ):
         raise HTTPException(
             status_code=403,
             detail="La clave no corresponde a este colector",

@@ -176,6 +176,23 @@ def test_out_of_order_does_not_rollback_state():
     assert state.json()["devices"][0]["freshness"]["last_sample_ts"] == newer
 
 
+def test_split_batch_completes_state_same_ts():
+    """Un lote de 200 filas puede cortar las métricas de un mismo ciclo."""
+    key = collector_key()
+    ts = "2026-10-23T10:00:00.000000+00:00"
+    assert post(key, payload([reachable(ts=ts, kind="icmp")])).status_code == 200
+    loss = {
+        "device_id": "sw-1", "ts": ts, "metric": "packet_loss_pct",
+        "value_bool": None, "value_num": 0.0, "ok": True,
+        "probe_kind": "icmp", "error": None,
+    }
+    assert post(key, payload([loss])).status_code == 200
+    devices = CLIENT.get(f"/api/remote/sites/{SITE}/devices", headers=auth(jwt("viewer")))
+    row = devices.json()["devices"][0]
+    assert row["packet_loss_pct"] == 0.0
+    assert row["freshness"]["last_sample_ts"] == ts
+
+
 def test_clock_skew_and_time_quality():
     key = collector_key()
     old = (utcnow() - timedelta(minutes=10)).isoformat(timespec="microseconds")

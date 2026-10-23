@@ -9,6 +9,7 @@ La key completa se devuelve una única vez en ``create_api_key()``.
 import hashlib
 import hmac
 import json
+import re
 import secrets
 import threading
 import uuid
@@ -22,6 +23,7 @@ _write_lock = threading.Lock()
 
 VALID_ROLES = ("admin", "operator", "viewer")
 VALID_KINDS = ("user", "collector")
+_SITE_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 
 
 def _read() -> list[dict]:
@@ -78,10 +80,12 @@ def create_api_key(
     if kind not in VALID_KINDS:
         raise ValueError(f"Kind inválido: {kind}. Válidos: {', '.join(VALID_KINDS)}")
     if kind == "collector":
-        site_id = (site_id or "").strip()
-        collector_id = (collector_id or "").strip()
-        if not site_id or not collector_id:
-            raise ValueError("Una clave de colector exige site_id y collector_id")
+        if not isinstance(site_id, str) or not isinstance(collector_id, str):
+            raise ValueError("site_id y collector_id deben ser texto")
+        site_id = site_id.strip()
+        collector_id = collector_id.strip()
+        if not _SITE_RE.match(site_id) or not _SITE_RE.match(collector_id):
+            raise ValueError("site_id/collector_id inválidos (minúsculas, números, . _ -, máx. 64)")
         role = None
     else:
         if role not in VALID_ROLES:

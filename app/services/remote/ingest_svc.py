@@ -55,6 +55,17 @@ def _validate_samples(raw_samples: list[dict[str, Any]]) -> tuple[list[RemoteSam
     return valid, rejected
 
 
+def _load_group(
+    conn: sqlite3.Connection, site_id: str, device_id: str, ts: str
+) -> dict[str, sqlite3.Row]:
+    rows = conn.execute(
+        "SELECT metric, value_num, value_bool, ok, probe_kind, error "
+        "FROM remote_sample WHERE site_id=? AND device_id=? AND ts=?",
+        (site_id, device_id, ts),
+    ).fetchall()
+    return {row["metric"]: row for row in rows}
+
+
 def _inventory_map() -> tuple[dict[str, Any] | None, str | None]:
     available, error = inventory_svc.inventory_health()
     if not available:
@@ -79,7 +90,7 @@ def ingest(
     # Normaliza y deduplica dentro del lote para construir el estado; la
     # inserción conserva la clave única del servidor.
     rows: list[tuple[Any, ...]] = []
-    groups: dict[tuple[str, str], dict[str, RemoteSampleIn]] = {}
+    keys: set[tuple[str, str]] = set()
     for sample in valid:
         ts = sample.ts.astimezone(timezone.utc).isoformat(timespec="microseconds")
         rows.append((
@@ -89,7 +100,7 @@ def ingest(
             None if sample.value_bool is None else int(sample.value_bool),
             1 if sample.ok else 0, sample.probe_kind, sample.error,
         ))
-        groups.setdefault((sample.device_id, ts), {}).setdefault(sample.metric, sample)
+        keys.add((sample.device_id, ts))
 
     inventory, inventory_error = _inventory_map()
     accepted = 0
@@ -123,7 +134,8 @@ def ingest(
             else:
                 duplicates += 1
 
-        for (device_id, ts), metrics in sorted(groups.items(), key=lambda item: item[0][1]):
+        for device_id, ts in sorted(keys, key=lambda item: item[1]):
+            metrics = _load_group(conn, site_id, device_id, ts)
             reachable = metrics.get("reachable")
             if reachable is None:
                 continue
@@ -134,10 +146,15 @@ def ingest(
             if prev_state is not None and ts < prev_state["last_ts"]:
                 out_of_order += 1
                 continue
-            if prev_state is not None and ts == prev_state["last_ts"]:
-                continue
+            # ts == last_ts también se actualiza: un lote pudo cortar las
+            # métricas del mismo ciclo (reachable/latency/loss) y la segunda
+            # mitad debe completar el estado, no quedar ignorada.
             latency = metrics.get("latency_ms")
             loss = metrics.get("packet_loss_pct")
+            reachable_bool = (
+                None if reachable["value_bool"] is None
+                else bool(reachable["value_bool"])
+            )
             inv_match: int | None
             if inventory is None:
                 inv_match = None
@@ -159,12 +176,16 @@ def ingest(
                 "inventory_error=excluded.inventory_error",
                 (
                     site_id, device_id, collector_id, ts, received_iso,
-                    None if reachable.value_bool is None else int(reachable.value_bool),
-                    latency.value_num if (latency is not None and reachable.value_bool) else None,
-                    loss.value_num if loss is not None else None,
-                    reachable.probe_kind,
-                    1 if reachable.ok else 0,
-                    reachable.error,
+                    None if reachable_bool is None else int(reachable_bool),
+                    (
+                        latency["value_num"]
+                        if latency is not None and reachable_bool
+                        else None
+                    ),
+                    loss["value_num"] if loss is not None else None,
+                    reachable["probe_kind"],
+                    int(reachable["ok"]),
+                    reachable["error"],
                     inv_match,
                     inventory_error if inv_match is None else None,
                 ),
