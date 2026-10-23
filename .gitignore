@@ -31,6 +31,7 @@ audit/
 .env
 .env.*
 !.env.example
+.env-piloto
 
 # Docker volumes (persistent data)
 docker/volumes/
