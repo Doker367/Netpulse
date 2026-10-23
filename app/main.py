@@ -157,6 +157,7 @@ app.include_router(ai.router)
 app.include_router(terminal.router)
 app.include_router(sftp.router)
 app.include_router(firewall.router)
+app.include_router(__import__("app.routers.reports", fromlist=["router"]).router)
 
 # ── Static files (Dashboard UI) ──────────────────────────────
 # El panel HTML es la única interfaz; /legacy sigue disponible para enlaces previos.
