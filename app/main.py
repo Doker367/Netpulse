@@ -17,7 +17,7 @@ from app.middleware.audit import AuditMiddleware
 from app.middleware.metrics import MetricsMiddleware
 from app.middleware.security import SecurityHeadersMiddleware
 from app.models.schemas import HealthResponse
-from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy, alerts, topology, traceroute, traffic, ops, security_ext, integrations, collectors, system, monitoring, ai, terminal, firewall, sftp
+from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy, alerts, alerts_admin, topology, traceroute, traffic, ops, security_ext, integrations, collectors, system, monitoring, ai, terminal, firewall, sftp
 from app.routers import discovery, reports
 from app.services.inventory_svc import list_devices
 
@@ -145,6 +145,7 @@ app.include_router(notifications.router)
 app.include_router(admin_users.router)
 app.include_router(prometheus_proxy.router)
 app.include_router(alerts.router)
+app.include_router(alerts_admin.router)
 app.include_router(topology.router)
 app.include_router(traceroute.router)
 app.include_router(traffic.router)
