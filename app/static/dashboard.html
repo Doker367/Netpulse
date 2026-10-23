@@ -2826,11 +2826,69 @@
       <div class="view" id="v-alerts" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
           <h2 style="font-size:18px;font-weight:600" data-i18n="view_alerts">🚨 Active Alerts</h2>
-          <button class="btn btn-o btn-sm" onclick="loadAlerts()" style="padding:7px 14px;font-size:11px"
-            data-i18n="btn_refresh">🔄 Refresh</button>
+          <button class="btn btn-o btn-sm" onclick="loadAlerts();loadAlertSilences();loadAlertRules()"
+            style="padding:7px 14px;font-size:11px" data-i18n="btn_refresh">🔄 Refresh</button>
         </div>
         <div id="alert-kpis" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap"></div>
         <div id="alert-list" style="display:flex;flex-direction:column;gap:10px"></div>
+
+        <!-- ── Admin de alertas: silencios (Alertmanager) + reglas (Prometheus) ── -->
+        <div id="alerts-admin"
+          style="margin-top:28px;border-top:1px solid var(--border-s);padding-top:22px;display:flex;flex-direction:column;gap:26px">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
+              <h3 style="font-size:14px;font-weight:600" data-i18n="al_sil_title">Silencios activos (Alertmanager)</h3>
+              <button class="btn btn-o btn-sm" onclick="togSilForm()" data-i18n="al_sil_new">Silenciar…</button>
+            </div>
+            <div id="sil-form" style="display:none;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:12px">
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+                <div class="fg" style="margin-bottom:0;min-width:170px">
+                  <label data-i18n="al_sil_device">device_id (opcional)</label>
+                  <input id="sil-dev" type="text" placeholder="cisco-core-01"
+                    style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:11px;width:100%;box-sizing:border-box">
+                </div>
+                <div class="fg" style="margin-bottom:0;min-width:170px">
+                  <label data-i18n="al_sil_group">group (opcional)</label>
+                  <input id="sil-group" type="text" placeholder="Core"
+                    style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:11px;width:100%;box-sizing:border-box">
+                </div>
+              </div>
+              <div style="margin-top:10px">
+                <label style="font-size:10px;color:var(--text-ter);text-transform:uppercase;letter-spacing:.5px;font-weight:500" data-i18n="al_sil_matchers">Matchers libres (opcional)</label>
+                <div id="sil-mrows" style="display:flex;flex-direction:column;gap:6px;margin-top:6px"></div>
+                <button type="button" class="btn btn-o btn-sm" onclick="silAddMatcher()" style="margin-top:6px;padding:4px 10px;font-size:10px" data-i18n="al_sil_matcher_add">+ matcher</button>
+              </div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-top:10px">
+                <div class="fg" style="margin-bottom:0">
+                  <label data-i18n="al_sil_duration">Duración</label>
+                  <select id="sil-dur"
+                    style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:11px">
+                    <option value="2h">2h</option>
+                    <option value="8h">8h</option>
+                    <option value="24h">24h</option>
+                    <option value="7d">7d</option>
+                  </select>
+                </div>
+                <div class="fg" style="margin-bottom:0;flex:1;min-width:200px">
+                  <label data-i18n="al_sil_comment">Comentario</label>
+                  <input id="sil-comment" type="text" placeholder="mantenimiento"
+                    style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm);font-size:11px;width:100%;box-sizing:border-box">
+                </div>
+                <div style="display:flex;gap:8px">
+                  <button type="button" class="btn btn-p btn-sm" onclick="alSubmitSilence()" data-i18n="al_sil_create">Crear silencio</button>
+                  <button type="button" class="btn btn-o btn-sm" onclick="togSilForm(false)" data-i18n="al_sil_cancel">Cancelar</button>
+                </div>
+              </div>
+              <div id="sil-form-msg" style="display:none;margin-top:10px;font-size:11px;border-radius:var(--radius-sm);padding:8px 10px"></div>
+            </div>
+            <div id="sil-list"></div>
+          </div>
+          <div>
+            <h3 style="font-size:14px;font-weight:600;margin-bottom:4px" data-i18n="al_rules_title">Reglas activas (Prometheus)</h3>
+            <div style="font-size:10px;color:var(--text-ter)" data-i18n="al_rules_hint">Solo lectura — la escritura de reglas no está disponible</div>
+            <div id="rules-list" style="margin-top:10px"></div>
+          </div>
+        </div>
       </div>
       <div class="view" id="v-logs" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
         <div
@@ -3452,6 +3510,35 @@
     // Dynamic extensions for deeply rendered DOM elements
     Object.assign(I18N.en, { stat_devices: 'DEVICES', stat_online: 'ONLINE', stat_offline: 'OFFLINE', stat_avail: 'AVAILABILITY', stat_alerts: 'ACTIVE ALERTS', stat_sys: 'NETWORK STATUS', state_ok: 'OPERATIONAL', state_down: 'OFFLINE', state_degraded: 'DEGRADED', state_unknown: 'UNVERIFIED', state_empty: 'NO DATA', tab_ov: 'Overview', tab_if: 'Interfaces', tab_cfg: 'Config (RAM)', tab_cmd: 'Commands', btn_cmd: '💻 Command', btn_ping: '📡 Ping', btn_facts: '📋 Facts', bulk_none: 'No selection', qa_bk: '💾 Backup', qa_sv: '💿 Save RAM', qa_ping: '📡 Ping Test', qa_exp: '⬇ Export', qa_cmp: '⇄ Compare', m_loading: 'Loading metrics...' });
     Object.assign(I18N.es, { stat_devices: 'DISPOSITIVOS', stat_online: 'EN LÍNEA', stat_offline: 'FUERA DE LÍNEA', stat_avail: 'DISPONIBILIDAD', stat_alerts: 'ALERTAS ACTIVAS', stat_sys: 'ESTADO DE LA RED', state_ok: 'OPERATIVA', state_down: 'CAÍDA', state_degraded: 'DEGRADADA', state_unknown: 'SIN VERIFICAR', state_empty: 'SIN DATOS', tab_ov: 'General', tab_if: 'Interfaces', tab_cfg: 'Configuración (RAM)', tab_cmd: 'Comandos', btn_cmd: '💻 Comando', btn_ping: '📡 Ping', btn_facts: '📋 Informes', bulk_none: 'Sin selección', qa_bk: '💾 Backup', qa_sv: '💿 Guardar RAM', qa_ping: '📡 Ping Test', qa_exp: '⬇ Exportar', qa_cmp: '⇄ Comparar', m_loading: 'Cargando métricas...' });
+    // Admin de alertas: silencios (Alertmanager) + reglas (Prometheus) — contrato docs/handoffs/alerts_ui.md
+    Object.assign(I18N.en, {
+      al_sil_title: 'Active silences (Alertmanager)', al_sil_new: 'Silence…',
+      al_sil_device: 'device_id (optional)', al_sil_group: 'group (optional)', al_sil_matchers: 'Free-form matchers (optional)',
+      al_sil_matcher_add: '+ matcher', al_sil_matcher_name_ph: 'name', al_sil_matcher_value_ph: 'value', al_sil_regex: 'regex',
+      al_sil_duration: 'Duration', al_sil_comment: 'Comment', al_sil_create: 'Create silence', al_sil_cancel: 'Cancel',
+      al_sil_none: 'No active silences', al_sil_unavail: 'Alertmanager unavailable — not verifiable',
+      al_sil_create_unavail: 'Alertmanager unavailable — silence not created', al_sil_created: 'Silence created', al_sil_deleted: 'Silence cancelled',
+      al_sil_delete_confirm: 'Cancel this silence?', al_sil_yes: 'Yes', al_sil_no: 'No', al_sil_404: 'The silence no longer exists (it may have expired)',
+      al_sil_err_generic: 'Could not complete the operation', al_sil_invalid_scope: 'Indicate what to silence (device, group or matchers)',
+      al_th_scope: 'Scope', al_th_owner: 'Created by', al_th_expires: 'Expires', al_th_comment: 'Comment',
+      al_rules_title: 'Active rules (Prometheus)', al_rules_hint: 'Read-only — writing rules is not available in this release',
+      al_rules_none: 'No rules loaded', al_rules_unavail: 'Prometheus unavailable — rules not verifiable',
+      al_th_name: 'Rule', al_th_expr: 'Expression', al_th_for: 'for', al_th_sev: 'Severity', al_th_labels: 'Labels', al_expand: 'expand'
+    });
+    Object.assign(I18N.es, {
+      al_sil_title: 'Silencios activos (Alertmanager)', al_sil_new: 'Silenciar…',
+      al_sil_device: 'device_id (opcional)', al_sil_group: 'group (opcional)', al_sil_matchers: 'Matchers libres (opcional)',
+      al_sil_matcher_add: '+ matcher', al_sil_matcher_name_ph: 'nombre', al_sil_matcher_value_ph: 'valor', al_sil_regex: 'regex',
+      al_sil_duration: 'Duración', al_sil_comment: 'Comentario', al_sil_create: 'Crear silencio', al_sil_cancel: 'Cancelar',
+      al_sil_none: 'Sin silencios activos', al_sil_unavail: 'Alertmanager no disponible — no verificable',
+      al_sil_create_unavail: 'Alertmanager no disponible — no se pudo crear', al_sil_created: 'Silencio creado', al_sil_deleted: 'Silencio cancelado',
+      al_sil_delete_confirm: '¿Cancelar este silencio?', al_sil_yes: 'Sí', al_sil_no: 'No', al_sil_404: 'El silencio ya no existe (quizá venció)',
+      al_sil_err_generic: 'No se pudo completar la operación', al_sil_invalid_scope: 'Indica qué silenciar (dispositivo, grupo o matchers)',
+      al_th_scope: 'Alcance', al_th_owner: 'Creado por', al_th_expires: 'Vence', al_th_comment: 'Comentario',
+      al_rules_title: 'Reglas activas (Prometheus)', al_rules_hint: 'Solo lectura — la escritura de reglas no está disponible en esta versión',
+      al_rules_none: 'Sin reglas cargadas', al_rules_unavail: 'Prometheus no disponible — reglas no verificables',
+      al_th_name: 'Regla', al_th_expr: 'Expresión', al_th_for: 'for', al_th_sev: 'Severidad', al_th_labels: 'Etiquetas', al_expand: 'expandir'
+    });
 
     Object.assign(I18N.en, {
       topo_tab_graph: '🕸️ Graph', topo_tab_map: '🌍 Map', topo_tab_table: '📋 Table',
@@ -5019,6 +5106,230 @@
       }).join('');
     }
 
+    // ── ADMIN DE ALERTAS: silencios (Alertmanager) + reglas (Prometheus) ──
+    // Contrato: docs/handoffs/alerts_ui.md — prefijo /api/alerts/admin (nunca otro path).
+    // Principio PRODUCT.md #4: ante error de red/servicio se muestra estado explícito gris,
+    // nunca verde ni listas vacías que parezcan éxito.
+    let alSilData = null, alSilConfirmId = null, alRulesData = null;
+    const alRulesOpen = new Set();
+
+    function alDur(s) {
+      s = Math.max(0, Math.round(Number(s) || 0));
+      const m = Math.floor(s / 60), h = Math.floor(m / 60), d = Math.floor(h / 24);
+      if (m < 60) return `${m}m`;
+      if (h < 24) return (h ? `${h}h ` : '') + `${m % 60}m`;
+      return `${d}d ${h % 24}h`;
+    }
+
+    function alUnavail(key, detail) {
+      // Banner gris "no verificable" (PRODUCT.md #4): nunca verde, nunca vacío aparentando éxito.
+      return `<div style="background:var(--panel);border:1px dashed var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-size:12px;color:var(--text-ter)">
+        ${esc(__t(key))}${detail ? ` — <span title="${escAttr(detail)}" style="color:var(--text-muted)">${esc(detail)}</span>` : ''}</div>`;
+    }
+
+    async function loadAlertSilences() {
+      const box = document.getElementById('sil-list');
+      if (!box) return;
+      alSilConfirmId = null;
+      box.innerHTML = '<div class="sp" style="margin:14px auto"></div>';
+      let data = null, detail = '';
+      try {
+        const r = await fetch(`${A}/alerts/admin/silences`, { headers: h() });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j && j.status === 'success') data = j;
+        else detail = (j && j.detail) || `HTTP ${r.status}`;
+      } catch (e) { detail = e.message || 'network error'; }
+      if (!data) { box.innerHTML = alUnavail('al_sil_unavail', detail); return; }
+      alSilData = data;
+      alRenderSilences();
+    }
+
+    function alSilChips(matchers) {
+      return (matchers || []).map(m =>
+        `<span title="${escAttr(m.value)}${m.isRegex ? ' (regex)' : ''}" style="background:var(--surface);border:1px solid var(--border-s);border-radius:999px;padding:2px 8px;font-size:9px;color:var(--text-secondary);white-space:nowrap">${esc(`${m.name}=${m.value}`)}${m.isRegex ? '<span style="color:var(--text-ter)">~</span>' : ''}</span>`
+      ).join(' ');
+    }
+
+    function alRenderSilences() {
+      const box = document.getElementById('sil-list');
+      if (!box) return;
+      const list = (alSilData && alSilData.silences) || [];
+      if (!list.length) {
+        box.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-size:12px;color:var(--text-ter)">${esc(__t('al_sil_none'))}</div>`;
+        return;
+      }
+      const head = ['al_th_scope', 'al_th_owner', 'al_th_expires', 'al_th_comment']
+        .map(k => `<span style="font-size:9px;color:var(--text-ter);text-transform:uppercase;letter-spacing:.5px;font-weight:600">${esc(__t(k))}</span>`).join('');
+      box.innerHTML = `<div style="display:flex;gap:12px;padding:0 4px 6px">${head}<span></span></div>` + list.map(s => {
+        const ends = s.endsAt ? new Date(s.endsAt).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : '—';
+        const confirmRow = alSilConfirmId === s.id
+          ? `<div id="sil-confirm" style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--text-secondary);background:var(--bg);border:1px solid var(--border-s);border-radius:var(--radius-sm);padding:8px 10px">
+              <span>${esc(__t('al_sil_delete_confirm'))}</span>
+              <button type="button" class="btn btn-p btn-sm" onclick="alSilCancel('${escAttr(s.id)}',true)" style="padding:4px 10px;font-size:10px">${esc(__t('al_sil_yes'))}</button>
+              <button type="button" class="btn btn-o btn-sm" onclick="alSilCancel(false)" style="padding:4px 10px;font-size:10px">${esc(__t('al_sil_no'))}</button>
+            </div>`
+          : '';
+        return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="flex:2 1 260px;min-width:0;display:flex;gap:6px;flex-wrap:nowrap;overflow:hidden">${alSilChips(s.matchers) || '<span style="font-size:11px;color:var(--text-ter)">—</span>'}</div>
+            <div style="flex:1 1 110px;font-size:11px;color:var(--text-secondary)">${esc(s.createdBy || '—')}</div>
+            <div style="flex:1 1 140px;font-size:11px;color:var(--text-secondary)">${esc(ends)} ${s.expires_in > 0 ? `<span style="color:var(--text-ter)">· ${esc(alDur(s.expires_in))}</span>` : ''}</div>
+            <div style="flex:2 1 180px;font-size:11px;color:var(--text-ter);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escAttr(s.comment || '')}">${esc(s.comment || '—')}</div>
+            <button type="button" onclick="alSilCancel('${escAttr(s.id)}')" aria-label="${escAttr(__t('al_sil_delete_confirm'))}" title="${escAttr(__t('al_sil_delete_confirm'))}"
+              style="background:none;border:1px solid var(--border-s);border-radius:6px;color:var(--text-ter);cursor:pointer;padding:3px 8px;font-size:10px;line-height:1">✕</button>
+          </div>${confirmRow}</div>`;
+      }).join('');
+    }
+
+    function togSilForm(force) {
+      const f = document.getElementById('sil-form');
+      if (!f) return;
+      const open = force === undefined ? f.style.display === 'none' : !!force;
+      f.style.display = open ? 'block' : 'none';
+      if (open) {
+        const mrows = document.getElementById('sil-mrows');
+        if (mrows && !mrows.children.length) silAddMatcher();
+        alSilFormMsg('', '');
+      }
+    }
+
+    function silAddMatcher() {
+      const box = document.getElementById('sil-mrows');
+      if (!box) return;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;gap:6px;align-items:center';
+      row.innerHTML = `<input class="sil-m-name" type="text" placeholder="${escAttr(__t('al_sil_matcher_name_ph'))}" style="flex:0 0 130px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:11px;box-sizing:border-box">
+        <input class="sil-m-value" type="text" placeholder="${escAttr(__t('al_sil_matcher_value_ph'))}" style="flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:var(--radius-sm);font-size:11px;box-sizing:border-box">
+        <label style="font-size:10px;color:var(--text-ter);display:flex;gap:4px;align-items:center;white-space:nowrap"><input class="sil-m-re" type="checkbox">${esc(__t('al_sil_regex'))}</label>
+        <button type="button" onclick="this.parentElement.remove()" aria-label="✕" style="background:none;border:1px solid var(--border-s);border-radius:6px;color:var(--text-ter);cursor:pointer;padding:3px 8px;font-size:10px;line-height:1">✕</button>`;
+      box.appendChild(row);
+    }
+
+    function alSilFormMsg(text, kind) {
+      const box = document.getElementById('sil-form-msg');
+      if (!box) return;
+      box.style.display = text ? 'block' : 'none';
+      box.textContent = text;
+      // gris para "no verificable" (503), naranja para error corregible (422)
+      box.style.border = text ? `1px solid ${kind === 'warn' ? 'var(--orange)' : 'var(--border)'}` : 'none';
+      box.style.color = kind === 'warn' ? 'var(--orange)' : 'var(--text-ter)';
+      box.style.background = kind === 'warn' ? 'var(--yellow-bg)' : 'var(--panel)';
+    }
+
+    async function alSubmitSilence() {
+      const payload = {};
+      const dev = (document.getElementById('sil-dev')?.value || '').trim();
+      const grp = (document.getElementById('sil-group')?.value || '').trim();
+      const dur = document.getElementById('sil-dur')?.value;
+      const comment = (document.getElementById('sil-comment')?.value || '').trim();
+      const matchers = [...document.querySelectorAll('#sil-mrows > div')]
+        .map(r => ({ name: r.querySelector('.sil-m-name')?.value.trim(), value: r.querySelector('.sil-m-value')?.value.trim(), isRegex: !!r.querySelector('.sil-m-re')?.checked }))
+        .filter(m => m.name && m.value);
+      if (dev) payload.device_id = dev;
+      if (grp) payload.group = grp;
+      if (matchers.length) payload.matchers = matchers;
+      if (!payload.device_id && !payload.group && !payload.matchers.length) { silAddMatcher(); alSilFormMsg(__t('al_sil_invalid_scope'), 'warn'); return; }
+      payload.duration = dur;
+      if (comment) payload.comment = comment;
+
+      let j = {};
+      try {
+        const r = await fetch(`${A}/alerts/admin/silences`, { method: 'POST', headers: h(), body: JSON.stringify(payload) });
+        j = await r.json().catch(() => ({}));
+        if (r.ok && j && j.status === 'created') {
+          togSilForm(false);
+          toast(`${__t('al_sil_created')}: ${j.id}`, 's', 4500);
+          loadAlertSilences();
+          return;
+        }
+        const unable = r.status === 503;
+        alSilFormMsg((unable ? __t('al_sil_create_unavail') : (j.detail || `${__t('al_sil_err_generic')} (HTTP ${r.status})`)) + (unable && j.detail ? ` — ${j.detail}` : ''), unable ? '' : 'warn');
+        if (r.status === 401 || r.status === 403) toast(j.detail || __t('al_sil_err_generic'), 'e');
+      } catch (e) { alSilFormMsg(`${__t('al_sil_err_generic')} — ${e.message || 'network error'}`, ''); }
+    }
+
+    async function alSilCancel(id, yes) {
+      if (!id) { alSilConfirmId = null; alRenderSilences(); return; }
+      if (!yes) { alSilConfirmId = id; alRenderSilences(); return; }
+      try {
+        const r = await fetch(`${A}/alerts/admin/silences/${encodeURIComponent(id)}`, { method: 'DELETE', headers: h() });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j && j.status === 'deleted') {
+          toast(`${__t('al_sil_deleted')}: ${j.id}`, 's', 4000);
+          alSilConfirmId = null;
+          loadAlertSilences();
+        } else if (r.status === 404) {
+          toast(__t('al_sil_404'), 'e', 4500);
+          loadAlertSilences();
+        } else {
+          toast(j.detail || `${__t('al_sil_err_generic')} (HTTP ${r.status})`, 'e', 4500);
+          alSilConfirmId = null;
+          alRenderSilences();
+        }
+      } catch (e) { toast(`${__t('al_sil_err_generic')} — ${e.message || 'network error'}`, 'e', 4500); }
+    }
+
+    async function loadAlertRules() {
+      const box = document.getElementById('rules-list');
+      if (!box) return;
+      alRulesOpen.clear();
+      box.innerHTML = '<div class="sp" style="margin:14px auto"></div>';
+      let data = null, detail = '';
+      try {
+        const r = await fetch(`${A}/alerts/admin/rules`, { headers: h() });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j && j.status === 'success') data = j;
+        else detail = (j && j.detail) || `HTTP ${r.status}`;
+      } catch (e) { detail = e.message || 'network error'; }
+      if (!data) { box.innerHTML = alUnavail('al_rules_unavail', detail); return; }
+      alRulesData = data;
+      alRenderRules();
+    }
+
+    function alRenderRules() {
+      const box = document.getElementById('rules-list');
+      if (!box || !alRulesData) return;
+      const rules = alRulesData.rules || [];
+      if (!rules.length) {
+        box.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;font-size:12px;color:var(--text-ter)">${esc(__t('al_rules_none'))}</div>`;
+        return;
+      }
+      const sevMap = { critical: { bg: 'var(--red-bg)', color: 'var(--red)', label: 'CRITICAL' }, warning: { bg: 'var(--yellow-bg)', color: 'var(--yellow)', label: 'WARNING' }, info: { bg: 'var(--blue-bg)', color: 'var(--accent)', label: 'INFO' } };
+      const labelsOf = r => {
+        const entries = Object.entries(r.labels || {}).filter(([k]) => k !== 'severity');
+        if (!entries.length) return `<span style="color:var(--text-ter)">—</span>`;
+        const shown = entries.slice(0, 3);
+        return shown.map(([k, v]) => `<span style="background:var(--surface);border:1px solid var(--border-s);border-radius:999px;padding:2px 7px;font-size:9px;color:var(--text-ter);white-space:nowrap">${esc(`${k}=${v}`)}</span>`).join(' ')
+          + (entries.length > 3 ? `<span style="font-size:9px;color:var(--text-ter)">+${entries.length - 3}</span>` : '');
+      };
+      const forOf = r => { const s = Number(r.for) || 0; return s < 60 ? `${s}s` : alDur(s); };
+      const head = ['al_th_name', 'al_th_expr', 'al_th_for', 'al_th_sev', 'al_th_labels']
+        .map(k => `<span style="font-size:9px;color:var(--text-ter);text-transform:uppercase;letter-spacing:.5px;font-weight:600">${esc(__t(k))}</span>`).join('');
+      box.innerHTML = `<div style="display:flex;gap:12px;padding:0 4px 6px">${head}</div>` + rules.map((r, i) => {
+        const sev = sevMap[r.severity], open = alRulesOpen.has(i);
+        const sevBadge = sev
+          ? `<span class="badge" style="background:${sev.color};color:#fff;font-size:8px;padding:2px 6px">${sev.label}</span>`
+          : `<span style="font-size:9px;color:var(--text-ter)">—</span>`;
+        const expr = String(r.expr || '').trim();
+        const expanded = open || expr.length <= 120;
+        return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="flex:1 1 130px;font-size:12px;font-weight:600;color:var(--text)">${esc(r.name || '—')}${r.group ? `<span title="${escAttr(r.group)}" style="font-size:9px;color:var(--text-ter);font-weight:400"> · ${esc(r.group)}</span>` : ''}</div>
+            <div style="flex:3 1 260px;min-width:0">${expanded
+              ? `<pre style="margin:0;font-family:var(--fm);font-size:10px;color:var(--text-secondary);white-space:pre-wrap;word-break:break-word;cursor:${expr.length > 120 ? 'pointer' : 'default'}" onclick="alToggleExpr(${i})" title="${escAttr(__t('al_expand'))}">${esc(expr)}</pre>`
+              : `<code style="font-family:var(--fm);font-size:10px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;cursor:pointer" onclick="alToggleExpr(${i})" title="${escAttr(__t('al_expand'))}">${esc(expr)}</code>`}</div>
+            <div style="flex:0 0 auto;font-size:10px;color:var(--text-ter)">${forOf(r)}</div>
+            <div style="flex:0 0 auto;min-width:64px">${sevBadge}</div>
+            <div style="flex:2 1 160px;display:flex;flex-wrap:nowrap;gap:5px;overflow:hidden">${labelsOf(r)}</div>
+          </div></div>`;
+      }).join('');
+    }
+
+    function alToggleExpr(i) {
+      if (!alRulesOpen.has(i)) alRulesOpen.add(i); else alRulesOpen.delete(i);
+      alRenderRules();
+    }
+
     // ── LOGS VIEW (Real Audit Data) ──
     // ── LOG SOURCE SWITCH (Auditoría / Loki) ────────────────
     function switchLogSource() {
@@ -6160,7 +6471,7 @@
       }
       if (v === 'connectivity') loadConn();
       if (v === 'performance') loadPerformance();
-      if (v === 'alerts') loadAlerts();
+      if (v === 'alerts') { loadAlerts(); loadAlertSilences(); loadAlertRules(); }
       if (v === 'logs') loadLogs();
       if (v === 'commands') populateCmdDevices();
       if (v === 'theme') updateThemeUI();
