@@ -48,6 +48,8 @@ def _load_users() -> dict[str, dict]:
         users[username] = {
             "username": username,
             "role": u.get("role", "viewer"),
+            "scope_group": u.get("scope_group"),
+            "scope_sites": u.get("scope_sites"),
             "password_hash": pwd_hash,
         }
 
@@ -69,7 +71,7 @@ def _get_users() -> dict[str, dict]:
 def login(request: Request, body: LoginRequest):
     """Inicia sesión con usuario y contraseña.
 
-    Devuelve un token JWT con claims: sub (username), role.
+    Devuelve un JWT con sub, role y, si existen, scope_group/scope_sites.
     Límite: 5 intentos por minuto por IP (anti fuerza bruta).
     """
     users = _get_users()
@@ -84,12 +86,12 @@ def login(request: Request, body: LoginRequest):
         )
 
     # Generar token JWT
-    token = create_access_token(
-        data={
-            "sub": user["username"],
-            "role": user["role"],
-        }
-    )
+    claims = {"sub": user["username"], "role": user["role"]}
+    # Sin asignación, el token conserva exactamente los claims anteriores.
+    for field in ("scope_group", "scope_sites"):
+        if user.get(field) is not None:
+            claims[field] = user[field]
+    token = create_access_token(data=claims)
 
     netpulse_auth_total.labels(status="success").inc()
     return TokenResponse(access_token=token)

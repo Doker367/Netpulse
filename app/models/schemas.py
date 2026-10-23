@@ -638,7 +638,30 @@ class UserInfo(BaseModel):
 # ── Admin User Management ────────────────────────────────────
 
 
-class UserCreate(BaseModel):
+class UserScope(BaseModel):
+    """Alcance de escritura: None/None conserva acceso global legado."""
+    scope_group: Optional[str] = Field(default=None, min_length=1, description="Un grupo de dispositivos autorizado")
+    scope_sites: Optional[list[str]] = Field(default=None, description="Grupos autorizados adicionales (sites)")
+
+    @field_validator("scope_group", mode="before")
+    @classmethod
+    def validate_group(cls, value):
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            raise ValueError("scope_group debe ser un grupo no vacío")
+        return value
+
+    @field_validator("scope_sites", mode="before")
+    @classmethod
+    def validate_sites(cls, value):
+        if value is not None and (
+            not isinstance(value, list)
+            or any(not isinstance(site, str) or not site.strip() for site in value)
+        ):
+            raise ValueError("scope_sites solo acepta una lista de grupos no vacíos")
+        return value
+
+
+class UserCreate(UserScope):
     """Datos para crear un nuevo usuario del sistema."""
     model_config = ConfigDict(
         json_schema_extra={
@@ -677,7 +700,7 @@ class UserCreate(BaseModel):
     )
 
 
-class UserUpdate(BaseModel):
+class UserUpdate(UserScope):
     """Campos actualizables de un usuario (todos opcionales)."""
     model_config = ConfigDict(
         json_schema_extra={
@@ -708,7 +731,7 @@ class UserUpdate(BaseModel):
     )
 
 
-class UserResponse(BaseModel):
+class UserResponse(UserScope):
     """Información de un usuario SIN contraseña."""
     model_config = ConfigDict(
         json_schema_extra={
