@@ -1095,6 +1095,11 @@ Reglas:
 - `sync` son datos reportados por el colector; `null` significa «no reportado»
   (versión antigua o primer lote), no «sin errores». `consecutive_failures=0`
   con `last_error` no nulo significa «hubo un error y ya se resolvió».
+- Aclaración del piloto (informe `collector-piloto.md`): `buffer.pending`,
+  `auth_state` y el resto de los campos de sync/heartbeat son el **último reporte
+  recibido** del colector, no estados observados directamente por la central
+  entre reportes. La frescura real de contacto la define `last_seen_at`/
+  `last_contact_age_s`.
 - Si no hay muestras todavía: `devices` con ceros **comprobados** y
   `last_seen_at` del heartbeat; no es «sin medir» porque el heartbeat sí se
   midió.
