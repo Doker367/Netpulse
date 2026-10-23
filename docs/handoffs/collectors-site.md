@@ -1723,3 +1723,32 @@ un mock que respete este documento.
 | Device no inventariado | `device_id` | `inventory_match=0` | Badge «No inventariado» | No crear inventario |
 | Buffer lleno | descarta lo viejo | `dropped_total`/`gap_since` | «Se descartaron N; hueco desde X» | No inventar continuidad |
 | Buffer recreado | nuevo `buffer_epoch` | epoch distinto | «Buffer reiniciado» | No comparar contadores como si fueran continuos |
+
+---
+
+## 16. Desviaciones de implementación
+
+Se anotan aquí los cambios respecto al diseño, sin reescribir las secciones
+anteriores.
+
+### PR-1 — colector, buffer y sync
+
+- **Capacidad real medida** (test `tests/test_remote_collector_capacity.py`):
+  100 devices × 1 día a 60 s con sonda ICMP = **432 000 filas**, **93.0 MB**
+  tras `wal_checkpoint(TRUNCATE)`, en **11.2 s** (~38 600 filas/s) en el
+  entorno de tests. La estimación de la sección 5.3 (45-65 MB/día) se quedó
+  corta: el valor medido ronda **~90 MB/día** para ese escenario, y
+  `max_rows=500 000` equivaldría a ~108 MB. No cambia la política de poda;
+  solo se corrige la cifra de dimensionamiento.
+- `status.json` incluye `buffer.dead` (filas rechazadas localmente) además de
+  los campos del diseño; es informativo y no viaja en el body de ingesta.
+- `sync.next_attempt_at` se calcula como hora futura tras aplicar el backoff,
+  no como la hora del último intento.
+- `SIGHUP` recarga `devices`/`probe`; cambios de `buffer`, `central`, `site_id`
+  o `collector_id` se registran y **requieren reinicio** (la clave y el cliente
+  HTTP viven en el proceso). El diseño no exigía más para fase 1.
+- El adaptador de `metrics_poller` usa `probe_svc` y conserva el contrato
+  `(latency_ms, loss_pct)`; la sonda ICMP/TCP real se prueba con mocks, sin
+  red.
+- `PyYAML` se declara explícitamente en `requirements-collector.txt`
+  (`6.0.2`); antes solo entraba como dependencia transitiva de napalm.
