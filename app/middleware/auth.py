@@ -51,6 +51,11 @@ class JWTBearer(HTTPBearer):
                     detail="API key inválida o revocada",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
+            if key_info.get("kind", "user") == "collector":
+                raise HTTPException(
+                    status_code=403,
+                    detail="Las claves de colector solo pueden usar /api/remote/ingest y /api/remote/whoami",
+                )
             request.state.user = {
                 "sub": f"apikey:{key_info['name']}",
                 "role": key_info.get("role", "viewer"),

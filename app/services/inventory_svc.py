@@ -31,6 +31,7 @@ DEFAULT_CONFIG = {
 # Caché en memoria (parseo único del YAML por firma de archivo)
 _cache_signature: Optional[tuple] = None
 _cache_data: Optional[dict] = None
+_last_read_error: Optional[str] = None
 
 
 def _sanitize_for_yaml(data: dict) -> dict:
@@ -49,9 +50,25 @@ def _sanitize_for_yaml(data: dict) -> dict:
 
 def invalidate_cache() -> None:
     """Invalida la caché de inventario (tras escrituras o en tests)."""
-    global _cache_signature, _cache_data
+    global _cache_signature, _cache_data, _last_read_error
     _cache_signature = None
     _cache_data = None
+    _last_read_error = None
+
+
+def inventory_health() -> tuple[bool, Optional[str]]:
+    """Indica si el inventario es legible, sin alterar ``list_devices``.
+
+    Returns:
+        ``(True, None)`` si el YAML existe y parsea; ``(False, causa)`` si no
+        existe o está corrupto. Un inventario vacío pero legible es ``True``.
+    """
+    if not DEVICES_FILE.exists():
+        return False, "devices.yaml no existe"
+    _read()
+    if _last_read_error:
+        return False, _last_read_error
+    return True, None
 
 
 def _signature() -> Optional[tuple]:
@@ -63,9 +80,10 @@ def _signature() -> Optional[tuple]:
 
 def _read() -> dict:
     """Lee el YAML, usando la caché si el archivo no cambió."""
-    global _cache_signature, _cache_data
+    global _cache_signature, _cache_data, _last_read_error
     sig = _signature()
     if sig is None:
+        _last_read_error = "devices.yaml no existe"
         if _cache_data is None:
             return DEFAULT_CONFIG
         return _cache_data
@@ -74,11 +92,16 @@ def _read() -> dict:
     try:
         with open(DEVICES_FILE) as f:
             data = yaml.safe_load(f) or DEFAULT_CONFIG
-    except yaml.YAMLError as e:
+    except (yaml.YAMLError, OSError) as e:
         # Nunca dejar la app caída por un YAML corrupto a mitad de escritura
         import logging
+        _last_read_error = str(e)
         logging.getLogger(__name__).error("devices.yaml inválido (%s); usando caché o vacío", e)
         return _cache_data or DEFAULT_CONFIG
+    if not isinstance(data, dict):
+        _last_read_error = "devices.yaml no contiene un objeto"
+        return _cache_data or DEFAULT_CONFIG
+    _last_read_error = None
 
     # Auto-fix ROS ports for existing devices added wrongly via SSH
     for d in data.get("devices", []):

@@ -1,0 +1,33 @@
+[Unit]
+Description=NetPulse remote collector (site)
+Documentation=https://github.com/netpulse-noc/netpulse-noc/docs/handoffs/collectors-site.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netpulse-collector
+Group=netpulse-collector
+WorkingDirectory=/opt/netpulse-collector
+EnvironmentFile=/etc/netpulse/collector.env
+ExecStart=/opt/netpulse-collector/.venv/bin/python -m app.remote_collector --config /etc/netpulse/collector.yaml
+Restart=on-failure
+RestartSec=5s
+RestartPreventExitStatus=2
+TimeoutStopSec=20s
+
+StateDirectory=netpulse-collector
+StateDirectoryMode=0750
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/netpulse-collector
+
+# Solo si se sustituye el binario ping por ICMP raw:
+# AmbientCapabilities=CAP_NET_RAW
+# CapabilityBoundingSet=CAP_NET_RAW
+
+[Install]
+WantedBy=multi-user.target
