@@ -1,7 +1,6 @@
 """NetPulse — FastAPI Application."""
 
 from contextlib import asynccontextmanager
-import os
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -18,7 +17,7 @@ from app.middleware.audit import AuditMiddleware
 from app.middleware.metrics import MetricsMiddleware
 from app.middleware.security import SecurityHeadersMiddleware
 from app.models.schemas import HealthResponse
-from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy, alerts, topology, traffic, ops, security_ext, integrations, collectors, system, monitoring, ai, terminal, firewall, sftp
+from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy, alerts, topology, traceroute, traffic, ops, security_ext, integrations, collectors, system, monitoring, ai, terminal, firewall, sftp
 from app.services.inventory_svc import list_devices
 
 # ── Rate Limiter (definido en app/core/limiter.py) ──────────
@@ -92,9 +91,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "http://localhost:5173",
         "http://127.0.0.1:3000",
-        "http://127.0.0.1:5173",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -148,6 +145,7 @@ app.include_router(admin_users.router)
 app.include_router(prometheus_proxy.router)
 app.include_router(alerts.router)
 app.include_router(topology.router)
+app.include_router(traceroute.router)
 app.include_router(traffic.router)
 app.include_router(ops.router)
 app.include_router(security_ext.router)
@@ -161,31 +159,19 @@ app.include_router(sftp.router)
 app.include_router(firewall.router)
 
 # ── Static files (Dashboard UI) ──────────────────────────────
-# El dashboard HTML anterior es la portada. React permanece disponible en
-# /modern y puede activarse en / con NETPULSE_FRONTEND=react.
+# El panel HTML es la única interfaz; /legacy sigue disponible para enlaces previos.
 _STATIC = Path(__file__).resolve().parent / "static"
-_LEGACY_DASHBOARD = _STATIC / "dashboard.html"
-_REACT_DASHBOARD = _STATIC / "react" / "index.html"
+_DASHBOARD = _STATIC / "dashboard.html"
 
 
 @app.get("/", response_class=FileResponse)
 async def dashboard():
-    if os.getenv("NETPULSE_FRONTEND", "legacy").lower() == "react" and _REACT_DASHBOARD.is_file():
-        return FileResponse(_REACT_DASHBOARD)
-    return FileResponse(_LEGACY_DASHBOARD)
+    return FileResponse(_DASHBOARD)
 
 
 @app.get("/legacy", response_class=FileResponse)
 async def legacy_dashboard():
-    return FileResponse(_LEGACY_DASHBOARD)
-
-
-@app.get("/modern", response_class=FileResponse)
-async def modern_dashboard():
-    """Acceso estable a React incluso cuando / apunta al panel anterior."""
-    if not _REACT_DASHBOARD.is_file():
-        return FileResponse(_LEGACY_DASHBOARD)
-    return FileResponse(_REACT_DASHBOARD)
+    return FileResponse(_DASHBOARD)
 
 
 @app.get("/favicon.svg", response_class=FileResponse)

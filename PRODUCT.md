@@ -16,14 +16,13 @@ NetPulse permite consultar el estado de equipos, servicios y alertas y operar in
 
 ## Operating Context
 
-El backend existente integra inventario, monitorización, Prometheus, NetBox, terminal y otras funciones. Tras probar la primera fase React, el usuario eligió volver al panel HTML/JS anterior como portada y mejorarlo sin perder sus funciones. React queda como alternativa opcional.
+El backend existente integra inventario, monitorización, Prometheus, NetBox, terminal y otras funciones. Tras probar otra interfaz, el usuario eligió el panel HTML/JS como única portada y pidió retirar la ruta y los recursos alternativos, sin perder sus funciones.
 
 ## Capabilities and Constraints
 
 - Mantener todos los endpoints, autenticación JWT y permisos RBAC del motor FastAPI.
-- El panel HTML anterior es la portada por defecto y también está disponible en `/legacy`; mejorar su login y navegación sin desactivar funcionalidades.
-- React sigue disponible en `/modern` y puede activarse explícitamente en `/` con `NETPULSE_FRONTEND=react`.
-- Esta decisión reemplaza la preferencia anterior de usar React por defecto; no se borra la implementación React mientras pueda compararse o recuperarse.
+- El panel HTML es la única interfaz en `/`; `/legacy` permanece como alias para enlaces existentes.
+- Retirar la ruta y los recursos de la interfaz alternativa sin desactivar el login, la navegación ni las herramientas del panel HTML.
 - No presentar datos simulados como datos de la infraestructura real.
 
 ## Brand Commitments
@@ -37,6 +36,6 @@ El nombre de producto es NetPulse NOC. No se pidió eliminar su identidad ni cam
 ## Product Principles
 
 1. Los problemas accionables tienen prioridad sobre los números decorativos.
-2. La nueva interfaz es un cliente del motor actual, no otro motor.
-3. Cada fase es reversible y no deja funciones inaccesibles.
+2. El panel HTML utiliza el motor FastAPI existente; no crea otro motor.
+3. Las mejoras del panel no dejan herramientas inaccesibles.
 4. Los estados sin datos o con servicios caídos deben explicarse con honestidad.

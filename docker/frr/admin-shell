@@ -1,0 +1,15 @@
+#!/bin/sh
+# NetPulse — shell de login del usuario `admin` en los routers FRR del lab.
+#
+#   SSH sin comando (sesión interactiva, NAPALM/netmiko)  -> CLI de FRR (vtysh)
+#   SSH con comando (exec_request: `sshd shell -c cmd`)   -> shell real del SO
+#
+# Así NAPALM sigue hablando con vtysh (show version, facts, configs) mientras
+# el exec de comandos del SO (lldpcli, tracepath) también funciona.
+
+if [ -n "$1" ]; then
+    # sshd invoca: admin-shell -c 'comando...' → ejecutamos en shell real.
+    [ "$1" = "-c" ] && shift
+    exec /bin/sh -c "$*"
+fi
+exec /usr/bin/vtysh

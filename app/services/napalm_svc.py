@@ -1046,13 +1046,121 @@ def get_mac_address_table(device_id: str) -> NapalmResult:
 
 
 def get_lldp_neighbors(device_id: str) -> NapalmResult:
-    """Obtiene vecinos LLDP del dispositivo (topología física)."""
+    """Obtiene vecinos LLDP del dispositivo (topología física).
+
+    Fallback: si NAPALM no soporta/encuentra LLDP (ej. FRRouting no habla
+    LLDP propio, usa lldpd), ejecuta `lldpcli show neighbors` por SSH exec
+    y parsea la salida al mismo esquema del driver.
+    """
     d = _find_device(device_id)
     if not d:
         r = NapalmResult(device_id)
         r.set_error("driver_error", f"Device {device_id} not found")
         return r
-    return _execute(d, "get_lldp_neighbors", retry=False)
+    result = _execute(d, "get_lldp_neighbors", retry=False)
+
+    data = result.data if result.success else None
+    if not data:
+        out = run_shell_command(device_id, "lldpcli show neighbors", timeout=15)
+        if out:
+            parsed = _parse_lldpcli_output(out)
+            if parsed:
+                result.data = parsed
+                result.success = True
+                result.error = None
+                result.error_type = None
+                result.error_raw = None
+                logger.info("[%s] LLDP vía lldpcli (lldpd): %d interfaces con vecinos",
+                            device_id, len(parsed))
+    return result
+
+
+def run_shell_command(device_id: str, command: str, timeout: float = 20.0) -> Optional[str]:
+    """Ejecuta un comando en el shell del SO del dispositivo vía SSH exec_request.
+
+    Diferente de run_commands() (clí del router, ej. vtysh): aquí el comando
+    corre en la shell de login del host (NAPALM/netmiko no lo necesitan).
+    Requiere que el SSH del equipo acepte exec_request (estándar OpenSSH).
+
+    Returns:
+        Salida del comando (str) o None si no se pudo conectar/ejecutar.
+    """
+    import paramiko
+
+    d = _find_device(device_id)
+    if not d:
+        return None
+    host = str(d.get("hostname", "")).strip()
+    port = int(d.get("cli_port") or d.get("port") or 22)
+    creds = d.get("credentials", {}) or {}
+    user = creds.get("username") or d.get("username") or ""
+    password = creds.get("password") or d.get("password") or ""
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(host, port=port, username=user, password=password,
+                       timeout=timeout, look_for_keys=False, allow_agent=False)
+        _, stdout, _ = client.exec_command(command, timeout=int(timeout))
+        return stdout.read().decode("utf-8", errors="replace")
+    except Exception as e:  # noqa: BLE001 — mejor degradar a None que romper la vista
+        logger.info("[%s] run_shell_command '%s' falló: %s", device_id, command, e)
+        return None
+    finally:
+        client.close()
+
+
+def _parse_lldpcli_output(text: str) -> dict:
+    """Parsea `lldpcli show neighbors` (lldpd) al esquema de NAPALM.
+
+    Formato:
+        Interface: eth1, via: LLDP, RID: 1, Time: 0 days, 00:00:07
+          Chassis:
+            ChassisID: mac d2:7d:d7:a9:65:2c
+            SysName: juniper-edge-01
+          Port:
+            PortID: mac d2:7d:d7:a9:65:2c
+            PortDescr: eth1
+
+    Returns:
+        {"eth1": [{"hostname": "juniper-edge-01", "port": "eth1"}], ...}
+    """
+    import re
+
+    result: dict[str, list] = {}
+    iface = ""
+    last_chassis: dict = {}
+
+    def _flush():
+        if iface and last_chassis.get("hostname"):
+            result.setdefault(iface, []).append({
+                "hostname": last_chassis["hostname"],
+                "port": last_chassis.get("port") or last_chassis.get("port_id", ""),
+            })
+
+    for raw in text.splitlines():
+        line = raw.strip()
+        mi = re.match(r"^Interface:\s+([^\s,]+)", line)
+        if mi:
+            _flush()
+            iface = mi.group(1)
+            last_chassis = {}
+            continue
+        ts = line.split(":", 1)
+        if len(ts) != 2:
+            continue
+        key, val = ts[0].strip(), ts[1].strip()
+        if key == "SysName":
+            last_chassis["hostname"] = val
+        elif key == "PortID":
+            # PortID suele ser MAC; preferimos el PortDescr si luega llega
+            last_chassis.setdefault("port_id", val)
+        elif key == "PortDescr":
+            last_chassis["port"] = val
+        elif line.startswith("Chassis:"):
+            _flush()
+            last_chassis = {}
+    _flush()
+    return result
 
 
 def get_ntp_servers(device_id: str) -> NapalmResult:

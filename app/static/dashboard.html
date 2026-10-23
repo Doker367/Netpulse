@@ -102,6 +102,21 @@
       margin-left: 260px
     }
 
+    /* En escritorio el rail es persistente: drawer solo se comporta como tal en pantallas medias. */
+    @media (min-width: 1280px) {
+      .sidebar {
+        transform: none
+      }
+
+      .sidebar~.main {
+        margin-left: 260px
+      }
+
+      .menu-btn {
+        display: none
+      }
+    }
+
     .sidebar::-webkit-scrollbar {
       width: 4px
     }
@@ -2043,8 +2058,10 @@
   </style>
   <link rel="stylesheet" href="/static/overview.css?v=2">
   <link rel="stylesheet" href="/static/vendor/xterm.css">
+  <link rel="stylesheet" href="/static/vendor/leaflet.css">
   <script src="/static/vendor/xterm.js"></script>
   <script src="/static/vendor/xterm-addon-fit.js"></script>
+  <script src="/static/vendor/leaflet.js"></script>
 </head>
 
 <body>
@@ -2227,6 +2244,32 @@
     </div>
 
     <div class="sidebar-s">
+      <h3 data-i18n="nav_observability">OBSERVABILITY</h3>
+      <div class="sidebar-item" onclick="swView('alerts')"><svg class="si" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg> <span data-i18n="nav_alerts">Alerts</span> <span class="badge" style="background:var(--surface);color:var(--text-sec)">—</span>
+      </div>
+      <div class="sidebar-item" onclick="swView('monitoring')"><svg class="si" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 3v18h18" />
+          <polyline points="7 14 11 9 15 13 19 6" />
+        </svg> <span data-i18n="nav_monitoring">Monitoring</span></div>
+      <div class="sidebar-item" onclick="swView('logs')"><svg class="si" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+        </svg> <span data-i18n="nav_logs">Logs</span></div>
+      <div class="sidebar-item" onclick="swView('performance')"><svg class="si" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+        </svg> <span data-i18n="nav_performance">Equipment</span></div>
+    </div>
+
+    <div class="sidebar-s">
       <h3 data-i18n="nav_infrastructure">INFRASTRUCTURE</h3>
       <div class="sidebar-item" onclick="swView('devices')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2241,36 +2284,6 @@
           <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
           <circle cx="12" cy="20" r="1" />
         </svg> <span data-i18n="nav_connectivity">Connectivity</span></div>
-    </div>
-
-    <div class="sidebar-s">
-      <h3 data-i18n="nav_observability">OBSERVABILITY</h3>
-      <div class="sidebar-item" onclick="swView('monitoreo')"><svg class="si" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-        </svg> <span data-i18n="nav_metrics">Metrics</span></div>
-      <div class="sidebar-item" onclick="swView('performance')"><svg class="si" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-        </svg> <span data-i18n="nav_performance">Performance</span></div>
-      <div class="sidebar-item" onclick="swView('alerts')"><svg class="si" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-        </svg> <span data-i18n="nav_alerts">Alerts</span> <span class="badge" style="background:var(--surface);color:var(--text-sec)">—</span>
-      </div>
-      <div class="sidebar-item" onclick="swView('logs')"><svg class="si" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="16" y1="13" x2="8" y2="13" />
-          <line x1="16" y1="17" x2="8" y2="17" />
-        </svg> <span data-i18n="nav_logs">Logs</span></div>
-      <div class="sidebar-item" onclick="swView('monitoring')"><svg class="si" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 3v18h18" />
-          <polyline points="7 14 11 9 15 13 19 6" />
-        </svg> <span data-i18n="nav_monitoring">Monitoring</span></div>
     </div>
 
     <div class="sidebar-s" id="sb-operations">
@@ -2300,6 +2313,13 @@
           <line x1="12" y1="8" x2="5" y2="16" />
           <line x1="12" y1="8" x2="19" y2="16" />
         </svg> <span data-i18n="nav_topology">Topology</span></div>
+      <div class="sidebar-item" onclick="swView('compare')"><svg class="si" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="17 4 21 8 17 12" />
+          <line x1="21" y1="8" x2="3" y2="8" />
+          <polyline points="7 20 3 16 7 12" />
+          <line x1="3" y1="16" x2="21" y2="16" />
+        </svg> <span data-i18n="nav_compare">Compare</span></div>
       <div class="sidebar-item" onclick="swView('maintenance')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3" />
@@ -2341,12 +2361,6 @@
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg> <span data-i18n="nav_webhooks">Webhooks</span></div>
-      <div class="sidebar-item" onclick="swView('export')"><svg class="si" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="17 8 12 3 7 8" />
-          <line x1="12" y1="3" x2="12" y2="15" />
-        </svg> <span data-i18n="nav_export">Export Data</span></div>
       <div class="sidebar-item" onclick="swView('theme')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3" />
@@ -2448,135 +2462,11 @@
             <button class="btn btn-p btn-sm" onclick="bCmd()" data-i18n="btn_cmd">💻 Comando</button>
             <button class="btn btn-o btn-sm" onclick="bPing()" data-i18n="btn_ping">📡 Ping</button>
             <button class="btn btn-o btn-sm" onclick="bFacts()" data-i18n="btn_facts">📋 Facts</button>
-            <button class="btn btn-o btn-sm" onclick="bClear()">✕</button>
+            <button class="btn btn-o btn-sm" onclick="bClear()" title="Quitar selección">✕</button>
           </div>
+          <div id="bulk-panel" style="display:none;margin-top:12px;padding:14px;background:var(--panel);border:1px solid var(--accent);border-radius:var(--radius)"></div>
+          <div id="bulk-r" style="margin-top:10px"></div>
         </div>
-        <!-- ADD DEVICE FORM -->
-        <div id="add-device-panel"
-          style="display:none;background:var(--panel);border:1px solid var(--accent);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px">
-          <div
-            style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border-s);padding-bottom:10px">
-            <span style="font-weight:600;font-size:14px" data-i18n="view_register">➕ Registrar Nuevo Dispositivo
-              (Datacenter)</span>
-            <button class="btn btn-o btn-xs" onclick="document.getElementById('add-device-panel').style.display='none'"
-              data-i18n="btn_close">✕ Cerrar</button>
-          </div>
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
-            <div style="display:flex;flex-direction:column;gap:12px">
-              <div><label
-                  style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px"
-                  data-i18n="lbl_id">Hostname / ID</label><input id="inv-id" type="text" placeholder="ej: sw-core-01"
-                  style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
-              </div>
-              <div><label
-                  style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px"
-                  data-i18n="lbl_host">IP Address</label><input id="inv-host" type="text" placeholder="10.0.0.1"
-                  style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
-              </div>
-              <div style="display:flex;gap:12px">
-                <div style="flex:1"><label
-                    style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px"
-                    data-i18n="lbl_vendor">Fabricante / SO</label><select id="inv-driver"
-                    style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
-                    <optgroup label="Cisco">
-                      <option value="ios">Cisco IOS</option>
-                      <option value="nxos">Cisco NX-OS</option>
-                      <option value="iosxr">Cisco IOS-XR</option>
-                    </optgroup>
-                    <optgroup label="HP">
-                      <option value="hp_comware">HP Comware</option>
-                      <option value="hp_procurve">HP ProCurve</option>
-                    </optgroup>
-                    <optgroup label="Huawei">
-                      <option value="huawei">Huawei VRP</option>
-                    </optgroup>
-                    <optgroup label="Alcatel">
-                      <option value="alcatel_aos">Alcatel AOS</option>
-                    </optgroup>
-                    <optgroup label="SNMP Standalone">
-                      <option value="snmp">SNMP Genérico (RFC1213 / MIB-II)</option>
-                    </optgroup>
-                    <optgroup label="Otros">
-                      <option value="junos">Juniper</option>
-                      <option value="ros">MikroTik</option>
-                    </optgroup>
-                  </select></div>
-                <div style="flex:1"><label
-                    style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Protocolo
-                    Dev</label><select id="inv-protocol" onchange="toggleInvAuth(this)"
-                    style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
-                    <option value="ssh">SSH (Rec.)</option>
-                    <option value="telnet">Telnet</option>
-                    <option value="snmp">SNMP (Read)</option>
-                  </select></div>
-              </div>
-            </div>
-
-            <div style="display:flex;flex-direction:column;gap:12px">
-              <div id="inv-auth-ssh">
-                <div style="display:flex;gap:12px;margin-bottom:12px">
-                  <div style="flex:1"><label
-                      style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Usuario</label><input
-                      id="inv-user" type="text" placeholder="admin"
-                      style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
-                  </div>
-                  <div style="flex:1"><label
-                      style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Contraseña</label><input
-                      id="inv-pass" type="password" placeholder="••••••••"
-                      style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
-                  </div>
-                </div>
-                <div style="display:flex;gap:12px">
-                  <div style="flex:2"><label
-                      style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Enable
-                      Secret</label><input id="inv-secret" type="password" placeholder="Opcional"
-                      style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
-                  </div>
-                  <div style="flex:1"><label
-                      style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Puerto</label><input
-                      id="inv-port" type="number" placeholder="22"
-                      style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
-                  </div>
-                </div>
-              </div>
-              <div id="inv-auth-snmp" style="display:none">
-                <label
-                  style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">SNMP
-                  Community String (v2c)</label>
-                <input id="inv-snmp-ro" type="text" placeholder="public"
-                  style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
-                <label
-                  style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin:10px 0 4px">Canal
-                  CLI para comandos (opcional)</label>
-                <select id="inv-cli-transport" onchange="toggleInvCli(this)"
-                  style="width:100%;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px">
-                  <option value="">Solo SNMP (sin CLI)</option>
-                  <option value="telnet">Telnet</option>
-                  <option value="ssh">SSH</option>
-                </select>
-                <div id="inv-cli-fields" style="display:none;margin-top:8px;flex-direction:column;gap:8px">
-                  <div style="display:flex;gap:8px">
-                    <input id="inv-cli-user" type="text" placeholder="Usuario CLI"
-                      style="flex:1;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:11px">
-                    <input id="inv-cli-pass" type="password" placeholder="Contraseña CLI"
-                      style="flex:1;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:11px">
-                  </div>
-                  <div style="display:flex;gap:8px">
-                    <input id="inv-cli-port" type="number" placeholder="Puerto (23/22)"
-                      style="flex:1;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:11px">
-                    <input id="inv-netmiko-type" type="text" placeholder="Tipo netmiko (ej. enterasys)"
-                      style="flex:1;height:32px;background:var(--bg);border:1px solid var(--border);padding:0 12px;border-radius:var(--radius-sm);color:var(--text);font-size:11px">
-                  </div>
-                </div>
-              </div>
-              <button class="btn btn-p" onclick="addInventoryDevice(this)"
-                style="margin-top:auto;padding:10px;font-weight:600;width:100%" data-i18n="btn_register">➕ Interconectar
-                Dispositivo</button>
-            </div>
-          </div>
-        </div>
-
         <section class="ops-inventory" aria-labelledby="ops-devices-heading">
           <div class="ops-section-bar">
             <div><h2 id="ops-devices-heading" tabindex="-1" data-i18n="sys_devices">Dispositivos</h2><p id="ops-inventory-note" data-i18n="ov_hint">Selecciona un equipo para ver su detalle.</p></div>
@@ -2817,27 +2707,6 @@
           </div>
         </div>
       </div>
-      <div class="view" id="v-export">
-        <h2 style="font-size:16px;font-weight:600;margin-bottom:16px" data-i18n="view_exp">📤 Exportar inventario</h2>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
-          <div class="sc" style="cursor:pointer;text-align:center" onclick="npExport('csv')">
-            <div style="font-size:32px;margin-bottom:8px">📄</div>
-            <div style="font-weight:500">Exportar CSV</div>
-            <div style="font-size:10px;color:var(--text-ter);margin-top:4px">Descargar inventario en CSV</div>
-          </div>
-          <div class="sc" style="cursor:pointer;text-align:center" onclick="npExport('json')">
-            <div style="font-size:32px;margin-bottom:8px">📋</div>
-            <div style="font-weight:500">Exportar JSON</div>
-            <div style="font-size:10px;color:var(--text-ter);margin-top:4px">Descargar inventario en JSON</div>
-          </div>
-          <div class="sc" style="cursor:pointer;text-align:center"
-            onclick="npExport('configs')">
-            <div style="font-size:32px;margin-bottom:8px">🗜️</div>
-            <div style="font-weight:500">Exportar configs ZIP</div>
-            <div style="font-size:10px;color:var(--text-ter);margin-top:4px">Descargar todas las configs en ZIP</div>
-          </div>
-        </div>
-      </div>
       <div class="view" id="v-compliance">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <h2 style="font-size:16px;font-weight:600" data-i18n="view_comp">✅ Validación de cumplimiento</h2>
@@ -2909,49 +2778,12 @@
           </div>
         </div>
       </div>
-      <div class="view" id="v-monitoreo" style="overflow-y:auto;max-height:calc(100vh - 60px)">
-        <div
-          style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-          <div style="display:flex;align-items:center;gap:10px">
-            <h2 style="font-size:16px;font-weight:600" data-i18n="view_mon">📊 Monitoreo</h2>
-            <select id="mon-range"
-              style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:11px"
-              onchange="refMon()">
-              <option value="1">1 hora</option>
-              <option value="2">2 horas</option>
-              <option value="3">3 horas</option>
-              <option value="6" selected>6 horas</option>
-              <option value="8">8 horas</option>
-              <option value="24">24 horas</option>
-            </select>
-            <span id="mon-range-label" style="font-size:10px;color:var(--text-ter)"></span>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <select id="mon-interval"
-              style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:11px"
-              onchange="setRefreshInterval(this.value)">
-              <option value="5">5s</option>
-              <option value="10">10s</option>
-              <option value="15" selected>15s</option>
-              <option value="30">30s</option>
-              <option value="60">60s</option>
-              <option value="0">Off</option>
-            </select>
-            <button class="btn btn-o btn-sm" onclick="refMon()" style="padding:7px 14px;font-size:11px">🔄
-              Refresh</button>
-          </div>
-        </div>
-        <div class="mon-grid" id="mon-grid"></div>
-        <div id="mon-charts" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start">
-        </div>
-      </div>
       <div class="view" id="v-performance" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-          <h2 style="font-size:18px;font-weight:600" data-i18n="view_perf">⚡ Performance — Real-Time</h2>
+          <h2 style="font-size:18px;font-weight:600" data-i18n="view_perf">⚡ Recursos por Equipo</h2>
           <button class="btn btn-o btn-sm" onclick="loadPerformance()" style="padding:7px 14px;font-size:11px"
             data-i18n="btn_refresh">🔄 Refresh</button>
         </div>
-        <div id="perf-host" style="margin-bottom:20px"></div>
         <div id="perf-kpis"
           style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:20px">
         </div>
@@ -3034,9 +2866,14 @@
       </div>
 
       <div class="view" id="v-devices" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:8px;flex-wrap:wrap">
           <h2 style="font-size:18px;font-weight:600" data-i18n="view_devices">🖥️ Devices</h2>
-          <button class="btn btn-o btn-sm" onclick="loadInventory()">🔄 Refresh</button>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn btn-o btn-sm" onclick="npExport('csv')" title="Descargar inventario en CSV">📄 CSV</button>
+            <button class="btn btn-o btn-sm" onclick="npExport('json')" title="Descargar inventario en JSON">📋 JSON</button>
+            <button class="btn btn-o btn-sm" onclick="npExport('configs')" title="Descargar todas las configs en ZIP">🗜️ ZIP</button>
+            <button class="btn btn-o btn-sm" onclick="loadInventory()">🔄 Refresh</button>
+          </div>
         </div>
         <div style="display:grid;grid-template-columns:320px 1fr;gap:20px">
           <!-- Add Device Form -->
@@ -3220,25 +3057,67 @@
       </div>
 
       <div class="view" id="v-topology" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;gap:8px;flex-wrap:wrap">
           <h2 style="font-size:16px;font-weight:600" data-i18n="view_topo">🗺️ Topología de Red</h2>
-          <button class="btn btn-o btn-sm" onclick="loadTopology()" data-i18n="btn_refresh">🔄</button>
+          <div style="display:flex;gap:8px;align-items:center">
+            <div id="topo-tabs" style="display:flex;gap:4px;background:var(--surface);border:1px solid var(--border-s);border-radius:10px;padding:4px">
+              <button id="topo-tab-graph" class="btn btn-sm" onclick="topoTab('graph')">🕸️ Grafo</button>
+              <button id="topo-tab-map" class="btn btn-sm" onclick="topoTab('map')">🌍 Mapa</button>
+              <button id="topo-tab-table" class="btn btn-sm" onclick="topoTab('table')">📋 Tabla</button>
+            </div>
+            <button class="btn btn-o btn-sm" onclick="loadTopology()" data-i18n="btn_refresh">🔄</button>
+          </div>
         </div>
+
+        <!-- Traceroute interactivo: origen (NOC o dispositivo) + destino -->
+        <div class="sc" style="padding:16px;margin-bottom:16px">
+          <h3 style="font-size:11px;color:var(--text-ter);margin-bottom:10px" data-i18n="topo_tr_title">TRACEROUTE SOBRE EL MAPA</h3>
+          <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
+            <div class="fg" style="min-width:230px">
+              <label data-i18n="topo_tr_origin">Origen</label>
+              <select id="topo-trace-origin" style="width:100%"></select>
+            </div>
+            <div class="fg" style="min-width:220px;flex:1">
+              <label data-i18n="topo_tr_dest">Destino (IP / FQDN)</label>
+              <input id="topo-trace-dest" placeholder="8.8.8.8" style="width:100%" onkeydown="if(event.key==='Enter')runTopoTrace()">
+            </div>
+            <button id="topo-trace-btn" class="btn btn-p btn-sm" onclick="runTopoTrace()" style="padding:9px 16px" data-i18n="topo_tr_run">▶ Ejecutar Traceroute</button>
+          </div>
+          <div id="topo-trace-msg" style="font-size:12px;color:var(--text-ter);margin-top:8px"></div>
+        </div>
+
         <div id="topo-stats" style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap"></div>
-        <div id="topo-nodes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">
+
+        <!-- Vista Grafo: canvas interactivo (drag, zoom, hover) -->
+        <div id="topo-view-graph" class="sc" style="padding:0;margin-bottom:16px;position:relative;overflow:hidden">
+          <canvas id="topo-canvas" style="display:block;width:100%;height:520px"></canvas>
         </div>
-        <div id="topo-links" style="margin-top:16px">
-          <h3 style="font-size:11px;color:var(--text-ter);margin-bottom:8px">ENLACES DETECTADOS (LLDP)</h3>
-          <div id="topo-links-list"></div>
+
+        <!-- Vista Mapa: Leaflet + saltos de traceroute + equipos geolocalizados -->
+        <div id="topo-view-map" class="sc" style="padding:0;margin-bottom:16px;display:none">
+          <div id="topo-map" style="height:520px;width:100%;border-radius:var(--radius-lg)"></div>
+          <div id="topo-map-legend" style="padding:10px 16px;font-size:11px;color:var(--text-ter)"></div>
         </div>
+
+        <!-- Vista Tabla: tarjetas + tabla LLDP (la de siempre) -->
+        <div id="topo-view-table">
+          <div id="topo-nodes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">
+          </div>
+          <div id="topo-links" style="margin-top:16px">
+            <h3 style="font-size:11px;color:var(--text-ter);margin-bottom:8px">ENLACES DETECTADOS (LLDP)</h3>
+            <div id="topo-links-list"></div>
+          </div>
+        </div>
+
+        <!-- Resultado del traceroute -->
+        <div id="topo-trace-result" style="margin-top:16px"></div>
       </div>
 
       <div class="view" id="v-monitoring" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-          <h2 style="font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px"><svg class="ic ic-lg" viewBox="0 0 24 24"><polyline points="3 12 7 12 10 4 14 20 17 12 21 12" /></svg><span data-i18n="view_monitoring">Monitoring</span></h2>
+          <h2 style="font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px"><svg class="ic ic-lg" viewBox="0 0 24 24"><polyline points="3 12 7 12 10 4 14 20 17 12 21 12" /></svg><span data-i18n="view_monitoring">Monitoreo</span></h2>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <a id="mon-grafana-link" class="btn btn-o btn-sm icbtn" target="_blank" rel="noopener"><svg class="ic ic-sm" viewBox="0 0 24 24"><path d="M14 3h7v7"/><line x1="10" y1="14" x2="21" y2="3"/><path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/></svg> Grafana</a>
-            <button class="btn btn-o btn-sm icbtn" id="mon-auto" onclick="monAutoToggle()"><svg class="ic ic-sm" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="9" y1="2" x2="15" y2="2"/></svg> <span>Auto: OFF</span></button>
             <button class="btn btn-o btn-sm" onclick="loadMonitoring()" title="Actualizar"><svg class="ic ic-sm" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2-9.5L23 10"/></svg></button>
           </div>
         </div>
@@ -3253,9 +3132,32 @@
         </div>
 
         <div class="sc" style="padding:16px;margin-bottom:16px">
-          <h3 style="font-size:11px;color:var(--text-ter);margin-bottom:10px">ALERTAS ACTIVAS (PROMETHEUS)</h3>
-          <div id="mon-alerts"></div>
-        </div>
+          <h3 style="font-size:11px;color:var(--text-ter);margin-bottom:10px">MÉTRICAS DE LA PLATAFORMA (PROMETHEUS)</h3>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <select id="mon-range" onchange="refMon()"
+              style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:11px">
+              <option value="1">1 hora</option>
+              <option value="2">2 horas</option>
+              <option value="3">3 horas</option>
+              <option value="6" selected>6 horas</option>
+              <option value="8">8 horas</option>
+              <option value="24">24 horas</option>
+            </select>
+            <select id="mon-interval" onchange="setRefreshInterval(this.value)"
+              style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:11px">
+              <option value="5">5s</option>
+              <option value="10">10s</option>
+              <option value="15" selected>15s</option>
+              <option value="30">30s</option>
+              <option value="60">60s</option>
+              <option value="0">Off</option>
+            </select>
+            <button class="btn btn-o btn-sm" onclick="refMon()" style="padding:7px 14px;font-size:11px">🔄
+              Refresh</button>
+          </div>
+          <div class="mon-grid" id="mon-grid"></div>
+          <div id="mon-charts" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-content:flex-start">
+          </div>
         </div>
 
         <div class="sc" style="padding:16px;margin-bottom:16px">
@@ -3439,14 +3341,14 @@
       en: {
         nav_overview: 'OVERVIEW', nav_dashboard: 'Dashboard', nav_infrastructure: 'INFRASTRUCTURE',
         nav_devices: 'Devices', nav_connectivity: 'Connectivity', nav_observability: 'OBSERVABILITY',
-        nav_metrics: 'Metrics', nav_performance: 'Performance', nav_alerts: 'Alerts', nav_logs: 'Logs', nav_monitoring: 'Monitoring',
+        nav_performance: 'Equipment', nav_alerts: 'Alerts', nav_logs: 'Logs', nav_monitoring: 'Monitoring',
         nav_operations: 'OPERATIONS', nav_commands: 'Commands', nav_backups: 'Backups',
-        nav_schedules: 'Schedules', nav_compare: 'Compare', nav_topology: 'Topology',
-        nav_health: 'Health Scores', nav_maintenance: 'Maintenance', nav_security: 'SECURITY',
-        nav_compliance: 'Compliance', nav_audit: 'Audit Trail', nav_events: 'Security Events',
+        nav_compare: 'Compare', nav_topology: 'Topology',
+        nav_maintenance: 'Maintenance', nav_security: 'SECURITY',
+        nav_compliance: 'Compliance',
         nav_apikeys: 'API Keys', nav_2fa: '2FA / TOTP', nav_administration: 'ADMINISTRATION',
         nav_inventory: 'Device Inventory', nav_users: 'Users & Roles', nav_webhooks: 'Webhooks',
-        nav_export: 'Export Data', nav_settings: 'Settings', nav_system: 'SYSTEM',
+        nav_settings: 'Settings', nav_system: 'SYSTEM',
         sys_devices: 'Devices', btn_signout: 'Sign Out',
 
         view_devices: 'Devices', view_cmd_center: 'Network Command Center',
@@ -3454,15 +3356,14 @@
         cmd_desc: 'Batch execution across infrastructure', cmd_targets: 'TARGET DEVICES',
         cmd_commands: 'COMMANDS (One per line)', cmd_output: 'EXECUTION OUTPUT',
 
-        btn_sel_all: 'Select All', btn_backup_sel: 'Backup Selected', btn_cmd_sel: 'Send Cmd',
         btn_multi: 'Multiple PUSH', btn_add_device: 'Add Device', btn_exec: 'Execute', btn_clear: 'Clear',
         btn_register: '✅ Register Device to Database', card_latency: 'Latency', btn_refresh: '🔄 Refresh', btn_test: '🔄 Test Connectivity', btn_close: '✕ Close',
 
-        view_conn: '📡 Connectivity', view_theme: '🎨 Theme & Appearance', view_mon: '📊 Monitoring',
-        view_perf: '⚡ Performance — Real-Time', view_alerts: '🚨 Active Alerts', view_logs: '📝 Audit & System Logs', view_monitoring: '📊 Monitoring (unified)',
-        view_bk: '💾 Backup Management', view_exp: '📤 Export Inventory', view_sched: '⏰ Scheduled Backups',
+        view_conn: '📡 Connectivity', view_theme: '🎨 Theme & Appearance',
+        view_perf: '⚡ Device Resources', view_alerts: '🚨 Active Alerts', view_logs: '📝 Audit & System Logs', view_monitoring: '📊 Monitoring',
+        view_bk: '💾 Backup Management', view_sched: '⏰ Scheduled Backups',
         view_comp: '✅ Compliance Validation', view_wh: '🔗 Webhooks / Notifications', view_admin: '⚙️ Administration',
-        view_act: '📝 Security Activity', view_cmp: '⇄ Compare Configurations', view_audit_tbl: '📋 Audit Trail',
+        view_cmp: '⇄ Compare Configurations', view_audit_tbl: '📋 Audit Trail',
         view_topo: '🗺️ Network Topology', view_health: '💚 Health Scores', view_maint: '🛠️ Maintenance Windows',
         view_keys: '🔑 API Keys',
 
@@ -3478,14 +3379,14 @@
       es: {
         nav_overview: 'GENERAL', nav_dashboard: 'Panel Principal', nav_infrastructure: 'INFRAESTRUCTURA',
         nav_devices: 'Dispositivos', nav_connectivity: 'Conectividad', nav_observability: 'OBSERVABILIDAD',
-        nav_metrics: 'Métricas', nav_performance: 'Rendimiento', nav_alerts: 'Alertas', nav_logs: 'Registros', nav_monitoring: 'Monitoreo',
+        nav_performance: 'Equipos', nav_alerts: 'Alertas', nav_logs: 'Registros', nav_monitoring: 'Monitoreo',
         nav_operations: 'OPERACIONES', nav_commands: 'Comandos', nav_backups: 'Respaldos',
-        nav_schedules: 'Programación', nav_compare: 'Comparar', nav_topology: 'Topología',
-        nav_health: 'Estado de Salud', nav_maintenance: 'Mantenimiento', nav_security: 'SEGURIDAD',
-        nav_compliance: 'Cumplimiento', nav_audit: 'Auditoría', nav_events: 'Eventos de Seguridad',
+        nav_compare: 'Comparar', nav_topology: 'Topología',
+        nav_maintenance: 'Mantenimiento', nav_security: 'SEGURIDAD',
+        nav_compliance: 'Cumplimiento',
         nav_apikeys: 'Llaves API', nav_2fa: '2FA / TOTP', nav_administration: 'ADMINISTRACIÓN',
         nav_inventory: 'Inventario de Equipos', nav_users: 'Usuarios y Roles', nav_webhooks: 'Webhooks',
-        nav_export: 'Exportar Datos', nav_settings: 'Configuración', nav_system: 'SISTEMA',
+        nav_settings: 'Configuración', nav_system: 'SISTEMA',
         sys_devices: 'Dispositivos', btn_signout: 'Cerrar Sesión',
 
         view_devices: 'Dispositivos', view_cmd_center: 'Centro de Comandos de Red',
@@ -3493,15 +3394,14 @@
         cmd_desc: 'Ejecución en lote multiplataforma', cmd_targets: 'DISPOSITIVOS (Ctrl+Click)',
         cmd_commands: 'COMANDOS (Uno por línea)', cmd_output: 'SALIDA DE TERMINAL',
 
-        btn_sel_all: 'Seleccionar Todos', btn_backup_sel: 'Backup Seleccionados', btn_cmd_sel: 'Enviar Comando',
         btn_multi: 'Multiselección', btn_add_device: 'Agregar dispositivo', btn_exec: 'Ejecutar', btn_clear: 'Limpiar',
         btn_register: '✅ Registrar Dispositivo en DB', card_latency: 'Latencia', btn_refresh: '🔄 Actualizar', btn_test: '🔄 Probar', btn_close: '✕ Cerrar',
 
-        view_conn: '📡 Conectividad', view_theme: '🎨 Apariencia', view_mon: '📊 Monitoreo',
-        view_perf: '⚡ Performance — Tiempo Real', view_alerts: '🚨 Alertas Activas', view_logs: '📝 Logs de Sistema y Auditoría', view_monitoring: '📊 Monitoreo (unificado)',
-        view_bk: '💾 Gestión de Backups', view_exp: '📤 Exportar Inventario', view_sched: '⏰ Backups Programados',
+        view_conn: '📡 Conectividad', view_theme: '🎨 Apariencia',
+        view_perf: '⚡ Recursos por Equipo', view_alerts: '🚨 Alertas Activas', view_logs: '📝 Logs de Sistema y Auditoría', view_monitoring: '📊 Monitoreo',
+        view_bk: '💾 Gestión de Backups', view_sched: '⏰ Backups Programados',
         view_comp: '✅ Validación de Cumplimiento', view_wh: '🔗 Webhooks / Notificaciones', view_admin: '⚙️ Administración',
-        view_act: '📝 Actividad de Seguridad', view_cmp: '⇄ Comparar Configuraciones', view_audit_tbl: '📋 Auditoría del Sistema',
+        view_cmp: '⇄ Comparar Configuraciones', view_audit_tbl: '📋 Auditoría del Sistema',
         view_topo: '🗺️ Topología de Red', view_health: '💚 Estado de Salud', view_maint: '🛠️ Ventanas de Mantenimiento',
         view_keys: '🔑 API Keys',
 
@@ -3520,6 +3420,30 @@
     Object.assign(I18N.en, { stat_devices: 'DEVICES', stat_online: 'ONLINE', stat_offline: 'OFFLINE', stat_avail: 'AVAILABILITY', stat_alerts: 'ACTIVE ALERTS', stat_sys: 'NETWORK STATUS', state_ok: 'OPERATIONAL', state_down: 'OFFLINE', state_degraded: 'DEGRADED', state_unknown: 'UNVERIFIED', state_empty: 'NO DATA', tab_ov: 'Overview', tab_if: 'Interfaces', tab_cfg: 'Config (RAM)', tab_cmd: 'Commands', btn_cmd: '💻 Command', btn_ping: '📡 Ping', btn_facts: '📋 Facts', bulk_none: 'No selection', qa_bk: '💾 Backup', qa_sv: '💿 Save RAM', qa_ping: '📡 Ping Test', qa_exp: '⬇ Export', qa_cmp: '⇄ Compare', m_loading: 'Loading metrics...' });
     Object.assign(I18N.es, { stat_devices: 'DISPOSITIVOS', stat_online: 'EN LÍNEA', stat_offline: 'FUERA DE LÍNEA', stat_avail: 'DISPONIBILIDAD', stat_alerts: 'ALERTAS ACTIVAS', stat_sys: 'ESTADO DE LA RED', state_ok: 'OPERATIVA', state_down: 'CAÍDA', state_degraded: 'DEGRADADA', state_unknown: 'SIN VERIFICAR', state_empty: 'SIN DATOS', tab_ov: 'General', tab_if: 'Interfaces', tab_cfg: 'Configuración (RAM)', tab_cmd: 'Comandos', btn_cmd: '💻 Comando', btn_ping: '📡 Ping', btn_facts: '📋 Informes', bulk_none: 'Sin selección', qa_bk: '💾 Backup', qa_sv: '💿 Guardar RAM', qa_ping: '📡 Ping Test', qa_exp: '⬇ Exportar', qa_cmp: '⇄ Comparar', m_loading: 'Cargando métricas...' });
 
+    Object.assign(I18N.en, {
+      topo_tab_graph: '🕸️ Graph', topo_tab_map: '🌍 Map', topo_tab_table: '📋 Table',
+      topo_tr_title: 'TRACEROUTE ON THE MAP', topo_tr_origin: 'Origin', topo_tr_dest: 'Destination (IP / FQDN)',
+      topo_tr_run: '▶ Run Traceroute', topo_tr_running: 'Running traceroute… (up to 90s)',
+      topo_tr_empty: 'Run a traceroute to display the hops on the map.',
+      topo_tr_err_pre: 'Traceroute failed: ', topo_th_hop: 'Hop', topo_th_host: 'Host',
+      topo_th_ip: 'IP', topo_th_rtt: 'RTT', topo_th_geo: 'Location', topo_th_dev: 'NetPulse device',
+      topo_tr_private: 'Private address — no public geolocation (drawn as unknown hop).',
+      topo_geo_off: 'Geolocation off: place GeoLite2-City.mmdb in config/ (docs: MaxMind).',
+      topo_tr_clear: '✕ Clear', topo_nodes_no_geo: 'Devices without geolocation (local IPs):',
+      topo_tr_from: 'from'
+    });
+    Object.assign(I18N.es, {
+      topo_tab_graph: '🕸️ Grafo', topo_tab_map: '🌍 Mapa', topo_tab_table: '📋 Tabla',
+      topo_tr_title: 'TRACEROUTE SOBRE EL MAPA', topo_tr_origin: 'Origen', topo_tr_dest: 'Destino (IP / FQDN)',
+      topo_tr_run: '▶ Ejecutar Traceroute', topo_tr_running: 'Ejecutando traceroute… (hasta 90s)',
+      topo_tr_empty: 'Ejecuta un traceroute para mostrar los saltos sobre el mapa.',
+      topo_tr_err_pre: 'Falló el traceroute: ', topo_th_hop: 'Salto', topo_th_host: 'Host',
+      topo_th_ip: 'IP', topo_th_rtt: 'RTT', topo_th_geo: 'Ubicación', topo_th_dev: 'Equipo NetPulse',
+      topo_tr_private: 'Dirección privada — sin geolocalización pública (se dibuja como salto desconocido).',
+      topo_geo_off: 'Geolocalización desactivada: coloca GeoLite2-City.mmdb en config/ (docs: MaxMind).',
+      topo_tr_clear: '✕ Limpiar', topo_nodes_no_geo: 'Equipos sin geolocalización (IPs locales):',
+      topo_tr_from: 'desde'
+    });
     Object.assign(I18N.en, { search_placeholder: 'Search devices or IPs (Ctrl+K)', ov_focus: 'Offline devices', ov_loading: 'Checking devices…', ov_loading_inventory: 'Loading inventory…', ov_hint: 'Select a device to inspect its details.', ov_topology: 'Open topology', ov_refresh: 'Refresh', ov_add: 'Add device', ov_offline: 'Offline', ov_online: 'Online', ov_devices: 'Devices', ov_availability: 'Online share', ov_alerts: 'Active alerts', ov_detail: 'View details', ov_unverified: 'Unverified', ov_disk: 'Disk', login_submit: 'Sign in', login_busy: 'Signing in…', login_err_401: 'Incorrect username or password. Check your credentials and try again.', login_err_429: 'Too many attempts. Wait a minute before signing in again.', login_err_generic: 'Could not sign in. Check that NetPulse is available and try again.', login_err_session: 'The session could not be validated. Please try again.', login_err_conn: 'Could not connect to NetPulse. Make sure the API is running and try again.' });
     Object.assign(I18N.es, { search_placeholder: 'Buscar equipos o IP (Ctrl+K)', ov_focus: 'Equipos fuera de línea', ov_loading: 'Verificando equipos…', ov_loading_inventory: 'Consultando inventario…', ov_hint: 'Selecciona un equipo para ver su detalle.', ov_topology: 'Abrir topología', ov_refresh: 'Actualizar', ov_add: 'Agregar equipo', ov_offline: 'Fuera de línea', ov_online: 'En línea', ov_devices: 'Dispositivos', ov_availability: 'Porcentaje en línea', ov_alerts: 'Alertas activas', ov_detail: 'Ver detalle', ov_unverified: 'Sin verificar', ov_disk: 'Disco', login_submit: 'Ingresar', login_busy: 'Ingresando…', login_err_401: 'Usuario o contraseña incorrectos. Revisa los datos e inténtalo de nuevo.', login_err_429: 'Demasiados intentos. Espera un minuto antes de volver a ingresar.', login_err_generic: 'No se pudo iniciar sesión. Comprueba que NetPulse esté disponible e inténtalo de nuevo.', login_err_session: 'No se pudo validar la sesión. Vuelve a intentarlo.', login_err_conn: 'No se pudo conectar con NetPulse. Verifica que la API esté encendida e inténtalo de nuevo.' });
 
@@ -3650,7 +3574,10 @@
       localStorage.setItem('netpulse-refresh-interval', secs);
       const cr = document.getElementById('refresh-current'); if (cr) cr.textContent = secs + 's';
       if (window._rInt) { clearInterval(window._rInt); window._rInt = null }
-      if (n > 0) window._rInt = setInterval(() => { refMon(); if (document.getElementById('v-monitoreo')?.classList.contains('active')) loadH() }, n * 1000);
+      if (n > 0) window._rInt = setInterval(() => {
+        refMon();
+        if (document.getElementById('v-monitoring')?.classList.contains('active')) loadMonitoring();
+      }, n * 1000);
     }
 
     // Load saved theme on page load
@@ -3717,6 +3644,8 @@
       document.getElementById('login-error').style.display = 'none'
     }
     function togSide() {
+      // En escritorio (>=1280px) el rail siempre es visible; el toggle solo tiene sentido en pantallas medias.
+      if (window.innerWidth >= 1280) return;
       const open = document.getElementById('sidebar').classList.toggle('open');
       document.getElementById('sidebar-overlay').classList.toggle('active', open);
       const menu = document.querySelector('.menu-btn');
@@ -4100,7 +4029,7 @@
         const saved = JSON.parse(localStorage.getItem('np-chart-order') || '[]');
         if (!saved.length) return;
 
-        const grid = document.querySelector('#v-monitoreo .mon-chart')?.parentNode;
+        const grid = document.querySelector('#v-monitoring .mon-chart')?.parentNode;
         if (!grid) return;
         saved.forEach(item => {
           const id = item.id || item;
@@ -4184,6 +4113,9 @@
 
     async function init() {
       setLang(currentLang); // Auto-apply persisted language
+      // Restaurar la vista de la URL (p. ej. '#devices' tras un refresco a mitad de incidente).
+      const hv = decodeURIComponent(location.hash.slice(1));
+      if (hv && document.getElementById(`v-${hv}`)) swView(hv);
       void refreshAlertSummary();
       await loadDev(); await loadBk();
       setInterval(loadH, 10000); setInterval(loadBk, 60000);
@@ -4312,7 +4244,7 @@
     function tB() {
       bMode = !bMode; document.getElementById('bulk-t').textContent = bMode ? '☑ Multi' : '☐ Multi';
       document.querySelectorAll('.bulk-cb').forEach(c => c.style.display = bMode ? 'block' : 'none');
-      if (!bMode) { bSel.clear(); renderD(); document.getElementById('bulk-bar').style.display = 'none' }
+      if (!bMode) { bSel.clear(); renderD(); document.getElementById('bulk-bar').style.display = 'none'; bulkReset() }
     }
     function tB2(id, chk) {
       chk ? bSel.add(id) : bSel.delete(id);
@@ -4320,48 +4252,119 @@
     }
     function updB() {
       const bar = document.getElementById('bulk-bar');
-      if (!bSel.size) { bar.style.display = 'none'; return }
+      if (!bSel.size) { bar.style.display = 'none'; bulkReset(); return }
       bar.style.display = 'block'; document.getElementById('bulk-t').textContent = `🔀 ${bSel.size} seleccionado(s)`;
       document.getElementById('bulk-tags').innerHTML = [...bSel].map(id => `<span class="tag">${id}</span>`).join('')
     }
-    function bClear() { bSel.clear(); renderD(); document.getElementById('bulk-bar').style.display = 'none' }
+    function bClear() { bSel.clear(); renderD(); document.getElementById('bulk-bar').style.display = 'none'; bulkReset() }
 
-    async function bCmd() {
-      const ids = [...bSel]; if (!ids.length) return; const cmd = prompt('Comando:', 'show version'); if (!cmd) return;
-      const bar = document.getElementById('bulk-bar'), res = document.createElement('div');
-      bar.innerHTML = `<div class="bt">💻 Ejecutando...</div>`; bar.appendChild(res);
+    // ── Bulk: panel de confirmación y feedback honesto ──
+    function bulkPanel(html) {
+      const p = document.getElementById('bulk-panel');
+      if (!p) return;
+      p.innerHTML = html;
+      p.style.display = 'block';
+    }
+    function bulkClosePanel() {
+      const p = document.getElementById('bulk-panel');
+      if (!p) return;
+      p.style.display = 'none';
+      p.innerHTML = '';
+    }
+    function bulkReset() {
+      bulkClosePanel();
+      const r = document.getElementById('bulk-r');
+      if (r) r.innerHTML = '';
+    }
+    function bulkSummary(res, total, ok, fail) {
+      res.innerHTML += `<div style="font-size:11px;font-weight:600;margin-top:8px;color:${fail ? 'var(--red)' : 'var(--green)'}">${ok}/${total} ok${fail ? ` · ${fail} fallaron — ver detalles` : ''}</div>`;
+    }
+
+    function bCmd() {
+      const ids = [...bSel]; if (!ids.length) return;
+      bulkReset();
+      // Confirmación inline: comando verbatim + chips de destino, sin prompt() ciego.
+      bulkPanel(`
+        <div class="bt" style="margin-bottom:10px">💻 Ejecutar comando en ${ids.length} ${ids.length === 1 ? 'equipo' : 'equipos'}</div>
+        <form id="bp-form" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input id="bp-cmd" type="text" placeholder="show version" autocomplete="off" spellcheck="false"
+            style="flex:1;min-width:220px;height:34px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0 12px;color:var(--text);font-size:12px;font-family:var(--mono)">
+          <button type="submit" class="btn btn-p btn-sm">▶ Ejecutar</button>
+          <button type="button" class="btn btn-o btn-sm" onclick="bulkClosePanel()">Cancelar</button>
+        </form>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${ids.map(id => `<span class="tag" style="font-size:10px;padding:3px 8px">${esc(id)}</span>`).join('')}</div>
+        <div style="font-size:10px;color:var(--text-ter);margin-top:8px">Se usa la credencial guardada de cada equipo; el comando viaja verbatim a una sola línea.</div>`);
+      document.getElementById('bp-cmd')?.focus();
+      document.getElementById('bp-form')?.addEventListener('submit', e => {
+        e.preventDefault();
+        bCmdRun((e.target.elements['bp-cmd'].value || '').trim());
+      });
+    }
+    async function bCmdRun(cmd) {
+      if (!cmd) { toast('Escribe un comando para ejecutar', 'error'); return; }
+      const ids = [...bSel]; if (!ids.length) return;
+      bulkClosePanel();
+      const res = document.getElementById('bulk-r'); if (!res) return;
+      res.innerHTML = `<div class="bt">💻 Ejecutando en ${ids.length} ${ids.length === 1 ? 'equipo' : 'equipos'}…</div>`;
+      let ok = 0, fail = 0;
       for (const id of ids) {
+        let bad = false, err = '', out = '';
         try {
-          const r = await fetch(`${A}/command/${id}`, { method: 'POST', headers: h(), body: JSON.stringify({ commands: [cmd] }) });
-          const d = await r.json();
-          res.innerHTML += `<pre style="font-size:9px;margin-top:3px;padding:6px;border-radius:6px;background:var(--bg)"><span style="color:var(--accent-h)">${id}$ </span>${esc(cmd)}\n${esc((d.results?.[0]?.output || '').substring(0, 400))}</pre>`
-        } catch (e) { res.innerHTML += `<pre style="color:var(--red);font-size:9px">${id}: ${e.message}</pre>` }
+          const r = await fetch(`${A}/command/${encodeURIComponent(id)}`, { method: 'POST', headers: h(), body: JSON.stringify({ commands: [cmd] }), signal: AbortSignal.timeout(60000) });
+          const d = await r.json().catch(() => ({}));
+          bad = !r.ok || !!d.error || !!d.results?.[0]?.error;
+          if (bad) err = d.detail || (typeof d.error === 'string' ? d.error : typeof d.results?.[0]?.error === 'string' ? d.results[0].error : '') || `HTTP ${r.status}`;
+          else out = (d.results?.[0]?.output || '').trim();
+        } catch (e) { bad = true; err = e.message; }
+        if (bad) fail++; else ok++;
+        res.innerHTML += `<pre style="font-size:10px;margin-top:4px;padding:8px;border-radius:6px;background:var(--bg);border:1px solid ${bad ? 'var(--red)' : 'var(--border)'}"><span style="color:${bad ? 'var(--red)' : 'var(--accent-h)'};font-weight:600">${bad ? '❌' : '✅'} ${esc(id)}$ </span>${esc(cmd)}\n${bad ? esc(err || 'falló') : esc(out.length > 400 ? out.substring(0, 400) + '…' : out)}</pre>`;
       }
-      toast(`✅ ${ids.length} ejecutados`, 's')
+      bulkSummary(res, ids.length, ok, fail);
+      if (fail) toast(`💻 ${ok}/${ids.length} ok · ${fail} fallaron — ver detalles en la barra`, 'error');
+      else toast(`💻 ${ok}/${ids.length} ejecutados`, 's');
     }
     async function bPing() {
-      const ids = [...bSel]; if (!ids.length) return;
-      const bar = document.getElementById('bulk-bar');
-      bar.innerHTML = `<div class="bt">📡 Pingueando...</div><div id="bulk-r"></div>`;
-      const res = document.getElementById('bulk-r');
+      const ids = [...bSel];
+      if (!ids.length) { toast('Selecciona al menos un equipo', 'error'); return; }
+      // Ping desde el servidor NetPulse hacia el host de cada equipo seleccionado
+      // (antes usaba un target fijo 172.30.0.10 no explicable en la UI).
+      const byId = new Map(devices.map(d => [d.id, d.hostname || d.host || d.ip]));
+      bulkClosePanel();
+      const res = document.getElementById('bulk-r'); if (!res) return;
+      res.innerHTML = `<div class="bt">📡 Pingueando ${ids.length} ${ids.length === 1 ? 'equipo' : 'equipos'}…</div>`;
+      let ok = 0, fail = 0;
       for (const id of ids) {
+        const target = byId.get(id);
+        if (!target) { fail++; res.innerHTML += `<div style="font-size:10px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="color:var(--accent-h);font-weight:500">❌ ${esc(id)}</span>: sin IP conocida en el inventario</div>`; continue; }
         try {
-          const r = await fetch(`${A}/facts/${id}/ping?target=172.30.0.10`, { method: 'POST', headers: h() });
+          const r = await fetch(`${A}/system/ping?target=${encodeURIComponent(target)}&count=3`, { method: 'POST', headers: h(), signal: AbortSignal.timeout(12000) });
           const d = await r.json();
-          res.innerHTML += `<div style="font-size:10px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="color:var(--accent-h);font-weight:500">${id}</span>: ${d.probes_received > 0 ? '✅' : '❌'} ${d.probes_received || 0}/${d.probes_sent || 0}</div>`
-        } catch (e) { res.innerHTML += `<div style="color:var(--red);font-size:10px">${id}: ${e.message}</div>` }
+          if (d && d.success) ok++; else fail++;
+          res.innerHTML += `<div style="font-size:10px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="color:var(--accent-h);font-weight:500">${esc(id)}</span> → ${esc(target)}: ${d && d.success ? '✅ ' + Number(d.rtt_avg || 0).toFixed(1) + ' ms · ' + Math.round(d.packet_loss || 0) + '% pérdida' : '❌ sin respuesta'}</div>`;
+        } catch (e) { fail++; res.innerHTML += `<div style="color:var(--red);font-size:10px">${esc(id)} → ${esc(target)}: ${esc(e.message)}</div>` }
       }
+      bulkSummary(res, ids.length, ok, fail);
+      if (fail) toast(`📡 ${ok}/${ids.length} respondieron · ${fail} sin respuesta`, 'error');
+      else toast(`📡 ${ok}/${ids.length} respondieron`, 's');
     }
     async function bFacts() {
-      const ids = [...bSel]; if (!ids.length) return;
-      const bar = document.getElementById('bulk-bar');
-      bar.innerHTML = `<div class="bt">📋 Facts</div><div id="bulk-r"><div class="sp"></div></div>`;
+      const ids = [...bSel];
+      if (!ids.length) { toast('Selecciona al menos un equipo', 'error'); return; }
+      bulkClosePanel();
+      const res = document.getElementById('bulk-r'); if (!res) return;
+      res.innerHTML = `<div class="bt">📋 Facts de ${ids.length} ${ids.length === 1 ? 'equipo' : 'equipos'}…</div>`;
       try {
         const r = await fetch(`${A}/bulk/facts`, { method: 'POST', headers: h(), body: JSON.stringify(ids) });
         const d = await r.json();
-        document.getElementById('bulk-r').innerHTML = `<table style="margin-top:4px"><tr><th>Device</th><th>OS</th><th>Modelo</th></tr>
-      ${(d.results || []).map(rx => `<tr><td style="font-weight:500">${rx.device_id || rx.id || '?'}</td><td style="font-size:10px">${esc(((rx.data || {}).os_version || '?').substring(0, 22))}</td><td>${esc((rx.data || {}).model || '?')}</td></tr>`).join('')}</table>`
-      } catch (e) { document.getElementById('bulk-r').innerHTML = `<div style="color:var(--red)">${e.message}</div>` }
+        const rows = (d.results || []).filter(rx => rx);
+        const got = rows.filter(rx => rx.data && Object.keys(rx.data).length).length;
+        res.innerHTML = `<div class="bt">📋 Facts de ${ids.length} ${ids.length === 1 ? 'equipo' : 'equipos'}</div><table style="margin-top:4px;width:100%"><tr><th>Device</th><th>OS</th><th>Modelo</th></tr>
+      ${rows.map(rx => {
+          const okRow = rx.data && Object.keys(rx.data).length;
+          return `<tr><td style="font-weight:500">${esc(rx.device_id || rx.id || '?')}</td><td style="font-size:10px">${esc(((rx.data || {}).os_version || '?').substring(0, 22))}</td><td>${esc((rx.data || {}).model || '?')}</td></tr>`;
+        }).join('')}</table>${got < ids.length ? `<div style="font-size:10px;color:var(--yellow);margin-top:6px">Sin datos en ${ids.length - got} de ${ids.length} equipo(s)</div>` : ''}`;
+        if (got < ids.length) toast(`📋 Facts: ${got}/${ids.length} con datos`, 'error');
+      } catch (e) { res.innerHTML = `<div style="color:var(--red)">${esc(e.message)}</div>`; toast(`📋 Facts falló: ${e.message}`, 'error'); }
     }
 
     function renderD() {
@@ -4418,12 +4421,11 @@
       heading.focus({ preventScroll: true });
     }
     function showAddDevicePanel() {
-      const panel = document.getElementById('add-device-panel');
-      panel.style.display = 'block';
-      panel.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
-      // Los ids inv-* existen en dos formularios (panel y vista Inventario):
-      // enfocar el del panel, no el primero del DOM.
-      panel.querySelector('#inv-id')?.focus({ preventScroll: true });
+      // Un solo formulario de registro: vive en la vista Dispositivos.
+      // El panel duplicado del dashboard se retiró; su botón llega aquí con foco.
+      swView('devices');
+      const input = document.querySelector('#v-devices #inv-id');
+      if (input) setTimeout(() => input.focus({ preventScroll: true }), 200);
     }
     document.getElementById('ops-focus-items').addEventListener('click', event => {
       const button = event.target.closest('[data-device]');
@@ -4683,56 +4685,12 @@
       size = size || 72;
       return `<div class="donut" style="--pct:${pct};width:${size}px;height:${size}px;margin:0 auto"><svg viewBox="0 0 36 36"><path class="donut-bg" d="M18 2.0845a15.9155 15.9155 0 0 1 0 31.831a15.9155 15.9155 0 0 1 0-31.831"/><path class="donut-fg" stroke="${color}" stroke-dasharray="${pct},100" d="M18 2.0845a15.9155 15.9155 0 0 1 0 31.831a15.9155 15.9155 0 0 1 0-31.831"/></svg><div class="donut-lbl" style="font-size:13px;font-weight:700">${pct}%</div></div>`;
     }
-    async function loadHostPanel() {
-      const el = document.getElementById('perf-host'); if (!el) return;
-      el.innerHTML = '<div class="sp" style="margin:10px auto"></div>';
-      try {
-        const r = await fetch(`${A}/system/overview`, { headers: h(), signal: AbortSignal.timeout(6000) });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const d = await r.json();
-        const host = d.host || {}, cpu = host.cpu || {}, mem = host.memory || {}, proc = host.process || {};
-        const poller = d.poller || {}, ds = d.devices_summary || {};
-        const disks = (host.disks || []).filter(x => !String(x.mountpoint).startsWith('/System/Volumes'));
-        const rootDisk = disks.find(x => x.mountpoint === '/') || disks[0] || {};
-        const net = (host.network || []).reduce((a, n) => ({ sent: a.sent + (n.bytes_sent || 0), recv: a.recv + (n.bytes_recv || 0) }), { sent: 0, recv: 0 });
-        const cpuColor = cpu.percent > 80 ? 'var(--red)' : cpu.percent > 50 ? 'var(--yellow)' : 'var(--green)';
-        const pollerBadge = poller.running
-          ? `<span class="badge badge-g" style="font-size:9px">● Poller activo (${poller.interval}s)</span>`
-          : `<span class="badge badge-r" style="font-size:9px">● Poller detenido</span>`;
-        el.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
-            <h3 style="font-size:14px;font-weight:600;color:var(--text)">🖥️ Servidor NetPulse — ${esc(host.hostname || 'host')}</h3>
-            <div style="display:flex;gap:8px;align-items:center">
-              ${pollerBadge}
-              <span class="badge" style="background:var(--surface);font-size:9px">${esc(host.system || '')} ${esc(host.release || '')} · Python ${esc(host.python || '')}</span>
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:16px;align-items:center">
-            <div style="text-align:center">${_donut(cpu.percent, cpuColor, 78)}<div style="font-size:11px;font-weight:600;margin-top:8px;color:var(--text-secondary)">CPU</div><div style="font-size:9px;color:var(--text-ter)">${cpu.count_logical || 0} núcleos · load ${cpu.load1 || 0}</div></div>
-            <div style="text-align:center">${_donut(mem.percent, mem.percent > 85 ? 'var(--red)' : 'var(--green)', 78)}<div style="font-size:11px;font-weight:600;margin-top:8px;color:var(--text-secondary)">RAM</div><div style="font-size:9px;color:var(--text-ter)">${_fmtBytes(mem.used)} / ${_fmtBytes(mem.total)}</div></div>
-            <div style="text-align:center">${_donut(rootDisk.percent, rootDisk.percent > 90 ? 'var(--red)' : 'var(--yellow)', 78)}<div style="font-size:11px;font-weight:600;margin-top:8px;color:var(--text-secondary)">Disco /</div><div style="font-size:9px;color:var(--text-ter)">${_fmtBytes(rootDisk.used)} / ${_fmtBytes(rootDisk.total)}</div></div>
-            <div style="text-align:center">${_donut(mem.swap_percent, 'var(--accent)', 78)}<div style="font-size:11px;font-weight:600;margin-top:8px;color:var(--text-secondary)">Swap</div><div style="font-size:9px;color:var(--text-ter)">${_fmtBytes(mem.swap_used)} / ${_fmtBytes(mem.swap_total)}</div></div>
-          </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:18px;padding-top:14px;border-top:1px solid var(--border-s)">
-            <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Uptime host</div><div style="font-size:13px;font-weight:600;color:var(--text)">${_fmtUptime(host.uptime_seconds)}</div></div>
-            <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Carga (1/5/15m)</div><div style="font-size:13px;font-weight:600;color:var(--text)">${cpu.load1 || 0} / ${cpu.load5 || 0} / ${cpu.load15 || 0}</div></div>
-            <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Red (total)</div><div style="font-size:13px;font-weight:600;color:var(--text)">↓${_fmtBytes(net.recv)} ↑${_fmtBytes(net.sent)}</div></div>
-            <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Procesos / Conexiones</div><div style="font-size:13px;font-weight:600;color:var(--text)">${host.processes_total || 0} / ${host.connections_total || 0}</div></div>
-            <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">API NetPulse (pid ${proc.pid || '?'})</div><div style="font-size:13px;font-weight:600;color:var(--text)">${(proc.cpu_percent || 0).toFixed ? (proc.cpu_percent || 0).toFixed(1) : proc.cpu_percent}% CPU · ${_fmtBytes(proc.memory_rss)}</div></div>
-            <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Dispositivos</div><div style="font-size:13px;font-weight:600;color:var(--text)"><span style="color:var(--green)">${ds.online || 0} up</span> · <span style="color:var(--red)">${ds.offline || 0} down</span></div></div>
-          </div>
-        </div>`;
-      } catch (e) {
-        el.innerHTML = `<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;font-size:12px;color:var(--text-ter)">⚠️ No se pudieron cargar las métricas del servidor: ${esc(e.message)}</div>`;
-      }
-    }
     async function loadPerformance() {
       const kpis = document.getElementById('perf-kpis');
       const grid = document.getElementById('perf-grid');
       if (!kpis || !grid) return;
       kpis.innerHTML = '<div class="sp"></div>';
       grid.innerHTML = '<div class="sp" style="grid-column:1/-1"></div>';
-      loadHostPanel();
 
       // Snapshot del poller (latencia/estado por dispositivo)
       let devMetrics = {};
@@ -5311,8 +5269,11 @@
 
     function renderCmd(id, el) {
       const uid = crypto.randomUUID?.() || Date.now();
+      // Sugerencia de ping con la IP real del equipo (antes: target fijo 172.30.0.10).
+      const _dev = (devices || []).find(x => x.id === id) || {};
+      const _tgt = _dev.hostname || _dev.host || _dev.ip || '10.0.0.1';
       el.innerHTML = `<div class="fr2">
-    <textarea id="c-${uid}" placeholder="show version&#10;show ip route&#10;ping 172.30.0.10" rows="3" style="min-height:60px" onkeydown="if(event.key==='Enter'&&event.ctrlKey)rCmd('${id}','${uid}')"></textarea>
+    <textarea id="c-${uid}" placeholder="show version&#10;show ip route&#10;ping ${_tgt}" rows="3" style="min-height:60px" onkeydown="if(event.key==='Enter'&&event.ctrlKey)rCmd('${id}','${uid}')"></textarea>
     <div style="display:flex;flex-direction:column;gap:3px">
       <button class="btn btn-p btn-sm" onclick="rCmd('${id}','${uid}')" style="padding:8px 14px">▶</button>
       <button class="btn btn-o btn-xs" onclick="document.getElementById('t-${uid}').innerHTML='<span style=\\'color:var(--text-ter)\\'>Limpiado</span>'">⌫</button></div></div>
@@ -5504,64 +5465,6 @@
             </tr>`}).join('')}</tbody>
         </table>` : '<div style="padding:40px;text-align:center;color:var(--text-ter)"><div style="font-size:32px;margin-bottom:12px">💾</div>No hay backups guardados.<br><small>Usa el botón "Backup All" o ejecuta un backup desde cada dispositivo.</small></div>';
       } catch (e) { }
-    }
-
-    // ── ACTIVITY ──
-    async function loadAct() {
-      const el = document.getElementById('act-list'); if (!el || !t) return;
-      try {
-        const r = await fetch(`${A}/audit?limit=25`, { headers: h() }); const d = await r.json();
-        const ev = d.data || d.results || d || [];
-        if (!ev.length) el.innerHTML = '<div class="empty"><span class="icon">📝</span><br>Sin actividad</div>';
-        else el.innerHTML = ev.slice(0, 25).map(e => {
-          const p = e.path || '', s = e.status || e.response_status || 200;
-          const ty = p.includes('backup') ? 'b' : p.includes('config') ? 'c' : p.includes('command') ? 'm' : p.includes('template') ? 'y' : 'c';
-          return `<div class="ai"><span class="ad ${s >= 400 ? 'r' : ty}"></span>
-        <div style="flex:1"><div style="font-weight:500;font-size:12px">${e.method || ''} ${esc((p || '/').substring(0, 38))}</div>
-        <div style="font-size:9px;color:var(--text-ter)">${e.username || 'system'} · <span class="badge ${s < 400 ? 'badge-g' : 'badge-r'}">${s}</span></div></div>
-        <span style="font-size:10px;color:var(--text-ter);white-space:nowrap">${e.timestamp ? new Date(e.timestamp).toLocaleTimeString() : '—'}</span></div>`
-        }).join('')
-      } catch (e) { }
-    }
-
-    // ── AUDIT ──
-    async function loadAudit() {
-      const el = document.getElementById('audit-list'); if (!el || !t) return;
-      try {
-        const r = await fetch(`${A}/audit?limit=35`, { headers: h() }); const d = await r.json();
-        const items = d.data || d.results || d || [];
-        if (!items.length) el.innerHTML = '<div class="empty"><span class="icon">📋</span><br>Sin registros</div>';
-        else el.innerHTML = `<div style="overflow-x:auto;border:1px solid var(--border);border-radius:6px;background:var(--panel)"><table style="width:100%;text-align:left;border-collapse:collapse">
-      <thead style="background:var(--surface);border-bottom:1px solid var(--border-s)">
-        <tr><th style="padding:12px;font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Hora</th><th style="padding:12px;font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Usuario</th><th style="padding:12px;font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Método</th><th style="padding:12px;font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Ruta</th><th style="padding:12px;font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase">Estado</th><th style="padding:12px;font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase">IP</th></tr>
-      </thead><tbody>
-      ${items.slice(0, 35).map(e => `<tr style="border-bottom:1px solid var(--border-s);transition:background .2s;cursor:pointer" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='transparent'"><td style="padding:10px;font-size:11px;color:var(--text-secondary);white-space:nowrap">${e.timestamp ? new Date(e.timestamp).toLocaleString() : '—'}</td>
-      <td style="padding:10px;font-size:12px;font-weight:500;color:var(--text)">${esc(e.username || '—')}</td><td style="padding:10px"><span class="badge" style="background:var(--blue-bg);color:var(--blue)">${e.method || '—'}</span></td>
-      <td style="padding:10px;max-width:240px;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono);font-size:11px;color:var(--text-ter)">${esc((e.path || '').substring(0, 35))}</td>
-      <td style="padding:10px"><span class="badge ${!e.success || e.success === 'true' ? 'badge-g' : 'badge-r'}">${e.response_status || e.status || '?'}</span></td>
-      <td style="padding:10px;font-size:11px;color:var(--text-ter);font-family:var(--mono)">${e.ip || '—'}</td></tr>`).join('')}
-      </tbody></table></div>`
-      } catch (e) { if (document.getElementById('audit-list')) document.getElementById('audit-list').innerHTML = '<div style="font-size:11px;color:var(--text-ter)">Error</div>' }
-    }
-
-    // ── CONTRIBUTION GRAPH ──
-    async function loadCG() {
-      const grid = document.getElementById('cg'); if (!grid || !t) return;
-      try {
-        const r = await fetch(`${A}/audit?limit=100`, { headers: h() });
-        const d = await r.json(); const ev = d.data || d.results || d || [];
-        const cd = {};
-        if (Array.isArray(ev)) for (const e of ev) if (e.timestamp) { const dk = new Date(e.timestamp).toISOString().split('T')[0]; cd[dk] = (cd[dk] || 0) + 1 }
-        const today = new Date(); const days = 49; const vals = Object.values(cd); const max = Math.max(...vals, 1);
-        let html = '';
-        for (let i = days - 1; i >= 0; i--) {
-          const d = new Date(today); d.setDate(d.getDate() - i); const dk = d.toISOString().split('T')[0];
-          const count = cd[dk] || 0; const pct = count / max;
-          const lvl = count === 0 ? '' : pct > 0.8 ? 'l5' : pct > 0.6 ? 'l4' : pct > 0.4 ? 'l3' : pct > 0.2 ? 'l2' : 'l1';
-          html += `<div class="cc${lvl}"><div class="tip">${d.toLocaleDateString('es', { weekday: 'short', day: 'numeric', month: 'short' })}${count ? ` · ${count} ${count === 1 ? 'cambio' : 'cambios'}` : ' · Sin actividad'}</div></div>`
-        }
-        grid.innerHTML = html
-      } catch (e) { grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-ter);font-size:9px;padding:8px">Conectate para ver</div>' }
     }
 
     async function dlBackup(id, fname) {
@@ -5915,10 +5818,18 @@
     });
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && document.getElementById('sidebar').classList.contains('open')) togSide();
+      // El buscador global anuncia (Ctrl+K): que sea verdad, en todas las plataformas.
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const search = document.getElementById('sb');
+        if (search && document.getElementById('main').style.display !== 'none') { search.focus(); search.select(); }
+      }
     });
 
     // ── SWITCH VIEW ──
     function swView(v) {
+      // La vista "Métricas" se fusionó en "Monitoreo": el hash #monitoreo sigue funcionando.
+      if (v === 'monitoreo') v = 'monitoring';
       const target = document.getElementById(`v-${v}`);
       if (!target) { console.warn('Vista inexistente:', v); return; }
       document.querySelectorAll('.view').forEach(e => e.classList.remove('active'));
@@ -5934,7 +5845,12 @@
       if (v === 'devices') loadInventory();
       if (v === 'webhooks') loadWebhooks();
       if (v === 'admin') loadUsers();
-      if (v === 'monitoreo') { refMon(); if (window._mInt) clearInterval(window._mInt); window._mInt = setInterval(refMon, 15000) }
+      if (v === 'monitoring') {
+        loadMonitoring(); refMon();
+        // Un solo auto-refresh para la vista: gobierna stack y métricas de plataforma.
+        if (window._mInt) clearInterval(window._mInt);
+        window._mInt = setInterval(() => { loadMonitoring(); refMon(); }, 15000);
+      }
       if (v === 'connectivity') loadConn();
       if (v === 'performance') loadPerformance();
       if (v === 'alerts') loadAlerts();
@@ -5942,7 +5858,6 @@
       if (v === 'commands') populateCmdDevices();
       if (v === 'theme') updateThemeUI();
       if (v === 'topology') loadTopology();
-      if (v === 'monitoring') loadMonitoring();
       if (v === 'maintenance') loadMaint();
       if (v === 'apikeys') loadKeys();
       if (v === 'compliance') loadCompliance();
@@ -5956,11 +5871,19 @@
         }
       }
       if (v === 'compare') bdPopulateDevices();
+      // La vista vive en la URL: refresco y enlaces compartidos aterrizan donde el operador estaba.
+      if (location.hash.slice(1) !== v) location.hash = v;
     }
 
-    // ── MONITORING (unificado) ────────────────────────────────
-    let _monTimer = null;
+    // Boton atras/adelante y vistas abiertas por URL sincronizan con la vista activa.
+    window.addEventListener('hashchange', () => {
+      const v = location.hash.slice(1);
+      const target = v && document.getElementById(`v-${v}`);
+      if (!target || target.classList.contains('active')) return;
+      swView(v);
+    });
 
+    // ── MONITOREO (secciones stack + plataforma) ─────────────
     function monNum(v, suffix) {
       if (v === null || v === undefined || isNaN(v)) return '—';
       const n = Math.round(Number(v) * 10) / 10;
@@ -6003,19 +5926,10 @@
             <div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase">${label}</div>
             <div style="font-size:22px;font-weight:700">${value}</div></div></div>`).join('');
 
-        // Alertas activas (NetPulse → Prometheus/Alertmanager)
+        // (Las alertas activas tienen su vista dedicada: se enlaza, no se duplica.)
         try {
           const al = await fetch(`${A}/alerts/active`, { headers: h() }).then(r => r.json()).catch(() => ({}));
-          const alerts = al.alerts || [];
-          const sevColor = s => s === 'critical' ? 'var(--red)' : (s === 'high' ? '#f59e0b' : 'var(--accent)');
-          document.getElementById('mon-alerts').innerHTML = alerts.length
-            ? alerts.map(a => `<div style="margin-bottom:10px">
-                <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px">
-                  <span style="color:var(--text-secondary)">${esc(a.name || '')}</span>
-                  <span style="font-family:var(--mono);color:${sevColor(a.severity)}">${esc(a.state || '')}</span></div>
-                <div style="font-size:11px;color:var(--text-ter)">${esc(a.summary || a.description || '')}</div>
-              </div>`).join('')
-            : '<div style="color:var(--text-ter);font-size:12px">Sin alertas activas</div>';
+          if (al.status || al.alerts) void refreshAlertSummary(); // mantiene el badge del nav y del header al día
         } catch (e) { /* silencioso */ }
 
         const targets = ov.targets || [];
@@ -6049,17 +5963,6 @@
       }
     }
 
-    function monAutoToggle() {
-      const b = document.getElementById('mon-auto');
-      const sp = b.querySelector('span');
-      if (_monTimer) {
-        clearInterval(_monTimer); _monTimer = null;
-        if (sp) sp.textContent = 'Auto: OFF'; b.classList.remove('btn-p'); b.classList.add('btn-o');
-      } else {
-        _monTimer = setInterval(loadMonitoring, 15000);
-        if (sp) sp.textContent = 'Auto: ON'; b.classList.remove('btn-o'); b.classList.add('btn-p');
-      }
-    }
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         const dd = document.getElementById('user-dd');
@@ -6067,14 +5970,58 @@
       }
     });
 
-    // ── TOPOLOGY ──────────────────────────────────────────────
+    // ── TOPOLOGY (grafo canvas + mapa Leaflet + tabla + traceroute) ──
+    let _topoData = { nodes: [], links: [] };
+    let _topoTab = 'graph';
+    let _topoGraph = null;        // estado de simulación del canvas
+    let _topoGraphRAF = null;
+    let _topoMap = null;          // Leaflet (lazy)
+    let _topoDevLayer = null;
+    let _topoTraceLayer = null;
+    let _topoTraceData = null;    // último traceroute ejecutado
+
+    function _t(k) {
+      return (I18N[currentLang] || I18N.en)[k] || k;
+    }
+
+    function topoTab(tv) {
+      _topoTab = tv;
+      const show = id => { const el = document.getElementById(id); if (el) el.style.display = ''; };
+      const hide = id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; };
+      if (tv === 'graph') { show('topo-view-graph'); hide('topo-view-map'); hide('topo-view-table'); }
+      if (tv === 'map') { hide('topo-view-graph'); show('topo-view-map'); hide('topo-view-table'); }
+      if (tv === 'table') { hide('topo-view-graph'); hide('topo-view-map'); show('topo-view-table'); }
+      ['graph', 'map', 'table'].forEach(x => {
+        const b = document.getElementById(`topo-tab-${x}`);
+        if (!b) return;
+        const on = x === tv;
+        b.style.background = on ? 'var(--accent-bg)' : 'transparent';
+        b.style.color = on ? 'var(--accent)' : 'var(--text-secondary)';
+        b.style.fontWeight = on ? '700' : '500';
+      });
+      if (tv === 'graph') requestAnimationFrame(startTopoGraph);
+      if (tv === 'map') requestAnimationFrame(() => { ensureTopoMap(); updateTopoMapDevices(); redrawTopoTrace(); });
+    }
+
+    function buildTraceOrigins() {
+      const sel = document.getElementById('topo-trace-origin');
+      if (!sel) return;
+      const cur = sel.value;
+      sel.innerHTML =
+        `<option value="noc">🛰️ Servidor NetPulse</option>` +
+        ((_topoData.nodes || []).map(n =>
+          `<option value="${esc(n.id)}">${esc(n.id)}${n.ip ? ` (${esc(n.ip)})` : ''}</option>`).join(''));
+      if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
+    }
+
     async function loadTopology() {
       try {
         const r = await fetch(`${A}/topology/map`, { headers: h() });
         if (!r.ok) return;
         const d = await r.json();
+        _topoData = d;
         const nodes = d.nodes || [], links = d.links || [];
-        
+
         document.getElementById('topo-stats').innerHTML =
           `<div class="sc" style="display:flex;align-items:center;gap:16px;padding:16px 20px;">
             <div style="background:var(--blue-bg);border-radius:12px;display:flex;align-items:center;justify-content:center;width:48px;height:48px;font-size:20px;flex-shrink:0">🖧</div>
@@ -6089,8 +6036,15 @@
               <div class="sl" style="font-size:11px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Enlaces Detectados</div>
               <div class="sv" style="font-size:24px;font-weight:700">${links.length}</div>
             </div>
+          </div>
+          <div class="sc" style="display:flex;align-items:center;gap:16px;padding:16px 20px;">
+            <div style="background:var(--accent-bg);border-radius:12px;display:flex;align-items:center;justify-content:center;width:48px;height:48px;font-size:20px;flex-shrink:0">📍</div>
+            <div style="min-width:0;flex:1">
+              <div class="sl" style="font-size:11px;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Geo-localizados</div>
+              <div class="sv" style="font-size:24px;font-weight:700">${nodes.filter(n => n.geo).length}</div>
+            </div>
           </div>`;
-          
+
         document.getElementById('topo-nodes').innerHTML = nodes.map(n =>
           `<div class="dc" style="display:flex;flex-direction:column;gap:12px;cursor:default;background:var(--elevated);border-radius:var(--radius-lg);padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.05)">
             <div style="display:flex;align-items:center;gap:12px;">
@@ -6100,12 +6054,14 @@
                 <div style="font-size:11px;color:var(--text-ter);font-family:var(--mono);margin-top:2px">${esc(n.type)}</div>
               </div>
             </div>
-            <div style="display:flex;gap:8px;margin-top:4px">
+            <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
               <span class="badge" style="background:var(--surface);color:var(--text-secondary);font-size:10px">${esc(n.driver).toUpperCase()}</span>
               ${n.group ? `<span class="badge" style="background:var(--accent-bg);color:var(--accent);font-size:10px">${esc(n.group)}</span>` : ''}
+              ${n.geo ? `<span class="badge" style="background:var(--green-bg);color:var(--green);font-size:10px">📍 ${esc(n.geo.city || n.geo.country || '')}</span>` : ''}
+              ${n.ip ? `<span class="badge" style="background:var(--surface);color:var(--text-secondary);font-size:10px;font-family:var(--mono)">${esc(n.ip)}</span>` : ''}
             </div>
           </div>`).join('') || '<div class="empty" style="padding:40px;background:var(--elevated);border-radius:var(--radius-lg);border:1px dashed var(--border)">Sin dispositivos en la topología</div>';
-          
+
         document.getElementById('topo-links-list').innerHTML = links.length ?
           `<table style="width:100%;border-collapse:collapse;text-align:left">
             <thead style="background:var(--surface);border-bottom:1px solid var(--border)">
@@ -6128,8 +6084,399 @@
               </tr>`).join('')}
             </tbody>
           </table>` : '<div class="empty" style="padding:40px">Sin enlaces LLDP/CDP detectados</div>';
+
+        buildTraceOrigins();
+        topoTab(_topoTab);
+        if (!_topoTraceData) renderTraceResult(null);
       } catch (e) { }
     }
+
+    // ── Grafo interactivo (canvas, física, drag + zoom + hover) ──
+    function _topoScreen2World(cv, ev) {
+      const g = _topoGraph, rect = cv.getBoundingClientRect();
+      const x = ev.clientX - rect.left, y = ev.clientY - rect.top;
+      return { x: (x - g.view.x) / g.view.z, y: (y - g.view.y) / g.view.z };
+    }
+
+    function _topoResolveEdges() {
+      const ids = new Map((_topoData.nodes || []).map(n => [String(n.id).toLowerCase(), n.id]));
+      const resolve = name => {
+        if (!name) return null;
+        const s = String(name).toLowerCase();
+        if (ids.has(s)) return ids.get(s);
+        for (const [k, v] of ids) { if (k.includes(s) || s.includes(k)) return v; }
+        return null;
+      };
+      const list = [];
+      const seen = new Set();
+      for (const l of _topoData.links || []) {
+        const a = resolve(l.source), b = resolve(l.target);
+        if (!a || !b || a === b) continue;
+        const key = [a, b].sort().join('~');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        list.push({ a, b, label: `${l.local_port || ''} → ${l.remote_port || ''}` });
+      }
+      return list;
+    }
+
+    function startTopoGraph() {
+      const cv = document.getElementById('topo-canvas');
+      if (!cv || _topoTab !== 'graph') return;
+      if (_topoGraphRAF) cancelAnimationFrame(_topoGraphRAF);
+      const dpr = window.devicePixelRatio || 1;
+      cv.width = cv.clientWidth * dpr;
+      cv.height = cv.clientHeight * dpr;
+      const gw = cv.clientWidth, gh = cv.clientHeight;
+      const ctx = cv.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const cs = getComputedStyle(document.documentElement);
+      const cAccent = (cs.getPropertyValue('--accent') || '').trim() || '#3b82f6';
+      const cText = (cs.getPropertyValue('--text') || '').trim() || '#e2e8f0';
+      const cMut = (cs.getPropertyValue('--text-ter') || '').trim() || '#64748b';
+
+      const edgesRaw = _topoResolveEdges();
+      const known = (_topoData.nodes || []).map(n => ({
+        id: n.id, type: n.type || 'router', group: n.group || '', driver: n.driver || '?',
+        ip: n.ip || '', geo: n.geo, phantom: false,
+      }));
+      const knownSet = new Set(known.map(k => String(k.id)));
+      // Vecinos LLDP que no están en el inventario → nodos "fantasma" de referencia
+      for (const e of edgesRaw) {
+        for (const end of [e.a, e.b]) {
+          if (!knownSet.has(end)) {
+            knownSet.add(end);
+            known.push({ id: end, type: 'neighbor', group: '', driver: 'lldp', ip: '', geo: null, phantom: true });
+          }
+        }
+      }
+      if (!known.length) {
+        ctx.clearRect(0, 0, gw, gh);
+        ctx.fillStyle = cMut;
+        ctx.font = '13px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText('Sin dispositivos en la topología', gw / 2, gh / 2);
+        return;
+      }
+
+      const cx = gw / 2, cy = gh / 2, R = Math.min(gw, gh) * 0.34;
+      const ns = known.map((n, i) => {
+        const ang = (i / Math.max(1, known.length)) * Math.PI * 2;
+        return { ...n, x: cx + Math.cos(ang) * R, y: cy + Math.sin(ang) * R, vx: 0, vy: 0 };
+      });
+      const byId = new Map(ns.map(n => [String(n.id), n]));
+      const edges = edgesRaw.map(e => ({ ...e, ea: byId.get(e.a), eb: byId.get(e.b) }));
+      const palette = ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ec4899', '#06b6d4', '#ef4444', '#84cc16'];
+      const groupColors = {};
+      let gi = 0;
+      for (const n of ns) {
+        const g = n.group || n.type || 'net';
+        if (!(g in groupColors)) groupColors[g] = palette[gi++ % palette.length];
+      }
+      _topoGraph = { ns, edges, view: { x: 0, y: 0, z: 1 }, hover: null, drag: null, gw, gh, cx, cy };
+      const g = _topoGraph;
+
+      function step() {
+        // Repulsión O(n²) — inventarios NOC chicos
+        for (let i = 0; i < g.ns.length; i++) {
+          const na = g.ns[i];
+          for (let j = i + 1; j < g.ns.length; j++) {
+            const nb = g.ns[j];
+            let dx = nb.x - na.x, dy = nb.y - na.y;
+            const d2 = dx * dx + dy * dy || 1;
+            if (d2 < 200000) {
+              const f = 5000 / d2, d = Math.sqrt(d2);
+              dx /= d; dy /= d;
+              na.vx -= dx * f; na.vy -= dy * f;
+              nb.vx += dx * f; nb.vy += dy * f;
+            }
+          }
+          na.vx += (g.cx - na.x) * 0.0035; na.vy += (g.cy - na.y) * 0.0035;
+        }
+        for (const e of g.edges) {
+          const dx = e.eb.x - e.ea.x, dy = e.eb.y - e.ea.y;
+          const d = Math.max(1, Math.hypot(dx, dy));
+          const f = (d - 130) * 0.02;
+          const ux = dx / d, uy = dy / d;
+          e.ea.vx += ux * f; e.ea.vy += uy * f;
+          e.eb.vx -= ux * f; e.eb.vy -= uy * f;
+        }
+        for (const n of g.ns) {
+          if (n === g.drag) { n.vx = n.vy = 0; continue; }
+          n.vx *= 0.85; n.vy *= 0.85;
+          n.x += Math.max(-6, Math.min(6, n.vx));
+          n.y += Math.max(-6, Math.min(6, n.vy));
+        }
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, gw, gh);
+        ctx.save();
+        ctx.translate(g.view.x, g.view.y);
+        ctx.scale(g.view.z, g.view.z);
+        // Enlaces
+        for (const e of g.edges) {
+          const hl = g.hover && (g.hover === e.ea || g.hover === e.eb);
+          ctx.beginPath();
+          ctx.moveTo(e.ea.x, e.ea.y);
+          ctx.lineTo(e.eb.x, e.eb.y);
+          ctx.strokeStyle = hl ? cAccent : 'rgba(148,163,184,0.35)';
+          ctx.lineWidth = hl ? 2.2 : 1.2;
+          ctx.stroke();
+          if (hl && g.view.z > 0.5) {
+            const mx = (e.ea.x + e.eb.x) / 2, my = (e.ea.y + e.eb.y) / 2;
+            const label = e.label, pad = 4;
+            ctx.font = '10px var(--mono), ui-monospace, monospace';
+            const w = ctx.measureText(label).width;
+            ctx.fillStyle = 'rgba(10,14,20,0.85)';
+            ctx.fillRect(mx - w / 2 - pad, my - 9, w + pad * 2, 15);
+            ctx.fillStyle = cText;
+            ctx.textAlign = 'center';
+            ctx.fillText(label, mx, my + 2);
+          }
+        }
+        // Nodos
+        for (const n of g.ns) {
+          const r = n.phantom ? 9 : 15;
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+          ctx.fillStyle = n.phantom ? 'rgba(100,116,139,0.35)' : (groupColors[n.group] || groupColors[n.type] || cAccent);
+          ctx.globalAlpha = n === g.hover ? 1 : 0.92;
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          if (n === g.hover) {
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, r - 4.5, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(8,12,18,0.55)';
+          ctx.fill();
+          ctx.font = `${n.phantom ? 9 : 11}px system-ui`;
+          ctx.textAlign = 'center';
+          ctx.fillStyle = g.hover === n ? cText : (n.phantom ? cMut : 'rgba(226,232,240,0.85)');
+          ctx.fillText(String(n.id), n.x, n.y + r + 12);
+        }
+        // Tooltip fijo
+        if (g.hover) {
+          const n = g.hover;
+          const lines = [
+            `🖥️ ${n.id}`,
+            `type: ${n.type}   group: ${n.group || '—'}`,
+            `driver: ${n.driver.toUpperCase()}${n.ip ? `   ip: ${n.ip}` : ''}`,
+            `${n.geo ? `📍 ${n.geo.city || ''}${n.geo.city && n.geo.country ? ', ' : ''}${n.geo.country || ''}` : ''}`,
+          ].filter(Boolean);
+          const bx = 14, by = 14, lw = Math.max(...lines.map(t => ctx.measureText(t).width));
+          ctx.fillStyle = 'rgba(10,14,20,0.92)';
+          ctx.fillRect(bx, by, lw + 20, lines.length * 15 + 10);
+          ctx.strokeStyle = 'rgba(148,163,184,0.4)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(bx, by, lw + 20, lines.length * 15 + 10);
+          ctx.textAlign = 'left';
+          ctx.font = '11px system-ui';
+          lines.forEach((t, i) => {
+            ctx.fillStyle = i === 0 ? cAccent : cText;
+            ctx.fillText(t, bx + 10, by + 19 + i * 15);
+          });
+        }
+        ctx.restore();
+      }
+
+      function loop() {
+        if (_topoGraph !== g) return;
+        step();
+        draw();
+        _topoGraphRAF = requestAnimationFrame(loop);
+      }
+      loop();
+
+      cv.onmousedown = ev => {
+        const p = _topoScreen2World(cv, ev);
+        const hit = g.ns.find(n => Math.hypot(n.x - p.x, n.y - p.y) <= 18);
+        if (hit) { g.drag = hit; cv.style.cursor = 'grabbing'; }
+      };
+      cv.onmousemove = ev => {
+        const p = _topoScreen2World(cv, ev);
+        if (g.drag) { g.drag.x = p.x; g.drag.y = p.y; g.drag.vx = 0; g.drag.vy = 0; return; }
+        const hit = g.ns.find(n => Math.hypot(n.x - p.x, n.y - p.y) <= 18);
+        g.hover = hit || null;
+        cv.style.cursor = hit ? 'pointer' : 'grab';
+      };
+      const endDrag = () => { g.drag = null; cv.style.cursor = 'grab'; };
+      cv.onmouseup = endDrag;
+      cv.onmouseleave = () => { g.hover = null; endDrag(); };
+      cv.onwheel = ev => {
+        ev.preventDefault();
+        const rect = cv.getBoundingClientRect();
+        const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+        const z0 = g.view.z;
+        const z = Math.max(0.35, Math.min(3.2, z0 * (ev.deltaY < 0 ? 1.12 : 1 / 1.12)));
+        g.view.x = mx - ((mx - g.view.x) * z) / z0;
+        g.view.y = my - ((my - g.view.y) * z) / z0;
+        g.view.z = z;
+      };
+      cv.ondblclick = () => { g.view = { x: 0, y: 0, z: 1 }; };
+    }
+
+    // ── Mapa Leaflet ─────────────────────────────────────────
+    function ensureTopoMap() {
+      if (_topoMap) { _topoMap.invalidateSize(); return; }
+      const el = document.getElementById('topo-map');
+      if (!el || typeof L === 'undefined') return;
+      _topoMap = L.map(el, { worldCopyJump: true }).setView([20, 0], 2);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap',
+      }).addTo(_topoMap);
+      _topoDevLayer = L.layerGroup().addTo(_topoMap);
+      _topoTraceLayer = L.layerGroup().addTo(_topoMap);
+    }
+
+    function updateTopoMapDevices() {
+      if (!_topoMap || !_topoDevLayer) return;
+      _topoDevLayer.clearLayers();
+      let withoutGeo = 0;
+      for (const n of _topoData.nodes || []) {
+        if (n.geo && n.geo.lat && n.geo.lon) {
+          L.circleMarker([n.geo.lat, n.geo.lon], {
+            radius: 7, color: '#22c55e', weight: 2, fillColor: '#14532d', fillOpacity: 0.85,
+          }).bindPopup(
+            `<b>🖥️ ${esc(n.id)}</b><br>${esc(n.ip || '')}<br><span style="color:#22c55e">📍 ${esc(n.geo.city || '')}${n.geo.city && n.geo.country ? ', ' : ''}${esc(n.geo.country || '')}</span>`
+          ).addTo(_topoDevLayer);
+        } else {
+          withoutGeo++;
+        }
+      }
+      const legend = document.getElementById('topo-map-legend');
+      if (legend) {
+        const geo = _topoTraceData;
+        legend.innerHTML =
+          `<span style="color:#22c55e">●</span> Equipos NetPulse geolocalizados — ` +
+          `<span style="color:#3b82f6">📍</span> Saltos del${geo ? ' último' : ''} traceroute` +
+          `${withoutGeo ? `<br><span style="color:var(--text-ter)">${esc(_t('topo_nodes_no_geo'))} ${withoutGeo} (${esc(_t('topo_geo_off'))})</span>` : ''}`;
+      }
+    }
+
+    function redrawTopoTrace() {
+      if (!_topoMap || !_topoTraceLayer) return;
+      _topoTraceLayer.clearLayers();
+      const hops = (_topoTraceData && _topoTraceData.hops) || [];
+      const ll = [];
+      for (const h of hops) {
+        if (h.geo && h.geo.lat && h.geo.lon) {
+          const pos = [h.geo.lat, h.geo.lon];
+          ll.push(pos);
+          L.circleMarker(pos, {
+            radius: 9, color: '#3b82f6', weight: 2.5, fillColor: '#1d4ed8', fillOpacity: 0.9,
+          }).bindPopup(
+            `<b>Salto ${h.hop}</b><br>${esc(h.hostname || h.ip || '?')}<br>` +
+            `${esc(h.ip || '')}${h.rtt_ms != null ? ` · ${h.rtt_ms} ms` : ''}<br>` +
+            `<span style="color:#3b82f6">📍 ${esc(h.geo.city || '')}${h.geo.city && h.geo.country ? ', ' : ''}${esc(h.geo.country || '')}</span>` +
+            `${h.device_id ? `<br><b style="color:#22c55e">Equipo NetPulse: ${esc(h.device_id)}</b>` : ''}`
+          ).bindTooltip(`#${h.hop} ${h.hostname || h.ip || '*'}`, { direction: 'top' }).addTo(_topoTraceLayer);
+        }
+      }
+      if (ll.length >= 2) {
+        L.polyline(ll, { color: '#3b82f6', weight: 2.5, dashArray: '7 7', opacity: 0.8 }).addTo(_topoTraceLayer);
+        _topoMap.fitBounds(L.latLngBounds(ll).pad(0.35), { maxZoom: 10 });
+      } else if (_topoData.nodes.some(n => n.geo)) {
+        const b = L.latLngBounds((_topoData.nodes.filter(n => n.geo)).map(n => [n.geo.lat, n.geo.lon]));
+        _topoMap.fitBounds(b.pad(0.4), { maxZoom: 8 });
+      }
+    }
+
+    // ── Traceroute interactivo ───────────────────────────────
+    async function runTopoTrace() {
+      const destEl = document.getElementById('topo-trace-dest');
+      const origin = (document.getElementById('topo-trace-origin') || {}).value || 'noc';
+      const dest = (destEl.value || '').trim();
+      const btn = document.getElementById('topo-trace-btn');
+      const msg = document.getElementById('topo-trace-msg');
+      if (!dest) {
+        msg.textContent = '⚠ ' + _t('topo_tr_dest');
+        return;
+      }
+      btn.disabled = true;
+      msg.textContent = '⏳ ' + _t('topo_tr_running');
+      document.getElementById('topo-trace-result').innerHTML = '';
+      try {
+        const r = await fetch(`${A}/topology/traceroute`, {
+          method: 'POST',
+          headers: { ...h(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ origin, destination: dest }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          const det = typeof d.detail === 'string' ? d.detail : (d.detail && JSON.stringify(d.detail)) || `HTTP ${r.status}`;
+          throw new Error(det);
+        }
+        _topoTraceData = d;
+        msg.textContent = `✅ ${d.hops.length} salto(s) · ${_t('topo_tr_from')} ${esc(d.origin.label)} → ${esc(dest)}`;
+        renderTraceResult(d);
+        topoTab('map');
+        updateTopoMapDevices();
+        redrawTopoTrace();
+      } catch (e) {
+        msg.textContent = '❌ ' + _t('topo_tr_err_pre') + e.message;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function clearTopoTrace() {
+      _topoTraceData = null;
+      document.getElementById('topo-trace-result').innerHTML = '';
+      document.getElementById('topo-trace-msg').textContent = '';
+      if (_topoTraceLayer) _topoTraceLayer.clearLayers();
+      updateTopoMapDevices();
+      renderTraceResult(null);
+    }
+
+    function renderTraceResult(d) {
+      const box = document.getElementById('topo-trace-result');
+      if (!box) return;
+      if (!d) {
+        box.innerHTML = `<div class="empty" style="padding:20px;background:var(--elevated);border-radius:var(--radius-lg);border:1px dashed var(--border)">${esc(_t('topo_tr_empty'))}</div>`;
+        return;
+      }
+      const rows = d.hops.map(h => `
+        <tr style="border-bottom:1px solid var(--border-s)">
+          <td style="padding:8px 12px;font-size:12px;font-family:var(--mono);color:var(--text-ter)">${h.hop}</td>
+          <td style="padding:8px 12px;font-size:13px;font-weight:600;color:var(--text)">${h.hostname ? esc(h.hostname) : esc(h.ip || '⏱ *')}</td>
+          <td style="padding:8px 12px;font-size:12px;color:var(--text-secondary);font-family:var(--mono)">${esc(h.ip || '—')}</td>
+          <td style="padding:8px 12px;font-size:12px;color:var(--text-secondary);font-family:var(--mono)">${h.rtt_ms != null ? h.rtt_ms + ' ms' : '—'}</td>
+          <td style="padding:8px 12px;font-size:12px;color:var(--text-secondary)">${h.geo ? `📍 ${esc(h.geo.city || '')}${h.geo.city && h.geo.country ? ', ' : ''}${esc(h.geo.country || '')}` : `<span title="${esc(_t('topo_tr_private'))}">🌐 ✕</span>`}</td>
+          <td style="padding:8px 12px;font-size:12px">${h.device_id ? `<span class="badge" style="background:var(--green-bg);color:var(--green)">${esc(h.device_id)}</span>` : ''}</td>
+        </tr>`).join('');
+      box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap">
+          <h3 style="font-size:11px;color:var(--text-ter)">
+            SALTO POR SALTO · ${esc(d.origin.label)} ➔ ${esc(d.destination)}
+          </h3>
+          <button class="btn btn-o btn-sm" onclick="clearTopoTrace()">${esc(_t('topo_tr_clear'))}</button>
+        </div>
+        ${d.geoip_available === false ? `<div style="font-size:11px;color:var(--text-ter);margin-bottom:8px">ℹ️ ${esc(_t('topo_geo_off'))}</div>` : ''}
+        <table style="width:100%;border-collapse:collapse;text-align:left;border:1px solid var(--border-s);border-radius:8px">
+          <thead style="background:var(--surface);border-bottom:1px solid var(--border)">
+            <tr>
+              <th style="padding:10px 12px;font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase">${esc(_t('topo_th_hop'))}</th>
+              <th style="padding:10px 12px;font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase">${esc(_t('topo_th_host'))}</th>
+              <th style="padding:10px 12px;font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase">${esc(_t('topo_th_ip'))}</th>
+              <th style="padding:10px 12px;font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase">${esc(_t('topo_th_rtt'))}</th>
+              <th style="padding:10px 12px;font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase">${esc(_t('topo_th_geo'))}</th>
+              <th style="padding:10px 12px;font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase">${esc(_t('topo_th_dev'))}</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        ${d.raw_output ? `<details style="margin-top:8px"><summary style="font-size:11px;color:var(--text-ter);cursor:pointer">Salida raw</summary><pre style="font-size:11px;color:var(--text-ter);white-space:pre-wrap;max-height:220px;overflow:auto;background:var(--bg);padding:10px;border-radius:8px">${esc(d.raw_output)}</pre></details>` : ''}`;
+    }
+
+    window.addEventListener('resize', () => {
+      if (_topoTab === 'graph' && _topoGraph) startTopoGraph();
+      if (_topoMap) _topoMap.invalidateSize();
+    });
 
     // ── HEALTH SCORES ─────────────────────────────────────────
     async function loadHealth() {
