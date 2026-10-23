@@ -248,12 +248,13 @@ class Service:
         if (
             new.buffer.path != self.config.buffer.path
             or new.central.base_url != self.config.central.base_url
+            or new.sync != self.config.sync
             or new.site_id != self.config.site_id
             or new.collector_id != self.config.collector_id
         ):
             logger.warning(
-                "[reload] cambios en buffer/central/site/collector requieren reinicio; "
-                "solo se aplican probe y devices"
+                "[reload] cambios en buffer/central/sync/site/collector requieren "
+                "reinicio; solo se aplican probe y devices"
             )
         self.config = replace(self.config, probe=new.probe, devices=new.devices)
         logger.info(

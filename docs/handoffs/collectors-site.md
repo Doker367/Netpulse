@@ -1744,9 +1744,9 @@ anteriores.
   los campos del diseño; es informativo y no viaja en el body de ingesta.
 - `sync.next_attempt_at` se calcula como hora futura tras aplicar el backoff,
   no como la hora del último intento.
-- `SIGHUP` recarga `devices`/`probe`; cambios de `buffer`, `central`, `site_id`
-  o `collector_id` se registran y **requieren reinicio** (la clave y el cliente
-  HTTP viven en el proceso). El diseño no exigía más para fase 1.
+- `SIGHUP` recarga `devices`/`probe`; cambios de `buffer`, `central`, `sync`,
+  `site_id` o `collector_id` se registran y **requieren reinicio** (la clave y
+  el cliente HTTP viven en el proceso). El diseño no exigía más para fase 1.
 - El adaptador de `metrics_poller` usa `probe_svc` y conserva el contrato
   `(latency_ms, loss_pct)`; la sonda ICMP/TCP real se prueba con mocks, sin
   red.
