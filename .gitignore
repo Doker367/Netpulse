@@ -97,3 +97,8 @@ secrets/
 
 # Runtime metrics history (host/device state, not source)
 config/metrics_history.json
+
+# Disco y scripts extraídos de vaerh/routeros (persistencia del lab, 50+ MB).
+# Si falta: docker create tmp vaerh/routeros && docker cp tmp:/routeros/. docker/routeros/rootfs/
+docker/routeros/rootfs/
+docker/routeros/chr-7.22.vdi
