@@ -102,3 +102,6 @@ config/metrics_history.json
 # Si falta: docker create tmp vaerh/routeros && docker cp tmp:/routeros/. docker/routeros/rootfs/
 docker/routeros/rootfs/
 docker/routeros/chr-7.22.vdi
+
+# Enlaces .venv de los worktrees (symlink, no directorio)
+.venv
