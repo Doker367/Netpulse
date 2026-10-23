@@ -123,3 +123,6 @@ curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9093/api/v2/silences
 curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9090/api/v1/rules
 ```
 
+Los prompts listos para copiar a cada ventana están en
+[`prompts-ola2.md`](prompts-ola2.md).
+
