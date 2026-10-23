@@ -149,6 +149,10 @@ def probe(
     host = str(host).strip()
     protocol = (protocol or "ssh").lower()
     driver = (driver or "").lower()
-    if protocol == "snmp" or driver == "snmp" or int(port) == 161:
+    try:
+        port_number = int(port)
+    except (TypeError, ValueError):
+        return ProbeResult(False, None, None, None, "tcp", "puerto inválido")
+    if protocol == "snmp" or driver == "snmp" or port_number == 161:
         return _icmp_probe(host, timeout_ms)
-    return _tcp_probe(host, int(port), timeout_ms)
+    return _tcp_probe(host, port_number, timeout_ms)

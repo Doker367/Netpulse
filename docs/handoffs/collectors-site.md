@@ -1752,3 +1752,25 @@ anteriores.
   red.
 - `PyYAML` se declara explícitamente en `requirements-collector.txt`
   (`6.0.2`); antes solo entraba como dependencia transitiva de napalm.
+
+### PR-2 — almacén y endpoints centrales
+
+- **Rechazo parcial real**: el body se valida con un modelo de sobre
+  (`RemoteIngestIn.samples` son objetos crudos) y cada muestra se valida con
+  `RemoteSampleIn` dentro de `ingest_svc`. Así una muestra inválida no tumba
+  el lote entero y se devuelve su triplete en `rejected_samples`, como exige
+  el contrato. El router pre-parsea el JSON para devolver `413` (no `422`)
+  cuando hay más de 500 muestras.
+- `GET /api/remote/sites/{site_id}` incluye `retention_days`,
+  `oldest_sample_ts` y `buffer_epoch_changed_at`, tal como se documentó.
+- `inventory_svc.inventory_health()` es la adición mínima prevista: registra
+  el último error de lectura y permite distinguir «device no inventariado»
+  (`inventory_match=0`) de «inventario ilegible» (`NULL` + `inventory_error`).
+- `api_keys_svc` usa `hmac.compare_digest` y acepta `kind=collector`; los
+  registros antiguos sin `kind` se exponen como `kind:"user"`.
+- El store central cachea el esquema por ruta (`_SCHEMA_READY`) y asume un
+  proceso uvicorn; la poda se ejecuta en lotes de 10 000 con
+  `NETPULSE_REMOTE_RETENTION_DAYS=30` por defecto.
+- La frescura de `GET .../devices` se calcula con `last_received_at` (reloj
+  del servidor), no con el `ts` del colector; el histórico usa `ts`. Es la
+  separación diseñada para que un reloj desviado no oculte un site activo.

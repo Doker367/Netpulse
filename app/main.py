@@ -18,7 +18,7 @@ from app.middleware.metrics import MetricsMiddleware
 from app.middleware.security import SecurityHeadersMiddleware
 from app.models.schemas import HealthResponse
 from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy, alerts, alerts_admin, topology, traceroute, traffic, ops, security_ext, integrations, collectors, system, monitoring, ai, terminal, firewall, sftp
-from app.routers import discovery, reports
+from app.routers import discovery, reports, remote
 from app.services.inventory_svc import list_devices
 
 # ── Rate Limiter (definido en app/core/limiter.py) ──────────
@@ -162,6 +162,7 @@ app.include_router(firewall.router)
 app.include_router(discovery.router)
 app.include_router(reports.router)
 app.include_router(__import__("app.routers.retention", fromlist=["router"]).router)
+app.include_router(remote.router)
 
 # ── Static files (Dashboard UI) ──────────────────────────────
 # El panel HTML es la única interfaz; /legacy sigue disponible para enlaces previos.
