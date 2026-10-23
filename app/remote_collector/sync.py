@@ -152,7 +152,10 @@ def build_payload(
             "gap_since": summary["gap_since"],
             "paused_reason": summary["paused_reason"],
         },
-        "sync": buffer.sync_state(),
+        "sync": {
+            key: value for key, value in buffer.sync_state().items()
+            if key in ("last_error", "last_error_at", "consecutive_failures", "auth_state")
+        },
         "samples": samples,
     }
 

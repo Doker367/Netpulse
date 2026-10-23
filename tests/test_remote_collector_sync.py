@@ -81,6 +81,10 @@ def test_success_marks_synced_and_sends_contract(tmp_path):
     assert "site_id" not in body and "collector_id" not in body
     assert len(body["samples"]) == 2
     assert body["buffer"]["pending"] == 2
+    assert set(body["sync"]) == {
+        "last_error", "last_error_at", "consecutive_failures", "auth_state",
+    }
+    assert "last_success_at" not in body["sync"]  # local-only, forbidden by central
     assert response["marked_synced"] == 2
     assert buf.counts()["pending"] == 0
 
