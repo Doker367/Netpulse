@@ -2284,6 +2284,10 @@
           <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
           <circle cx="12" cy="20" r="1" />
         </svg> <span data-i18n="nav_connectivity">Connectivity</span></div>
+      <div class="sidebar-item" onclick="swView('groups')"><svg class="si" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+        </svg> <span data-i18n="nav_groups">Groups</span></div>
     </div>
 
     <div class="sidebar-s" id="sb-operations">
@@ -2356,6 +2360,13 @@
           <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
           <path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg> <span data-i18n="nav_users">Users & Roles</span></div>
+      <div class="sidebar-item" onclick="swView('netbox')"><svg class="si" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="20" height="8" rx="2" />
+          <rect x="2" y="14" width="20" height="8" rx="2" />
+          <line x1="6" y1="6" x2="6.01" y2="6" />
+          <line x1="6" y1="18" x2="6.01" y2="18" />
+        </svg> <span data-i18n="nav_netbox">NetBox</span></div>
       <div class="sidebar-item" onclick="swView('webhooks')"><svg class="si" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
@@ -2729,6 +2740,17 @@
           </div>
         </div>
       </div>
+      <div class="view" id="v-netbox">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h2 style="font-size:16px;font-weight:600" data-i18n="view_netbox">🔗 NetBox</h2>
+          <button class="btn btn-o btn-sm" onclick="loadNetbox()" data-i18n="btn_refresh">🔄 Refresh</button>
+        </div>
+        <div id="netbox-content">
+          <div class="empty">
+            <div class="sp"></div>
+          </div>
+        </div>
+      </div>
       <div class="view" id="v-connectivity">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <h2 style="font-size:16px;font-weight:600" data-i18n="view_conn">📡 Conectividad</h2>
@@ -2736,6 +2758,17 @@
             data-i18n="btn_test">🔄 Probar</button>
         </div>
         <div id="conn-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">
+        </div>
+      </div>
+      <div class="view" id="v-groups">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+          <h2 style="font-size:16px;font-weight:600" data-i18n="view_groups">🗂️ Grupos de dispositivos</h2>
+          <button class="btn btn-o btn-sm" onclick="loadGroups()" data-i18n="btn_refresh">🔄 Refresh</button>
+        </div>
+        <div id="groups-content">
+          <div class="empty">
+            <div class="sp"></div>
+          </div>
         </div>
       </div>
       <div class="view" id="v-theme">
@@ -3446,6 +3479,74 @@
     });
     Object.assign(I18N.en, { search_placeholder: 'Search devices or IPs (Ctrl+K)', ov_focus: 'Offline devices', ov_loading: 'Checking devices…', ov_loading_inventory: 'Loading inventory…', ov_hint: 'Select a device to inspect its details.', ov_topology: 'Open topology', ov_refresh: 'Refresh', ov_add: 'Add device', ov_offline: 'Offline', ov_online: 'Online', ov_devices: 'Devices', ov_availability: 'Online share', ov_alerts: 'Active alerts', ov_detail: 'View details', ov_unverified: 'Unverified', ov_disk: 'Disk', login_submit: 'Sign in', login_busy: 'Signing in…', login_err_401: 'Incorrect username or password. Check your credentials and try again.', login_err_429: 'Too many attempts. Wait a minute before signing in again.', login_err_generic: 'Could not sign in. Check that NetPulse is available and try again.', login_err_session: 'The session could not be validated. Please try again.', login_err_conn: 'Could not connect to NetPulse. Make sure the API is running and try again.' });
     Object.assign(I18N.es, { search_placeholder: 'Buscar equipos o IP (Ctrl+K)', ov_focus: 'Equipos fuera de línea', ov_loading: 'Verificando equipos…', ov_loading_inventory: 'Consultando inventario…', ov_hint: 'Selecciona un equipo para ver su detalle.', ov_topology: 'Abrir topología', ov_refresh: 'Actualizar', ov_add: 'Agregar equipo', ov_offline: 'Fuera de línea', ov_online: 'En línea', ov_devices: 'Dispositivos', ov_availability: 'Porcentaje en línea', ov_alerts: 'Alertas activas', ov_detail: 'Ver detalle', ov_unverified: 'Sin verificar', ov_disk: 'Disco', login_submit: 'Ingresar', login_busy: 'Ingresando…', login_err_401: 'Usuario o contraseña incorrectos. Revisa los datos e inténtalo de nuevo.', login_err_429: 'Demasiados intentos. Espera un minuto antes de volver a ingresar.', login_err_generic: 'No se pudo iniciar sesión. Comprueba que NetPulse esté disponible e inténtalo de nuevo.', login_err_session: 'No se pudo validar la sesión. Vuelve a intentarlo.', login_err_conn: 'No se pudo conectar con NetPulse. Verifica que la API esté encendida e inténtalo de nuevo.' });
+
+    // Claves nuevas: Grupos (módulo dormido), NetBox (solo admin) y guard de Compliance.
+    Object.assign(I18N.en, {
+      nav_groups: 'Groups', nav_netbox: 'NetBox',
+      view_groups: '🗂️ Device Groups', view_netbox: '🔗 NetBox',
+      np_unverified: 'Not verifiable',
+      grp_col_group: 'Group', grp_col_desc: 'Description', grp_col_devices: 'Devices',
+      grp_add_title: 'Create group', grp_name_ph: 'Name (e.g. DMZ)', grp_desc_ph: 'Optional description', grp_add_btn: 'Create',
+      grp_admin_required: 'Creating groups requires the admin role', grp_empty: 'No groups defined',
+      grp_list_unverified: 'The group list could not be verified',
+      grp_view_devices: 'View devices', grp_devices_none: 'no devices in this group',
+      grp_name_missing: 'Type a name for the group', grp_exists: 'That group already exists',
+      grp_created: 'Group {g} created', grp_create_fail: 'Could not create the group',
+      nb_admin_required: 'Requires the admin role', nb_unavailable: 'NetBox not available',
+      nb_state_title: 'Availability', nb_online: 'NetBox reachable',
+      nb_sites_title: 'Sites', nb_sites_empty: 'NetBox reachable, but no sites defined',
+      nb_col_site: 'Site', nb_col_status: 'Status', nb_col_region: 'Region', nb_col_devices: 'Devices',
+      nb_sync_title: 'Sync from NetBox', nb_sync: 'Synchronize',
+      nb_sync_desc: 'Pulls devices from NetBox into the local inventory (devices.yaml). NetBox is the source of truth; existing devices are updated and nothing is deleted.',
+      nb_sync_confirm_title: 'Confirm NetBox → inventory sync',
+      nb_sync_run: 'Run sync', nb_cancel: 'Cancel', nb_sync_running: 'Synchronizing… this can take a while',
+      nb_count_created: 'created', nb_count_updated: 'updated', nb_count_skipped: 'skipped',
+      comp_admin_required: 'Compliance requires the admin role',
+      comp_baselines: 'Defined baselines', comp_no_baselines: 'No baselines defined yet: create one in step 1',
+      comp_step1: 'Pick group', comp_step1_d: 'Type or choose the group this baseline applies to',
+      comp_step2: 'Write baseline', comp_step2_d: 'Standard configuration the devices must comply with',
+      comp_step3: 'Verify devices', comp_step3_d: 'Choose which devices to check against the baseline',
+      comp_no_devices: 'No devices loaded from the inventory yet', comp_save_baseline: 'Save baseline',
+      comp_check_btn: 'Check compliance', comp_report_btn: 'Full report',
+      comp_report_running: 'Generating report…', comp_need_device: 'Select at least one device',
+      comp_checking: 'Verifying…', comp_ok_summary: 'devices comply', comp_mal_summary: 'devices do NOT comply',
+      comp_errors: 'with read errors', comp_check_fail: 'Compliance check failed',
+      comp_baseline_fail: 'Could not save the baseline', comp_baseline_saved: 'Baseline for {g} saved',
+      comp_th_device: 'Device', comp_th_result: 'Result', comp_th_violations: 'Violations'
+    });
+    Object.assign(I18N.es, {
+      nav_groups: 'Grupos', nav_netbox: 'NetBox',
+      view_groups: '🗂️ Grupos de dispositivos', view_netbox: '🔗 NetBox',
+      np_unverified: 'No verificable',
+      grp_col_group: 'Grupo', grp_col_desc: 'Descripción', grp_col_devices: 'Equipos',
+      grp_add_title: 'Crear grupo', grp_name_ph: 'Nombre (ej. DMZ)', grp_desc_ph: 'Descripción opcional', grp_add_btn: 'Crear',
+      grp_admin_required: 'Crear grupos requiere rol admin', grp_empty: 'Sin grupos definidos',
+      grp_list_unverified: 'No se pudo verificar la lista de grupos',
+      grp_view_devices: 'Ver equipos', grp_devices_none: 'sin equipos asociados',
+      grp_name_missing: 'Escribe un nombre para el grupo', grp_exists: 'Ese grupo ya existe',
+      grp_created: 'Grupo {g} creado', grp_create_fail: 'No se pudo crear el grupo',
+      nb_admin_required: 'Requiere rol admin', nb_unavailable: 'NetBox no disponible',
+      nb_state_title: 'Disponibilidad', nb_online: 'NetBox responde',
+      nb_sites_title: 'Sites', nb_sites_empty: 'NetBox responde, pero sin sites definidos',
+      nb_col_site: 'Sitio', nb_col_status: 'Estado', nb_col_region: 'Región', nb_col_devices: 'Equipos',
+      nb_sync_title: 'Sincronizar desde NetBox', nb_sync: 'Sincronizar',
+      nb_sync_desc: 'Vuelca los equipos de NetBox al inventario local (devices.yaml). NetBox es la fuente de verdad; los equipos existentes se actualizan y no se borra nada.',
+      nb_sync_confirm_title: 'Confirmar sincronización NetBox → inventario',
+      nb_sync_run: 'Ejecutar sincronización', nb_cancel: 'Cancelar', nb_sync_running: 'Sincronizando… puede tardar un rato',
+      nb_count_created: 'creados', nb_count_updated: 'actualizados', nb_count_skipped: 'omitidos',
+      comp_admin_required: 'Cumplimiento requiere rol admin',
+      comp_baselines: 'Baselines definidos', comp_no_baselines: 'Sin baselines definidos aún: se crean en el paso 1',
+      comp_step1: 'Elegir grupo', comp_step1_d: 'Escribe o elige el grupo al que aplica el baseline',
+      comp_step2: 'Escribir baseline', comp_step2_d: 'Configuración estándar que deben cumplir los dispositivos',
+      comp_step3: 'Verificar dispositivos', comp_step3_d: 'Elegí cuáles revisar contra el baseline',
+      comp_no_devices: 'Sin equipos cargados del inventario todavía', comp_save_baseline: 'Guardar baseline',
+      comp_check_btn: 'Verificar cumplimiento', comp_report_btn: 'Reporte completo',
+      comp_report_running: 'Generando reporte…', comp_need_device: 'Seleccioná al menos un dispositivo',
+      comp_checking: 'Verificando…', comp_ok_summary: 'equipos cumplen', comp_mal_summary: 'equipos NO cumplen',
+      comp_errors: 'con errores de lectura', comp_check_fail: 'Fallo la verificación de cumplimiento',
+      comp_baseline_fail: 'No se pudo guardar el baseline', comp_baseline_saved: 'Baseline para {g} guardado',
+      comp_th_device: 'Dispositivo', comp_th_result: 'Resultado', comp_th_violations: 'Violaciones'
+    });
 
     function setLang(lang) {
       currentLang = lang;
@@ -5561,63 +5662,269 @@
       catch (e) { toast('No puedes eliminarte a ti mismo', 'error') }
     }
 
-    // ── COMPLIANCE ──
+    // ── COMPLIANCE (existente; /api/compliance/* es SOLO admin, 403 con operator) ──
     async function loadCompliance() {
       const el = document.getElementById('compliance-content'); if (!el || !t) return;
+      // Guardia de rol honesta: sin rol admin no hay vista, ni verdes, ni error genérico.
+      if (!__isAdmin()) {
+        el.innerHTML = npGray(`🔒 ${__t('comp_admin_required')}`);
+        return;
+      }
+      el.innerHTML = '<div class="empty"><div class="sp"></div></div>';
+      let baselines = null, groups = null, groupsNote = '';
       try {
-        const r = await fetch(`${A}/compliance/baselines`, { headers: h() });
-        const bls = await r.json(); const groups = Array.isArray(bls) ? bls.map(b => b.group || b) : [];
-        el.innerHTML = `<div style="margin-bottom:16px;font-size:12px;color:var(--text-ter)">📋 En 3 pasos: <b>1. Definí un baseline</b> → <b>2. Verificá</b> → <b>3. Revisá resultados</b></div>
+        const [rB, rG] = await Promise.all([
+          fetch(`${A}/compliance/baselines`, { headers: h(), signal: AbortSignal.timeout(15000) }),
+          fetch(`${A}/groups`, { headers: h(), signal: AbortSignal.timeout(15000) })
+        ]);
+        baselines = rB.ok ? await rB.json() : null;
+        if (rG.ok) { const gl = await rG.json().catch(() => []); groups = Array.isArray(gl) ? gl.map(g => g.name).filter(Boolean) : []; }
+        else groupsNote = `<div style="font-size:10px;margin-top:4px">${esc(__t('grp_list_unverified'))} · HTTP ${rG.status}</div>`;
+      } catch (e) { baselines = null; }
+      // Fallo de la API (403 u otro) → gris "no verificable", nunca pasos vacíos ni verdes.
+      if (baselines === null) {
+        el.innerHTML = npGray(`✅ ${__t('np_unverified')}`);
+        return;
+      }
+      const bl = Array.isArray(baselines) ? baselines.filter(b => typeof b === 'string') : [];
+      const blHeader = bl.length
+        ? `📋 ${__t('comp_baselines')}: <b>${bl.map(esc).join(', ')}</b>`
+        : `<span style="color:var(--text-ter)">📋 ${esc(__t('comp_no_baselines'))}</span>`;
+      const grpSub = !groupsNote && Array.isArray(groups) ? (groups.length ? '' : `<div style="font-size:10px;color:var(--text-ter);margin-top:4px">${esc(__t('grp_empty'))}</div>`) : groupsNote;
+      const dl = (Array.isArray(groups) ? groups : []).map(g => `<option value="${escAttr(g)}">${esc(g)}</option>`).join('');
+      el.innerHTML = `<div style="margin-bottom:16px;font-size:12px;color:var(--text-ter)">${blHeader}${grpSub}</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div class="sc">
-        <div class="c-step" onclick="document.getElementById('cmp-bl-group').focus()"><span class="cs-n">1</span><div><div class="cs-t">Seleccionar grupo</div><div class="cs-d">Core, Edge o Access</div></div></div>
+        <div class="c-step" onclick="document.getElementById('cmp-bl-group').focus()"><span class="cs-n">1</span><div><div class="cs-t">${__t('comp_step1')}</div><div class="cs-d">${__t('comp_step1_d')}</div></div></div>
         <div class="fg" style="margin:12px 0 6px"><label>Grupo</label>
-          <select id="cmp-bl-group" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;width:100%;font-size:12px">
-            <option value="Core">Core</option><option value="Edge">Edge</option><option value="Access">Access</option>
-          </select>
+          <input id="cmp-bl-group" list="cmp-bl-groups" placeholder="Core" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;width:100%;font-size:12px">
+          <datalist id="cmp-bl-groups">${dl}</datalist>
         </div>
-        <div class="c-step"><span class="cs-n">2</span><div><div class="cs-t">Escribir baseline</div><div class="cs-d">Configuración estándar que deben cumplir los dispositivos</div></div></div>
-        <textarea id="cmp-bl-config" placeholder="Configuración deseada (baseline)..." style="min-height:100px;margin-top:8px;font-size:11px">! Grupos Core\nhostname {{device}}\n!\ninterface Management1\n ip address dhcp\n no shutdown</textarea>
-        <button class="btn btn-p btn-sm" onclick="setBaseline()" style="margin-top:6px">💾 Guardar baseline</button>
+        <div class="c-step"><span class="cs-n">2</span><div><div class="cs-t">${__t('comp_step2')}</div><div class="cs-d">${__t('comp_step2_d')}</div></div></div>
+        <textarea id="cmp-bl-config" placeholder="! Escribe aquí la configuración deseada (baseline)..." style="min-height:100px;margin-top:8px;font-size:11px"></textarea>
+        <button class="btn btn-p btn-sm" onclick="setBaseline()" style="margin-top:6px">💾 ${__t('comp_save_baseline')}</button>
       </div>
       <div class="sc">
-        <div class="c-step"><span class="cs-n">3</span><div><div class="cs-t">Verificar dispositivos</div><div class="cs-d">Elegí cuáles revisar contra el baseline</div></div></div>
+        <div class="c-step"><span class="cs-n">3</span><div><div class="cs-t">${__t('comp_step3')}</div><div class="cs-d">${__t('comp_step3_d')}</div></div></div>
         <div style="margin-top:6px;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:4px">
-          ${devices.map(d => `<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:5px 8px;cursor:pointer;border-radius:4px;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
-            <input type="checkbox" class="cmp-chk" value="${d.id}" checked style="width:14px;accent-color:var(--accent)"> <span>${d.id}</span><span style="margin-left:auto;font-size:9px;color:var(--text-ter)">${d.driver}</span>
-          </label>`).join('')}
+          ${(devices || []).length ? devices.map(d => `<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:5px 8px;cursor:pointer;border-radius:4px;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
+            <input type="checkbox" class="cmp-chk" value="${escAttr(d.id)}" checked style="width:14px;accent-color:var(--accent)"> <span>${esc(d.id)}</span><span style="margin-left:auto;font-size:9px;color:var(--text-ter)">${esc(d.driver)}</span>
+          </label>`).join('') : `<div style="font-size:11px;color:var(--text-ter);padding:8px">${__t('comp_no_devices')}</div>`}
         </div>
-        <button class="btn btn-p btn-sm" onclick="checkCompliance()" style="margin-top:8px">🔍 Verificar cumplimiento</button>
+        <button class="btn btn-p btn-sm" onclick="checkCompliance()" style="margin-top:8px">🔍 ${__t('comp_check_btn')}</button>
+        <button class="btn btn-o btn-sm" onclick="loadCompReport()" style="margin-top:8px" ${(devices || []).length ? '' : 'disabled'}>📄 ${__t('comp_report_btn')}</button>
       </div>
     </div>
-    <div id="cmp-result" style="margin-top:12px"></div>`
-      } catch (e) { el.innerHTML = `<div class="empty"><span class="icon">✅</span><br>Cargando...</div>` }
+    <div id="cmp-result" style="margin-top:12px"></div>`;
     }
     async function setBaseline() {
-      const group = document.getElementById('cmp-bl-group')?.value;
+      const group = document.getElementById('cmp-bl-group')?.value.trim();
       const config = document.getElementById('cmp-bl-config')?.value;
       if (!group || !config) return;
       try {
-        await fetch(`${A}/compliance/baseline`, { method: 'POST', headers: h(), body: JSON.stringify({ group, config }) });
-        toast(`✅ Baseline para ${group} guardado`, 's')
-      } catch (e) { toast('Error al guardar baseline', 'error') }
+        const r = await fetch(`${A}/compliance/baseline`, { method: 'POST', headers: h(), body: JSON.stringify({ group, config }) });
+        // Antes no se miraba r.ok: un 403/500 cantaba éxito. Ahora el toast dice la verdad.
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          toast(`${__t('comp_baseline_fail')} · ${esc(d.detail || 'HTTP ' + r.status)}`, 'error');
+          return;
+        }
+        toast(`✅ ${__t('comp_baseline_saved').replace('{g}', group)}`, 's')
+      } catch (e) { toast(`${__t('comp_baseline_fail')}: ${e.message}`, 'error') }
     }
     async function checkCompliance() {
       const checks = [...document.querySelectorAll('.cmp-chk:checked')].map(c => c.value);
-      if (!checks.length) { toast('Seleccioná al menos un dispositivo', 'error'); return }
+      if (!checks.length) { toast(__t('comp_need_device'), 'error'); return }
       const el = document.getElementById('cmp-result');
-      el.innerHTML = '<div class="sp"></div> Verificando...';
+      el.innerHTML = `<div class="sp"></div> ${__t('comp_checking')}`;
       try {
         const r = await fetch(`${A}/compliance/check`, { method: 'POST', headers: h(), body: JSON.stringify({ device_ids: checks }) });
+        // Antes un 403 renderizaba ✅ para todos: sin r.ok se inventaba compliant=true. Nunca más.
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          el.innerHTML = `<div style="border:1px solid var(--border);border-radius:6px;margin-top:8px;padding:10px;font-size:12px;color:var(--text-ter)">${__t('np_unverified')} · ${esc(d.detail || 'HTTP ' + r.status)}</div>`;
+          return;
+        }
         const d = await r.json();
-        const results = d.results || (Array.isArray(d.data) ? d.data : Array.isArray(d) ? d : d.data ? [d.data] : [d]);
-        const list = Array.isArray(results) ? results : (d.violations ? [{ device_id: checks.join(','), compliant: d.compliant, violations: d.violations || [] }] :
-          checks.map(id => ({ device_id: id, compliant: d.compliant !== false, violations: d.violations || [] })));
-        el.innerHTML = `<div style="border:1px solid var(--border);border-radius:6px;margin-top:8px"><table><tr><th>Dispositivo</th><th>Compliant</th><th>Violaciones</th></tr>
-      ${list.map(rx => `<tr><td style="font-weight:500">${rx.device_id || rx.id || '?'}</td>
-      <td>${(rx.compliant || rx.success) ? '<span class="badge badge-g">✅</span>' : '<span class="badge badge-r">❌</span>'}</td>
-      <td>${(rx.violations || rx.errors || []).length || '—'}</td></tr>`).join('')}</table></div>`
-      } catch (e) { el.innerHTML = `<div style="color:var(--red)">${e.message}</div>` }
+        // Contrato real (device_ids): {total, compliant, non_compliant, results: {id: {compliant, violations}}}.
+        const raw = d.results && typeof d.results === 'object' ? d.results : {};
+        const list = Array.isArray(raw) ? raw : Object.entries(raw).map(([id, rx]) => ({ device_id: id, compliant: !!(rx && rx.compliant), violations: (rx && rx.violations) || [] }));
+        const okCount = typeof d.compliant === 'number' ? d.compliant : list.filter(x => x.compliant).length;
+        const badCount = typeof d.non_compliant === 'number' ? d.non_compliant : list.length - okCount;
+        const total = Number(d.total) || list.length;
+        el.innerHTML = `<div style="border:1px solid var(--border);border-radius:6px;margin-top:8px">
+          <div style="padding:10px 12px;font-size:12px;font-weight:600;color:${badCount ? 'var(--yellow)' : 'var(--green)'}">${okCount}/${total} ${__t('comp_ok_summary')}${badCount ? ` · ${badCount} ${__t('comp_mal_summary')}` : ''}</div>
+          <table><tr><th>${__t('comp_th_device')}</th><th>${__t('comp_th_result')}</th><th>${__t('comp_th_violations')}</th></tr>
+          ${list.length ? list.map(rx => `<tr><td style="font-weight:500">${esc(rx.device_id || rx.id || '?')}</td>
+          <td>${rx.compliant ? '<span class="badge badge-g">✅</span>' : '<span class="badge badge-r">❌</span>'}</td>
+          <td>${(rx.violations || rx.errors || []).length || '—'}</td></tr>`).join('') : `<tr><td colspan="3" style="color:var(--text-ter)">${__t('np_unverified')}</td></tr>`}</table></div>`;
+      } catch (e) { el.innerHTML = `<div style="color:var(--text-ter)">${__t('comp_check_fail')}: ${esc(e.message)}</div>` }
+    }
+    async function loadCompReport() {
+      const el = document.getElementById('cmp-result'); if (!el) return;
+      el.innerHTML = `<div class="sp"></div> ${__t('comp_report_running')}`;
+      try {
+        const r = await fetch(`${A}/compliance/report`, { headers: h(), signal: AbortSignal.timeout(120000) });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          el.innerHTML = `<div style="border:1px solid var(--border);border-radius:6px;margin-top:8px;padding:10px;font-size:12px;color:var(--text-ter)">${__t('np_unverified')} · ${esc(d.detail || 'HTTP ' + r.status)}</div>`;
+          return;
+        }
+        const d = await r.json();
+        // Contrato real: {summary: {total, compliant, non_compliant, errors}, devices: {id: {compliant, violations}}}.
+        const s = d.summary || {};
+        const list = Object.entries(d.devices || {}).map(([id, rx]) => ({ device_id: id, compliant: !!(rx && rx.compliant), violations: (rx && rx.violations) || [] }));
+        const okN = s.compliant != null ? Number(s.compliant) : list.filter(x => x.compliant).length;
+        const errN = s.errors != null ? Number(s.errors) : 0;
+        const tot = Number(s.total) || list.length;
+        el.innerHTML = `<div style="border:1px solid var(--border);border-radius:6px;margin-top:8px">
+          <div style="padding:10px 12px;font-size:12px;font-weight:600">${tot ? `${okN}/${tot} ${__t('comp_ok_summary')}${errN ? ` · ${errN} ${__t('comp_errors')}` : ''}` : `<span style="color:var(--text-ter)">${__t('comp_no_devices')}</span>`}</div>
+          ${tot ? `<table><tr><th>${__t('comp_th_device')}</th><th>${__t('comp_th_result')}</th><th>${__t('comp_th_violations')}</th></tr>
+          ${list.map(rx => `<tr><td style="font-weight:500">${esc(rx.device_id || '?')}</td>
+          <td>${rx.compliant ? '<span class="badge badge-g">✅</span>' : '<span class="badge badge-r">❌</span>'}</td>
+          <td style="font-size:10px;max-width:280px;overflow:hidden;text-overflow:ellipsis">${esc((rx.violations || []).map(v => v.expected || v.got || '').filter(Boolean).join(' | ')) || '—'}</td></tr>`).join('')}</table>` : ''}</div>`;
+      } catch (e) { el.innerHTML = `<div style="color:var(--text-ter)">${__t('comp_check_fail')}: ${esc(e.message)}</div>` }
+    }
+
+    // ── GRUPOS DE DISPOSITIVOS (módulo dormido: GET /api/groups) ──
+    // Contrato real: GET /api/groups → 200 para viewer con [{name, description, device_count}].
+    // POST /api/groups → 201 admin, 409 si existe duplicado, 403 si operador no admin.
+    // GET /api/groups/{grupo}/devices → 404 si el grupo está vacío o no existe.
+    function __isAdmin() { return (currentUser?.role || 'viewer') === 'admin'; }
+    function npGray(msgHtml) {
+      return `<div class="empty" style="background:var(--bg2)"><span class="icon" style="filter:grayscale(1)">—</span><br><span style="color:var(--text-ter)">${msgHtml}</span></div>`;
+    }
+    async function loadGroups() {
+      const el = document.getElementById('groups-content'); if (!el || !t) return;
+      el.innerHTML = '<div class="empty"><div class="sp"></div></div>';
+      try {
+        const r = await fetch(`${A}/groups`, { headers: h(), signal: AbortSignal.timeout(15000) });
+        if (r.status === 403) { el.innerHTML = npGray(`🔒 ${__t('grp_admin_required')}`); return; }
+        if (!r.ok) { el.innerHTML = npGray(`${__t('np_unverified')} · HTTP ${r.status}`); return; }
+        const groups = await r.json();
+        const list = Array.isArray(groups) ? groups : [];
+        const rows = list.map(g => `<tr>
+          <td style="font-weight:500">${esc(g.name || '?')}</td>
+          <td style="font-size:11px;color:var(--text-sec)">${esc(g.description || '—')}</td>
+          <td><span class="badge" style="background:var(--surface)">${Number(g.device_count ?? 0)}</span></td>
+          <td><button class="btn btn-o btn-xs" onclick="grpDevs('${escAttr(g.name || '')}')">${__t('grp_view_devices')}</button></td>
+        </tr>`);
+        el.innerHTML = `
+          ${rows.length ? `
+            <div style="border:1px solid var(--border);border-radius:6px;margin-bottom:12px"><table><tr><th>${__t('grp_col_group')}</th><th>${__t('grp_col_desc')}</th><th>${__t('grp_col_devices')}</th><th></th></tr>${rows.join('')}</table></div>
+            <div id="grp-devs" style="margin-bottom:12px"></div>`
+            : npGray(`🗂️ ${__t('grp_empty')}`)}
+          <div class="sc">
+            <div class="sl">➕ ${__t('grp_add_title')}</div>
+            ${__isAdmin()
+            ? `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+                  <input id="grp-name" placeholder="${__t('grp_name_ph')}" style="flex:1;min-width:140px">
+                  <input id="grp-desc" placeholder="${__t('grp_desc_ph')}" style="flex:2;min-width:200px">
+                  <button class="btn btn-p btn-sm" onclick="createGroup()">➕ ${__t('grp_add_btn')}</button>
+                </div>`
+            : `<div style="font-size:11px;color:var(--text-ter);margin-top:8px">🔒 ${__t('grp_admin_required')}</div>`}
+          </div>`;
+      } catch (e) { el.innerHTML = npGray(`${__t('np_unverified')}: ${esc(e.message)}`); }
+    }
+    async function grpDevs(name) {
+      const el = document.getElementById('grp-devs'); if (!el || !name) return;
+      el.innerHTML = `<div class="bt">📦 ${esc(name)} · …</div>`;
+      try {
+        const r = await fetch(`${A}/groups/${encodeURIComponent(name)}/devices`, { headers: h(), signal: AbortSignal.timeout(15000) });
+        // 404 = grupo vacío o inexistente: estado honesto, no error genérico.
+        if (r.status === 404) { el.innerHTML = `<div class="bt" style="color:var(--text-ter)">📦 ${esc(name)} · ${__t('grp_devices_none')}</div>`; return; }
+        if (!r.ok) { el.innerHTML = `<div class="bt" style="color:var(--text-ter)">${__t('np_unverified')} · HTTP ${r.status}</div>`; return; }
+        const devs = await r.json();
+        const list = Array.isArray(devs) ? devs : [];
+        el.innerHTML = `<div class="bt">📦 ${esc(name)} · ${list.length} ${list.length === 1 ? 'equipo' : 'equipos'}</div>
+          ${list.map(d => `<span class="tag" style="font-size:10px;padding:3px 8px;margin:2px">${esc(d.id || d.hostname || '?')}</span>`).join('')}`;
+      } catch (e) { el.innerHTML = `<div class="bt" style="color:var(--text-ter)">${__t('np_unverified')}: ${esc(e.message)}</div>`; }
+    }
+    async function createGroup() {
+      const name = document.getElementById('grp-name')?.value.trim();
+      const desc = document.getElementById('grp-desc')?.value.trim() || '';
+      if (!name) { toast(__t('grp_name_missing'), 'error'); return; }
+      try {
+        const r = await fetch(`${A}/groups`, { method: 'POST', headers: h(), body: JSON.stringify({ name, description: desc }) });
+        if (r.status === 403) { toast('🔒 ' + __t('grp_admin_required'), 'error'); return; }
+        if (r.status === 409) { const d = await r.json().catch(() => ({})); toast(esc(d.detail || __t('grp_exists')), 'error'); return; }
+        if (!r.ok) { toast(`${__t('grp_create_fail')} · HTTP ${r.status}`, 'error'); return; }
+        toast(`✅ ${__t('grp_created').replace('{g}', name)}`, 's');
+        loadGroups();
+      } catch (e) { toast(`${__t('grp_create_fail')}: ${e.message}`, 'error'); }
+    }
+
+    // ── NETBOX (módulo dormido; /api/netbox/* es SOLO admin, 503 si NetBox caído) ──
+    // Contrato real: GET /api/netbox/sites → [{name, status, region, device_count}].
+    // POST /api/netbox/sync → {created, updated, skipped}. Sin "conflictos": no existen.
+    async function loadNetbox() {
+      const el = document.getElementById('netbox-content'); if (!el || !t) return;
+      if (!__isAdmin()) { el.innerHTML = npGray(`🔒 ${__t('nb_admin_required')}`); return; }
+      el.innerHTML = '<div class="empty"><div class="sp"></div></div>';
+      let sites = null, note = '';
+      try {
+        const r = await fetch(`${A}/netbox/sites`, { headers: h(), signal: AbortSignal.timeout(20000) });
+        if (r.status === 503) note = __t('nb_unavailable');
+        else if (r.status === 403) note = __t('nb_admin_required');
+        else if (!r.ok) note = `${__t('np_unverified')} · HTTP ${r.status}`;
+        else sites = await r.json();
+      } catch (e) { note = `${__t('nb_unavailable')} · ${esc(e.message)}`; }
+      const sitesList = sites !== null ? (Array.isArray(sites) ? sites : []) : null;
+      const statusLine = sitesList !== null
+        ? `<span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block"></span> ${__t('nb_online')}`
+        : `<span style="width:10px;height:10px;border-radius:50%;background:var(--text-ter);display:inline-block"></span> <span style="color:var(--text-ter)">${note || __t('np_unverified')}</span>`;
+      const rows = (sitesList || []).map(s => `<tr>
+        <td style="font-weight:500">${esc(s.name || '?')}</td>
+        <td style="font-size:11px">${esc(s.status || '—')}</td>
+        <td style="font-size:11px;color:var(--text-sec)">${esc(s.region || '—')}</td>
+        <td><span class="badge" style="background:var(--surface)">${Number(s.device_count ?? 0)}</span></td>
+      </tr>`);
+      el.innerHTML = `
+        <div class="sc" style="margin-bottom:12px">
+          <div class="sl" style="display:flex;align-items:center;gap:10px">${statusLine}</div>
+          ${sitesList !== null ? (rows.length
+            ? `<div style="border:1px solid var(--border);border-radius:6px;margin-top:10px"><table><tr><th>${__t('nb_col_site')}</th><th>${__t('nb_col_status')}</th><th>${__t('nb_col_region')}</th><th>${__t('nb_col_devices')}</th></tr>${rows.join('')}</table></div>`
+            : `<div style="font-size:11px;color:var(--text-ter);margin-top:10px">${__t('nb_sites_empty')}</div>`) : ''}
+        </div>
+        <div class="sc">
+          <div class="sl">🔄 ${__t('nb_sync_title')}</div>
+          <div style="font-size:11px;color:var(--text-sec);margin-top:6px">${__t('nb_sync_desc')}</div>
+          <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="nbSyncConfirm()">🔄 ${__t('nb_sync')}</button>
+          <div id="nb-panel" style="display:none;margin-top:12px;padding:14px;background:var(--panel);border:1px solid var(--accent);border-radius:var(--radius)"></div>
+          <div id="nb-result" style="margin-top:10px"></div>
+        </div>`;
+    }
+    // Confirmación inline (mismo patrón que el panel de la bulk-bar), sin prompt() ciego.
+    function nbSyncConfirm() {
+      const p = document.getElementById('nb-panel'); if (!p) return;
+      p.innerHTML = `
+        <div class="bt">🔄 ${__t('nb_sync_confirm_title')}</div>
+        <div style="font-size:11px;color:var(--text-sec);margin-top:6px">${__t('nb_sync_desc')}</div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-p btn-sm" onclick="nbSyncRun()">▶ ${__t('nb_sync_run')}</button>
+          <button class="btn btn-o btn-sm" onclick="nbSyncCancel()">${__t('nb_cancel')}</button>
+        </div>`;
+      p.style.display = 'block';
+    }
+    function nbSyncCancel() {
+      const p = document.getElementById('nb-panel');
+      if (p) { p.style.display = 'none'; p.innerHTML = ''; }
+    }
+    async function nbSyncRun() {
+      nbSyncCancel();
+      const res = document.getElementById('nb-result'); if (!res) return;
+      res.innerHTML = `<div class="bt">🔄 ${__t('nb_sync_running')}</div>`;
+      try {
+        const r = await fetch(`${A}/netbox/sync`, { method: 'POST', headers: h(), signal: AbortSignal.timeout(120000) });
+        if (r.status === 403) { res.innerHTML = `<div class="bt" style="color:var(--text-ter)">🔒 ${__t('nb_admin_required')}</div>`; return; }
+        if (r.status === 503) { res.innerHTML = `<div class="bt" style="color:var(--text-ter)">⬜ ${__t('nb_unavailable')}</div>`; return; }
+        if (!r.ok) { res.innerHTML = `<div class="bt" style="color:var(--text-ter)">${__t('np_unverified')} · HTTP ${r.status}</div>`; return; }
+        const d = await r.json();
+        // Resultado veraz: solo los contadores que el backend devuelve.
+        const line = `${Number(d.created) || 0} ${__t('nb_count_created')} · ${Number(d.updated) || 0} ${__t('nb_count_updated')} · ${Number(d.skipped) || 0} ${__t('nb_count_skipped')}`;
+        res.innerHTML = `<div class="bt">✅ ${line}</div>`;
+        toast(`🔄 ${line}`, 's');
+      } catch (e) { res.innerHTML = `<div class="bt" style="color:var(--text-ter)">${__t('np_unverified')}: ${esc(e.message)}</div>`; }
     }
 
     // ── WEBHOOKS ──
@@ -5861,6 +6168,8 @@
       if (v === 'maintenance') loadMaint();
       if (v === 'apikeys') loadKeys();
       if (v === 'compliance') loadCompliance();
+      if (v === 'groups') loadGroups();
+      if (v === 'netbox') loadNetbox();
       if (v === 'terminal') {
         // Si el inventario aún no terminó de cargar (init/loadDev en curso), se
         // repuebla el selector al terminar en vez de dejarlo vacío.
