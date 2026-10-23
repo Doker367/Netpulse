@@ -78,3 +78,48 @@ Estos datos salen de la API real corriendo y del código en `main` (`33d03c6`):
 2. UI al final: `feat/dormant-modules-ui` (dueña de `dashboard.html`).
 3. Resolver `app/main.py` a mano (líneas aditivas de `include_router`).
 4. `pytest` completo + `node --check` + ruff. Recién entonces abrir la Ola 2.
+
+---
+
+# Ola 2 — alertas operables + retención
+
+| Ventana | Tarjeta | Directorio | Rama |
+|---|---|---|---|
+| B | Alertas: silencios y reglas (backend) | `../netpulse-alerts` | `feat/alerts-admin` |
+| C | Retención y housekeeping | `../netpulse-retention` | `feat/retention` |
+| A | UI de alertas | `../netpulse-alerts-ui` | `feat/alerts-ui` |
+
+Orden: **B entrega el contrato** (`docs/handoffs/alerts_ui.md`) y C puede correr
+en paralelo. **A no empieza** hasta que el contrato esté commiteado en su rama.
+`app/static/dashboard.html` pertenece solo a la ventana A en esta ola.
+
+## Hechos verificados (2026-10-23)
+
+1. **Alertmanager v2 responde en `http://127.0.0.1:9093`**: `/api/v2/status` y
+   `/api/v2/silences` devuelven 200. Silencios: `GET/POST /api/v2/silences`,
+   `DELETE /api/v2/silence/{id}`.
+2. **Las reglas viven en Prometheus, no en Alertmanager**:
+   `GET http://127.0.0.1:9090/api/v1/rules` (200) devuelve las 14 alertas de
+   `config/prometheus-rules.yml`. Alertmanager solo enruta.
+3. **No existe `ALERTMANAGER_URL` en settings**: `app/core/settings.py` solo
+   tiene `ALERTMANAGER_TOKEN`. El servicio nuevo debe leer
+   `NETPULSE_ALERTMANAGER_URL` con default `http://127.0.0.1:9093` sin editar
+   `settings.py` (fuera de zona).
+4. **`/api/alerts/active` lee Prometheus**, no Alertmanager (`alerts.py:52`).
+   No lo cambies: añade un router nuevo.
+5. **Ventanas de mantenimiento ya existen**: `app/services/ops/maintenance_svc.py`
+   y `GET/POST/DELETE /api/ops/maintenance` (lectura AUTH, escritura ADMIN).
+   Un silencio creado desde una ventana es una mejora opcional; si se complica,
+   documéntalo en el handoff y no lo fuerces.
+6. **No hay `respx` en dev-deps**: los tests mockean con `httpx.MockTransport`,
+   `unittest.mock` o monkeypatch (httpx 0.28 está en runtime).
+
+## Verificación extra
+
+```bash
+# Alertmanager vivo
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9093/api/v2/silences
+# Reglas de Prometheus
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:9090/api/v1/rules
+```
+
