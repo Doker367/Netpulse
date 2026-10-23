@@ -60,6 +60,8 @@ def _user_to_response(user: dict) -> UserResponse:
         username=user["username"],
         role=UserRole(user.get("role", "viewer")),
         name=user.get("name", user["username"]),
+        scope_group=user.get("scope_group"),
+        scope_sites=user.get("scope_sites"),
     )
 
 
@@ -107,6 +109,8 @@ def create_user(body: UserCreate):
         "name": body.name,
         "password_hash": hash_password(body.password),
         "plain_password": None,
+        "scope_group": body.scope_group,
+        "scope_sites": body.scope_sites,
     }
     users.append(new_user)
     _save_users(users)
@@ -148,6 +152,10 @@ def update_user(username: str, body: UserUpdate):
         user["role"] = body.role.value
     if body.name is not None:
         user["name"] = body.name
+    # model_fields_set distingue omisión (mantener) de null (quitar restricción).
+    for field in ("scope_group", "scope_sites"):
+        if field in body.model_fields_set:
+            user[field] = getattr(body, field)
 
     users[idx] = user
     _save_users(users)

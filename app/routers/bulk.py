@@ -6,12 +6,12 @@ dispositivos, usando Nornir (con fallback serial a NAPALM).
 
 from typing import Optional
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Request
 
 from app.middleware.auth import JWTBearer
-from app.middleware.rbac import requires_role
+from app.middleware.rbac import get_current_user, partition_device_scope, requires_role
 from app.models.schemas import BulkDeployRequest, BulkDeployResponse, BulkDeployDeviceResult, BulkResult
-from app.services import napalm_svc, nornir_svc
+from app.services import inventory_svc, napalm_svc, nornir_svc
 
 router = APIRouter(prefix="/api/bulk", tags=["Bulk Operations"])
 
@@ -78,7 +78,7 @@ def bulk_get_facts(device_ids: Optional[list[str]] = Body(None)):
     response_model=BulkResult,
     dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
 )
-def bulk_backup(device_ids: Optional[list[str]] = Body(None)):
+def bulk_backup(request: Request, device_ids: Optional[list[str]] = Body(None)):
     """Hace backup de la running-config de todos los dispositivos.
 
     Guarda cada config en backups/<device_id>_<timestamp>.cfg
@@ -86,8 +86,16 @@ def bulk_backup(device_ids: Optional[list[str]] = Body(None)):
     Request body (opcional):
         {"device_ids": ["cisco-core-01"]}
     """
-    results = nornir_svc.bulk_backup(device_ids)
-    return _build_bulk_response(results)
+    user = get_current_user(request)
+    if user.get("scope_group") is None and user.get("scope_sites") is None:
+        return _build_bulk_response(nornir_svc.bulk_backup(device_ids))
+    targets = device_ids if device_ids is not None else [d["id"] for d in inventory_svc.list_devices()]
+    allowed, rejected = partition_device_scope(request, targets)
+    response = _build_bulk_response(nornir_svc.bulk_backup(allowed) if allowed else [])
+    response.total = len(targets)
+    response.failed += len(rejected)
+    response.errors.extend(rejected)
+    return response
 
 
 @router.get(
@@ -158,7 +166,7 @@ def _deploy_single(device_id: str, candidate_config: str, dry_run: bool) -> Bulk
     response_model=BulkDeployResponse,
     dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
 )
-def bulk_deploy(body: BulkDeployRequest):
+def bulk_deploy(body: BulkDeployRequest, request: Request):
     """Despliega una configuración en múltiples dispositivos simultáneamente.
 
     Flujo:
@@ -171,11 +179,13 @@ def bulk_deploy(body: BulkDeployRequest):
     """
     import concurrent.futures
 
-    results = []
+    allowed, rejected = partition_device_scope(request, body.device_ids)
+    results = [BulkDeployDeviceResult(device_id=item["device_id"], success=False,
+                                      committed=False, error=item["error"]) for item in rejected]
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         futures = {
             executor.submit(_deploy_single, did, body.candidate_config, body.dry_run): did
-            for did in body.device_ids
+            for did in allowed
         }
         for future in concurrent.futures.as_completed(futures):
             results.append(future.result())

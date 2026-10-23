@@ -3,11 +3,13 @@
 Provee:
 - get_current_user: dependencia que obtiene el payload del usuario autenticado.
 - requires_role: factory que genera una dependencia para exigir rol mínimo.
+- requires_scope: valida grupo real del dispositivo para mutaciones.
 """
 
 from fastapi import HTTPException, Request
 
 from app.models.schemas import UserRole
+from app.services import inventory_svc
 
 # Jerarquía de roles: admin > operator > viewer
 _ROLE_HIERARCHY = {
@@ -74,3 +76,58 @@ def requires_role(min_role: str | UserRole):
         return user
 
     return role_checker
+
+
+def scope_error(user: dict, group: str | None) -> str | None:
+    """Devuelve el rechazo literal o None; un device sin grupo no concede acceso.
+
+    Los sites son los mismos grupos del inventario, comparados sin distinguir
+    mayúsculas; [] explícito significa ningún grupo autorizado.
+    """
+    scoped = user.get("scope_group") is not None or user.get("scope_sites") is not None
+    if not scoped:
+        return None
+    sites = user.get("scope_sites")
+    names = [user.get("scope_group")]
+    if isinstance(sites, list):
+        names.extend(sites)
+    allowed = {name.casefold() for name in names if isinstance(name, str) and name.strip()}
+    if isinstance(group, str) and group.strip() and group.casefold() in allowed:
+        return None
+    return f"device fuera de tu scope: {group if group else 'sin grupo'}"
+
+
+def requires_scope(*, group: str | None = None, device_id: str | None = None,
+                   request: Request | None = None) -> None:
+    """Valida un grupo explícito o resuelve el device_id contra inventario.
+
+    Se invoca justo antes de la operación, tras JWTBearer/requires_role; no
+    permite usar un group enviado por cliente para suplantar el grupo real.
+    """
+    if request is None:
+        raise ValueError("requires_scope necesita request")
+    user = get_current_user(request)
+    if device_id is not None:
+        device = inventory_svc.get_device(device_id)
+        if device is None:
+            # Para tokens legados se conserva el manejo histórico del endpoint.
+            if user.get("scope_group") is None and user.get("scope_sites") is None:
+                return
+            raise HTTPException(404, f"Dispositivo '{device_id}' no encontrado")
+        group = device.get("group")
+    error = scope_error(user, group)
+    if error:
+        raise HTTPException(403, error)
+
+
+def partition_device_scope(request: Request, device_ids: list[str]) -> tuple[list[str], list[dict]]:
+    """Separa autorizados y errores por device sin cancelar todo el batch."""
+    allowed, rejected = [], []
+    for device_id in device_ids:
+        try:
+            requires_scope(device_id=device_id, request=request)
+        except HTTPException as exc:
+            rejected.append({"device_id": device_id, "error": exc.detail})
+        else:
+            allowed.append(device_id)
+    return allowed, rejected

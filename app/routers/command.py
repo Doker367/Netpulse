@@ -12,7 +12,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.middleware.auth import JWTBearer
-from app.middleware.rbac import get_current_user, requires_role
+from app.middleware.rbac import get_current_user, partition_device_scope, requires_role, requires_scope
 from app.models.schemas import (
     CommandRequest,
     CommandResponse,
@@ -50,49 +50,6 @@ def _build_response(device_id: str, result: napalm_svc.NapalmResult) -> CommandR
 
 
 @router.post(
-    "/{device_id}",
-    response_model=CommandResponse,
-    dependencies=[Depends(JWTBearer()), Depends(requires_role("operator"))],
-)
-def execute_commands(device_id: str, body: CommandRequest, request: Request):
-    """Ejecuta comandos CLI en un dispositivo específico.
-
-    Solo se permiten comandos de lectura/diagnóstico
-    (show, display, get, ping, traceroute, etc.).
-
-    Requiere rol: operator+
-    """
-    user = get_current_user(request)
-    username = user.get("sub", "anonymous")
-
-    # Log audit entry for every command execution
-    audit_svc.log_event(
-        action="command_execute",
-        device_id=device_id,
-        username=username,
-        details=f"Comandos: {', '.join(body.commands[:5])}",
-        ip_address=request.client.host if request.client else None,
-        path=f"/api/command/{device_id}",
-        method="POST",
-    )
-
-    result = napalm_svc.run_commands(device_id, body.commands)
-
-    if not result.success:
-        raise HTTPException(
-            status_code=502,
-            detail={
-                "error": result.error,
-                "error_raw": result.error_raw,
-                "error_type": result.error_type or "unknown",
-                "device_id": device_id,
-            },
-        )
-
-    return _build_response(device_id, result)
-
-
-@router.post(
     "/bulk",
     response_model=BulkCommandResponse,
     dependencies=[Depends(JWTBearer()), Depends(requires_role("operator"))],
@@ -119,10 +76,10 @@ def execute_commands_bulk(body: BulkCommandRequest, request: Request):
         method="POST",
     )
 
+    allowed, errors = partition_device_scope(request, body.device_ids)
     results: list[CommandResponse] = []
-    errors: list[dict] = []
 
-    for device_id in body.device_ids:
+    for device_id in allowed:
         result = napalm_svc.run_commands(device_id, body.commands)
 
         if result.success:
@@ -142,3 +99,39 @@ def execute_commands_bulk(body: BulkCommandRequest, request: Request):
         results=results,
         errors=errors,
     )
+
+
+# La ruta literal /bulk debe registrarse ANTES de /{device_id}.
+@router.post(
+    "/{device_id}",
+    response_model=CommandResponse,
+    dependencies=[Depends(JWTBearer()), Depends(requires_role("operator"))],
+)
+def execute_commands(device_id: str, body: CommandRequest, request: Request):
+    """Ejecuta comandos CLI de lectura/diagnóstico en un dispositivo."""
+    requires_scope(device_id=device_id, request=request)
+    user = get_current_user(request)
+    username = user.get("sub", "anonymous")
+
+    audit_svc.log_event(
+        action="command_execute",
+        device_id=device_id,
+        username=username,
+        details=f"Comandos: {', '.join(body.commands[:5])}",
+        ip_address=request.client.host if request.client else None,
+        path=f"/api/command/{device_id}",
+        method="POST",
+    )
+
+    result = napalm_svc.run_commands(device_id, body.commands)
+    if not result.success:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": result.error,
+                "error_raw": result.error_raw,
+                "error_type": result.error_type or "unknown",
+                "device_id": device_id,
+            },
+        )
+    return _build_response(device_id, result)
