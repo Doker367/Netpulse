@@ -1340,6 +1340,7 @@
     .user-item {
       display: flex;
       align-items: center;
+      flex-wrap: wrap;
       gap: 12px;
       padding: 10px 12px;
       border-bottom: 1px solid var(--border-s);
@@ -2295,6 +2296,14 @@
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
         </svg> <span data-i18n="nav_groups">Groups</span></div>
+      <div class="sidebar-item" onclick="swView('sites')"><svg class="si" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 21h18" />
+          <path d="M5 21V7l7-4v18" />
+          <path d="M12 8l7 3v10" />
+          <line x1="8" y1="10" x2="9" y2="10" />
+          <line x1="8" y1="14" x2="9" y2="14" />
+        </svg> <span data-i18n="nav_sites">Sites</span></div>
     </div>
 
     <div class="sidebar-s" id="sb-operations">
@@ -2356,6 +2365,12 @@
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg> <span data-i18n="nav_2fa">2FA / TOTP</span></div>
+      <div class="sidebar-item" onclick="swView('retention')"><svg class="si" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 8v13H3V8" />
+          <path d="M1 3h22v5H1z" />
+          <path d="M10 12h4" />
+        </svg> <span data-i18n="nav_retention">Retención</span></div>
     </div>
 
     <div class="sidebar-s" id="sb-admin">
@@ -2778,6 +2793,16 @@
           </div>
         </div>
       </div>
+      <div class="view" id="v-sites" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px">
+          <h2 style="font-size:18px;font-weight:600" data-i18n="view_sites">Sitios remotos</h2>
+          <button class="btn btn-o btn-sm" onclick="loadSites()" data-i18n="btn_refresh">🔄 Refresh</button>
+        </div>
+        <div id="sites-content">
+          <div class="empty"><div class="sp"></div></div>
+        </div>
+      </div>
+
       <div class="view" id="v-theme">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
           <h2 style="font-size:16px;font-weight:600" data-i18n="view_theme">🎨 Apariencia</h2>
@@ -3142,6 +3167,16 @@
         <!-- ── WIZARD DE AUTO-DISCOVERY (docs/handoffs/discovery.md): panel inline, sin modal ── -->
         <div id="dw-panel"
           style="display:none;margin-top:20px;background:var(--panel);border:1px solid var(--accent);border-radius:var(--radius-lg);padding:20px">
+        </div>
+      </div>
+
+      <div class="view" id="v-retention" style="overflow-y:auto;max-height:calc(100vh - 60px);padding:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px">
+          <h2 style="font-size:16px;font-weight:600" data-i18n="view_retention">🧹 Retención y housekeeping</h2>
+          <button class="btn btn-o btn-sm" onclick="loadRetention()" data-i18n="btn_refresh">🔄 Refresh</button>
+        </div>
+        <div id="ret-content">
+          <div class="empty"><div class="sp"></div></div>
         </div>
       </div>
 
@@ -3768,6 +3803,71 @@
       dw_cancel_back: 'Volver a candidatos',
       dw_st_ok: 'Escaneado', dw_st_sin_vecinos: 'Sin vecinos', dw_st_sin_soporte: 'Sin soporte para LLDP/CDP',
       dw_st_sin_cred: 'Sin credenciales', dw_st_error: 'No verificable'
+    });
+
+    Object.assign(I18N.en, {
+      nav_sites: 'Sites', view_sites: 'Remote Sites',
+      sites_empty: 'No site has contacted yet', sites_help: 'Data measured from the remote site node; not directly comparable to central polling.',
+      sites_view_devices: 'Devices', sites_last_seen: 'last contact', sites_stale: 'without contact',
+      sites_st_ok: 'Responds', sites_st_noresp: 'No probe reply', sites_st_nodata: 'No current data',
+      sites_last_known: 'last known state', sites_unmatched: 'Not in inventory',
+      sites_buf_pending: '{n} samples pending since {ts}', sites_buf_dropped: '{n} samples discarded; gap since {ts}',
+      sites_buf_disklow: 'Probe paused: low disk', sites_skew: 'Collector clock off by {s} s', sites_epoch: 'Buffer restarted on the site',
+      sites_no_devs: 'No devices reported by this site', sites_col_dev: 'Device', sites_col_source: 'Source',
+      sites_col_state: 'State', sites_col_lat: 'Probe latency (ms)', sites_col_last: 'Last sample', sites_col_inv: 'Inventory',
+      sites_inv_ok: 'In inventory', sites_inv_no: 'Not in inventory', sites_inv_unv: 'Inventory unverified',
+      sites_hist_btn: 'History', sites_hist_title: 'History (6 h, raw)',
+      sites_hist_nodata: 'No history yet', sites_hist_less: 'reduce hours', sites_hist_empty: 'Window contains no samples',
+      sites_hist_caption: 'Raw points: a failure is its own failing sample; gaps are left as gaps (no interpolation).',
+      nav_retention: 'Retention', view_retention: 'Retention & housekeeping',
+      ret_unmeasured: 'unmeasured', ret_audit: 'Audit trail', ret_backups: 'Local backups',
+      ret_records: 'Records', ret_oldest: 'Oldest', ret_files: 'Files', ret_usage: 'Usage',
+      ret_name: 'Name', ret_size: 'Size (bytes)', ret_mtime: 'Last modified UTC',
+      ret_prune_title: 'Purge audit trail', ret_days: 'Days',
+      ret_dry_btn: 'Simulate', ret_dry_result: '{n} records would be purged ({d} days).',
+      ret_col_ts: 'Date', ret_col_action: 'Action', ret_col_user: 'User',
+      ret_still_skip: 'Nothing deleted yet — preview only.',
+      ret_exec_btn: 'Purge', ret_cancel_btn: 'Cancel', ret_confirm_msg: 'Delete {n} audit records older than {d} days? This cannot be undone.',
+      ret_exec_now: 'Delete now', ret_done: '{n} records purged', ret_kept: '{n} records kept',
+      ret_pick_days: 'Choose a range first', ret_viewer_note: 'Purge requires the admin role — inventory is visible to you.',
+      scp_all: 'All sites', scp_none: 'No groups allowed',
+      scp_title: 'Operating scope', scp_no_main: 'no main group', scp_groups_unverified: 'Group list could not be verified — you may still type/select another source.',
+      scp_note: 'Scope applies on next login (existing tokens keep permissions until expiry).',
+      scp_save: 'Save scope', scp_clear: 'Remove scope (full access)',
+      scp_clear_confirm: 'A user without scope sees EVERYTHING — remove the restriction?', scp_saved: 'Scope saved',
+      scp_relogin: 'The user must log in again to receive the new scope in their token.', scp_cleared: 'Scope removed'
+    });
+    Object.assign(I18N.es, {
+      nav_sites: 'Sitios', view_sites: 'Sitios remotos',
+      sites_empty: 'Ningún site ha contactado todavía', sites_help: 'Datos medidos desde el nodo del site; no comparables directamente con el sondeo del centro.',
+      sites_view_devices: 'Dispositivos', sites_last_seen: 'último contacto', sites_stale: 'sin contacto',
+      sites_st_ok: 'Responde', sites_st_noresp: 'No responde al sondeo', sites_st_nodata: 'Sin dato actual',
+      sites_last_known: 'último estado conocido', sites_unmatched: 'No inventariado',
+      sites_buf_pending: '{n} muestras pendientes desde {ts}', sites_buf_dropped: 'Se descartaron {n} muestras; hueco desde {ts}',
+      sites_buf_disklow: 'Sonda pausada: disco bajo', sites_skew: 'Reloj del colector desviado {s} s', sites_epoch: 'Buffer reiniciado en el site',
+      sites_no_devs: 'Ningún dispositivo reportado por este site', sites_col_dev: 'Equipo', sites_col_source: 'Fuente',
+      sites_col_state: 'Estado', sites_col_lat: 'Latencia de sonda (ms)', sites_col_last: 'Última muestra', sites_col_inv: 'Inventario',
+      sites_inv_ok: 'En inventario', sites_inv_no: 'No inventariado', sites_inv_unv: 'Inventario no verificable',
+      sites_hist_btn: 'Histórico', sites_hist_title: 'Histórico (6 h, crudo)',
+      sites_hist_nodata: 'Sin histórico aún', sites_hist_less: 'reduce las horas', sites_hist_empty: 'La ventana no contiene muestras',
+      sites_hist_caption: 'Puntos crudos: un fallo es su propia muestra fallida; los huecos se dejan como huecos (sin interpolación).',
+      nav_retention: 'Retención', view_retention: 'Retención y housekeeping',
+      ret_unmeasured: 'sin medir', ret_audit: 'Auditoría', ret_backups: 'Backups locales',
+      ret_records: 'Registros', ret_oldest: 'Más viejo', ret_files: 'Archivos', ret_usage: 'Uso',
+      ret_name: 'Nombre', ret_size: 'Tamaño (bytes)', ret_mtime: 'Última modificación UTC',
+      ret_prune_title: 'Purgar auditoría', ret_days: 'Días',
+      ret_dry_btn: 'Simular', ret_dry_result: 'Se borrarían {n} registros ({d} días).',
+      ret_col_ts: 'Fecha', ret_col_action: 'Acción', ret_col_user: 'Usuario',
+      ret_still_skip: 'Aún no se borró nada — solo previsualización.',
+      ret_exec_btn: 'Purgar', ret_cancel_btn: 'Cancelar', ret_confirm_msg: '¿Borrar {n} registros de auditoría con más de {d} días? Esto NO se puede deshacer.',
+      ret_exec_now: 'Borrar ahora', ret_done: '{n} registros purgados', ret_kept: '{n} registros conservados',
+      ret_pick_days: 'Elige una ventana primero', ret_viewer_note: 'La purga requiere rol admin — el inventario sí es visible para ti.',
+      scp_all: 'Todos los sitios', scp_none: 'Ningún grupo autorizado',
+      scp_title: 'Alcance operativo', scp_no_main: 'sin grupo principal', scp_groups_unverified: 'No se pudo verificar la lista de grupos — puedes seguir guardando el valor actual.',
+      scp_note: 'El alcance aplica en el próximo inicio de sesión (los tokens existentes conservan permisos hasta vencer).',
+      scp_save: 'Guardar scope', scp_clear: 'Quitar scope (acceso total)',
+      scp_clear_confirm: 'Un usuario sin scope ve TODO — ¿quitar la restricción?', scp_saved: 'Scope guardado',
+      scp_relogin: 'El usuario debe iniciar sesión de nuevo para recibir el nuevo scope en su token.', scp_cleared: 'Scope quitado'
     });
 
     function setLang(lang) {
@@ -6079,7 +6179,10 @@
         <div style="flex:1"><div class="ui-n">${esc(u.name || u.username)} <span style="font-weight:400;color:var(--text-ter);font-size:11px">@${u.username}</span></div>
         <div class="ui-r">${u.role}</div></div>
         <span class="badge" style="background:${roleColors[u.role] || 'var(--accent-l)'};color:#fff">${u.role}</span>
+        ${userScopeBadge(u)}
+        ${__isAdmin() ? `<button class="btn btn-o btn-xs" onclick="userScopePanel('${escAttr(u.username)}')">🔒</button>` : ''}
         <button class="btn btn-o btn-xs" onclick="if(confirm('Eliminar ${u.username}?'))delUser('${u.username}')">✕</button>
+        <div id="sc-panel-${escAttr(u.username)}" style="display:none;flex-basis:100%"></div>
       </div>`).join('')}
     </div>
     <div class="sc">
@@ -6615,6 +6718,8 @@
       if (v === 'apikeys') loadKeys();
       if (v === 'compliance') loadCompliance();
       if (v === 'groups') loadGroups();
+      if (v === 'sites') loadSites();
+      if (v === 'retention') loadRetention();
       if (v === 'netbox') loadNetbox();
       if (v === 'reports') loadReports();
       if (v === 'terminal') {
@@ -8299,6 +8404,404 @@
           <div style="margin-top:12px"><button class="btn btn-o btn-sm" onclick="dwReset()">${__t('dw_rescan')}</button></div>`;
       } catch (e) {
         dwPanelError(`${__t('np_unverified')} · ${esc(e.message)}`);
+      }
+    }
+
+    // ── OLA 4: SITIOS REMOTOS + RETENCIÓN + SCOPES RBAC ─────────
+    // Cliente puro de /api/remote/* (collectors-site.md §8/§9.3), /api/retention/*
+    // (retention.md) y /api/admin/users + /api/groups (rbac-site.md). Sin paths
+    // fuera de esos contratos. Regla de oro: site stale nunca verde; ok=false
+    // nunca "caído"; null nunca se muestra como 0.
+
+    const _r4Epochs = {}; // site_id → último buffer_epoch visto (detecta "Buffer reiniciado")
+    let _r4Groups = null; // cache de /api/groups para el panel de scopes
+
+    function _det40(body, fb) { return _detText(body, fb); }
+
+    function _fmtBytes(n) {
+      const v = Number(n) || 0;
+      if (v < 1024) return `${v} B`;
+      if (v < 1024 * 1024) return `${(v / 1024).toFixed(1)} KB`;
+      if (v < 1024 * 1024 * 1024) return `${(v / 1048576).toFixed(1)} MB`;
+      return `${(v / 1073741824).toFixed(2)} GB`;
+    }
+
+    function _ageHuman(s) {
+      s = Math.max(0, Math.round(Number(s) || 0));
+      if (s < 60) return `${s} s`;
+      if (s < 3600) return `${Math.floor(s / 60)} min`;
+      return alDur(s);
+    }
+
+    function _isoLocal(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return isNaN(d.getTime()) ? esc(String(iso)) : d.toLocaleString();
+    }
+
+    async function loadSites() {
+      const el = document.getElementById('sites-content'); if (!el || !t) return;
+      el.innerHTML = '<div class="empty"><div class="sp"></div></div>';
+      let body = null, r;
+      try {
+        r = await fetch(`${A}/remote/sites`, { headers: h(), signal: AbortSignal.timeout(15000) });
+      } catch (e) {
+        el.innerHTML = npGray(`${__t('np_unverified')} · ${esc(e.message)}`);
+        return;
+      }
+      try { body = await r.json(); } catch (e) { }
+      if (r.status === 403) { el.innerHTML = npGray(`🔒 ${esc(_detText(body, 'Acceso denegado'))}`); return; }
+      if (!r.ok) { el.innerHTML = npGray(`${__t('np_unverified')} · HTTP ${r.status}${_detText(body, '') ? ' · ' + esc(_detText(body, '')) : ''}`); return; }
+      const sites = (body && Array.isArray(body.sites)) ? body.sites : [];
+      if (!sites.length) {
+        el.innerHTML = npGray(`${__t('sites_empty')}<br><span style="font-size:11px;color:var(--text-ter)">${__t('sites_help')}</span>`);
+        return;
+      }
+      el.innerHTML = sites.map(s => _sitesCard(s)).join('');
+    }
+
+    // Estados por device (§9.3, exactos). current=false NUNCA verde.
+    function _devState(d) {
+      const f = d.freshness || {};
+      if (!f.current) return `<td><span class="badge" style="background:var(--surface);color:var(--text-ter)">${__t('sites_st_nodata')}</span><div style="font-size:10px;color:var(--text-ter);margin-top:2px">${__t('sites_last_known')}: ${esc(String(d.reachable === null || d.reachable === undefined ? '—' : (d.reachable ? __t('sites_st_ok') : __t('sites_st_noresp'))))}</div></td>`;
+      if (d.ok === false) return `<td><span class="badge" style="background:var(--surface);color:var(--text-ter)">${__t('dw_st_error')}</span><div style="font-size:10px;color:var(--text-ter);margin-top:2px">${esc(d.error || '—')}</div></td>`;
+      if (d.reachable) return `<td><span class="badge" style="background:rgba(34,197,94,.15);color:var(--green)">${__t('sites_st_ok')}</span></td>`;
+      return `<td><span class="badge" style="background:rgba(239,68,68,.15);color:var(--red)">${__t('sites_st_noresp')}</span><div style="font-size:10px;color:var(--text-ter);margin-top:2px">${esc(d.error || '—')}</div></td>`;
+    }
+
+    function _sitesCard(s) {
+      const c = s.contact === 'fresh';
+      const contactHtml = c
+        ? `<span class="badge" style="background:rgba(34,197,94,.15);color:var(--green)">fresh · ${__t('sites_last_seen')}: ${_ageHuman(s.last_contact_age_s)}</span>`
+        : `<span class="badge" style="background:var(--surface);color:var(--text-ter)">${__t('sites_stale')}: ${_ageHuman(s.last_contact_age_s)}</span>`;
+      const cols = s.collectors || [];
+      const cl = cols[0] || {};
+      const buffs = [];
+      const buf = cl.buffer || {};
+      const epochKey = `${s.site_id}`;
+      if ((buf.pending ?? 0) > 0) buffs.push(`<div style="background:rgba(245,158,11,.12);border:1px solid var(--border-s);border-radius:4px;padding:4px 8px;font-size:11px;margin-top:6px">⏳ ${__t('sites_buf_pending').replace('{n}', String(buf.pending)).replace('{ts}', esc(String(buf.oldest_pending_ts || '—')))}</div>`);
+      if ((buf.dropped_total ?? 0) > 0) buffs.push(`<div style="background:var(--bg2);border:1px solid var(--border-s);border-radius:4px;padding:4px 8px;font-size:11px;margin-top:6px">${__t('sites_buf_dropped').replace('{n}', String(buf.dropped_total)).replace('{ts}', esc(String(buf.gap_since || '—')))}</div>`);
+      if (cl.paused_reason === 'disk_low') buffs.push(`<div style="background:var(--bg2);border:1px solid var(--border-s);border-radius:4px;padding:4px 8px;font-size:11px;margin-top:6px">${__t('sites_buf_disklow')}</div>`);
+      if (cl.time_quality === 'skewed') buffs.push(`<div style="background:var(--bg2);border:1px solid var(--border-s);border-radius:4px;padding:4px 8px;font-size:11px;margin-top:6px">🕐 ${__t('sites_skew').replace('{s}', String(cl.clock_skew_s ?? '—'))}</div>`);
+      if (_r4Epochs[epochKey] && buf.buffer_epoch && _r4Epochs[epochKey] !== buf.buffer_epoch) buffs.push(`<div style="background:var(--bg2);border:1px solid var(--border-s);border-radius:4px;padding:4px 8px;font-size:11px;margin-top:6px">${__t('sites_epoch')}</div>`);
+      if (buf.buffer_epoch) _r4Epochs[epochKey] = buf.buffer_epoch;
+      const dvs = s.devices || {};
+      return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <div>
+            <b style="font-size:15px">${esc(s.site_id)}</b>
+            <span style="font-size:11px;color:var(--text-ter);margin-left:8px">${esc(cl.collector_id || '—')}</span>
+          </div>
+          ${contactHtml}
+          <button class="btn btn-o btn-xs" onclick="siteToggle('${escAttr(s.site_id)}')" id="sites-btn-${escAttr(s.site_id)}">${__t('sites_view_devices')}</button>
+        </div>
+        ${buffs.join('')}
+        <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;margin-top:10px;color:var(--text-sec)">
+          <span>${__t('sites_st_ok')}: <b style="color:var(--green)">${Number(dvs.reachable ?? 0)}</b></span>
+          <span>${__t('sites_st_noresp')}: <b style="color:var(--red)">${Number(dvs.unreachable ?? 0)}</b></span>
+          <span>${__t('dw_st_error')}: <b style="color:var(--text-ter)">${Number(dvs.unverifiable ?? 0)}</b></span>
+          <span>${__t('sites_unmatched')}: <b style="color:var(--orange)">${Number(dvs.unmatched ?? 0)}</b></span>
+        </div>
+        <div id="sites-devs-${escAttr(s.site_id)}" style="display:none;margin-top:12px"></div>
+      </div>`;
+    }
+
+    async function siteToggle(siteId, force) {
+      const box = document.getElementById(`sites-devs-${siteId}`);
+      const btn = document.getElementById(`sites-btn-${siteId}`);
+      if (!box) return;
+      if (!force && box.style.display !== 'none') { box.style.display = 'none'; return; }
+      box.style.display = 'block';
+      box.innerHTML = '<div class="sp" style="margin:12px auto"></div>';
+      let body = null, r;
+      try {
+        r = await fetch(`${A}/remote/sites/${encodeURIComponent(siteId)}/devices?include_unmatched=true`, { headers: h(), signal: AbortSignal.timeout(15000) });
+        try { body = await r.json(); } catch (e) { }
+        if (!r.ok) { box.innerHTML = npGray(`${__t('np_unverified')} · HTTP ${r.status}${_detText(body, '') ? ' · ' + esc(_detText(body, '')) : ''}`); return; }
+        const list = Array.isArray(body.devices) ? body.devices : [];
+        if (!list.length) { box.innerHTML = npGray(__t('sites_no_devs')); return; }
+        const rows = list.map(d => {
+          const inv = d.inventory_match === true
+            ? `<span class="badge" style="background:rgba(34,197,94,.15);color:var(--green)">${__t('sites_inv_ok')}</span>`
+            : (d.inventory_match === false
+              ? `<span class="badge" style="background:rgba(245,158,11,.12);color:var(--orange)">${__t('sites_inv_no')}</span>`
+              : `<span class="badge" style="background:var(--surface);color:var(--text-ter)">${__t('sites_inv_unv')}<div style="display:none">${esc(d.inventory_error || '')}</div></span>`);
+          const srcs = d.source || {};
+          return `<tr>
+            <td style="font-weight:500">${esc(d.device_id)}</td>
+            <td style="font-size:11px;color:var(--text-sec)">${esc(srcs.site_id || '—')} / ${esc(srcs.collector_id || '—')}</td>
+            ${_devState(d)}
+            <td style="font-family:var(--mono,monospace);font-size:11px">${d.latency_ms === null || d.latency_ms === undefined ? '—' : Number(d.latency_ms).toFixed(1)}</td>
+            <td style="font-size:11px;color:var(--text-sec)">${_isoLocal(d.freshness && d.freshness.last_sample_ts)}</td>
+            <td>${inv}</td>
+            <td><button class="btn btn-o btn-xs" onclick="siteHist('${escAttr(siteId)}','${escAttr(d.device_id)}')">${__t('sites_hist_btn')}</button></td>
+          </tr>`;
+        }).join('');
+        box.innerHTML = `
+          <div style="border:1px solid var(--border);border-radius:6px;margin-bottom:8px"><table>
+            <tr><th>${__t('sites_col_dev')}</th><th>${__t('sites_col_source')}</th><th>${__t('sites_col_state')}</th><th>${__t('sites_col_lat')}</th><th>${__t('sites_col_last')}</th><th>${__t('sites_col_inv')}</th><th></th></tr>
+            ${rows}</table></div>
+          <div id="sites-hist-${escAttr(siteId)}"></div>`;
+      } catch (e) {
+        box.innerHTML = npGray(`${__t('np_unverified')} · ${esc(e.message)}`);
+      }
+    }
+
+    async function siteHist(siteId, devId) {
+      const box = document.getElementById(`sites-hist-${siteId}`); if (!box) return;
+      box.innerHTML = '<div class="sc"><div class="sl">📈 ' + __t('sites_hist_title') + ' — ' + esc(devId) + '</div><div id="sh-chart-' + esc(devId) + '" style="padding:8px 0"><div class="sp"></div></div></div>';
+      let body = null, r;
+      try {
+        r = await fetch(`${A}/remote/sites/${encodeURIComponent(siteId)}/devices/${encodeURIComponent(devId)}/history?hours=6`, { headers: h(), signal: AbortSignal.timeout(15000) });
+        try { body = await r.json(); } catch (e) { }
+        const el = document.getElementById(`sh-chart-${devId}`);
+        if (!el) return;
+        if (r.status === 404) { el.innerHTML = npGray(__t('sites_hist_nodata')); return; }
+        if (r.status === 422) { el.innerHTML = npGray(`${esc(_detText(body, 'ventana demasiado grande'))} · ${__t('sites_hist_less')}`); return; }
+        if (!r.ok) { el.innerHTML = npGray(`${__t('np_unverified')} · HTTP ${r.status}`); return; }
+        const pts = Array.isArray(body.points) ? body.points : [];
+        if (!pts.length) { el.innerHTML = npGray(__t('sites_hist_empty')); return; }
+        // Puntos crudos, sin interpolar: un fallo es una muestra reachable=false; un hueco es un hueco.
+        const maxLat = Math.max(1, ...pts.map(p => Number(p.latency_ms) || 0));
+        const mk = (h) => Math.round(Math.min(60, Math.max(3, h)));
+        el.innerHTML = `<div style="display:flex;align-items:flex-end;gap:2px;height:64px;flex-wrap:nowrap;overflow:hidden">${
+          pts.map(p => {
+            const down = p.ok === true && p.reachable === false;
+            const unver = p.ok === false || p.reachable === null || p.reachable === undefined;
+            const col = down ? 'var(--red)' : (unver ? 'var(--text-ter)' : 'var(--accent)');
+            const hgt = down ? 60 : (unver ? 6 : mk((Number(p.latency_ms) || 0) / maxLat * 60));
+            const ti = `${_isoLocal(p.ts)} — ${down ? __t('sites_st_noresp') : (unver ? __t('dw_st_error') + (p.error ? ': ' + p.error : '') : (Number(p.latency_ms) || 0).toFixed(1) + ' ms')}`;
+            return `<div title="${escAttr(ti)}" style="width:6px;height:${hgt}px;background:${col};border-radius:2px;opacity:.85"></div>`;
+          }).join('')}</div>
+          <div style="font-size:10px;color:var(--text-ter);margin-top:4px">${__t('sites_hist_caption')}</div>`;
+      } catch (e) {
+        const el = document.getElementById(`sh-chart-${devId}`);
+        if (el) el.innerHTML = npGray(`${__t('np_unverified')} · ${esc(e.message)}`);
+      }
+    }
+
+    // ── RETENCIÓN (contrato retention.md; dry-run obligatorio) ──
+    let _retPreview = null; // {dias, borraria} — invalidada al cambiar días
+
+    async function loadRetention() {
+      const el = document.getElementById('ret-content'); if (!el || !t) return;
+      el.innerHTML = '<div class="empty"><div class="sp"></div></div>';
+      let inv = null, bks = null, err = '';
+      try {
+        const [ri, rb] = await Promise.allSettled([
+          fetch(`${A}/retention/inventory`, { headers: h(), signal: AbortSignal.timeout(15000) }),
+          fetch(`${A}/retention/backups`, { headers: h(), signal: AbortSignal.timeout(15000) })
+        ]);
+        if (ri.status === 'rejected') err = `${__t('np_unverified')} · ${ri.reason.message}`;
+        else {
+          if (!ri.value.ok) err = `${__t('np_unverified')} · HTTP ${ri.value.status}`;
+          inv = await ri.value.json();
+        }
+        if (rb.status === 'fulfilled' && rb.value.ok) bks = await rb.value.json();
+      } catch (e) { err = err || `${__t('np_unverified')} · ${esc(e.message)}`; }
+      if (!inv) { el.innerHTML = npGray(err); return; }
+      const p = inv.prometheus || {}, a = inv.audit || {}, b = inv.backups || {};
+      const estadoBadge = (st) => (st && st !== 'con datos')
+        ? `<div style="font-size:11px;color:var(--text-ter);margin-top:4px">${esc(st)}</div>` : '';
+      const row = (k, v) => `<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0"><span style="color:var(--text-sec)">${esc(k)}</span><b style="font-size:12px">${v}</b></div>`;
+      const cards = `
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <b style="font-size:13px">Prometheus (TSDB)</b>
+          ${row('retention_time', p.retention_time === null || p.retention_time === undefined ? `<span style="color:var(--text-ter)">${__t('ret_unmeasured')}</span>` : esc(String(p.retention_time)))}
+          ${row('retention_size', p.retention_size === null || p.retention_size === undefined ? `<span style="color:var(--text-ter)">${__t('ret_unmeasured')}</span>` : esc(String(p.retention_size)))}
+          ${estadoBadge(p.estado)}
+        </div>
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <b style="font-size:13px">${__t('ret_audit')}</b>
+          ${row(__t('ret_records'), a.registros === null || a.registros === undefined ? `<span style="color:var(--text-ter)">${__t('ret_unmeasured')}</span>` : Number(a.registros))}
+          ${row(__t('ret_oldest'), a.mas_viejo === null || a.mas_viejo === undefined ? `<span style="color:var(--text-ter)">${__t('ret_unmeasured')}</span>` : _isoLocal(a.mas_viejo))}
+          ${estadoBadge(a.estado)}
+        </div>
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:12px">
+          <b style="font-size:13px">${__t('ret_backups')}</b>
+          ${row(__t('ret_files'), b.ruta === null || b.ruta === undefined ? `<span style="color:var(--text-ter)">${esc(b.estado || __t('ret_unmeasured'))}</span>` : esc(String(b.archivos ?? 0)))}
+          ${row(__t('ret_usage'), b.ruta === null || b.ruta === undefined ? '—' : _fmtBytes(b.uso_bytes))}
+          ${row(__t('ret_oldest'), b.ruta === null || b.ruta === undefined ? '—' : (b.mas_viejo ? _isoLocal(b.mas_viejo) : `<span style="color:var(--text-ter)">${__t('ret_unmeasured')}</span>`))}
+          ${estadoBadge(b.estado)}
+        </div>`;
+      const bRows = (bks && Array.isArray(bks.backups)) ? bks.backups.map(x => `<tr>
+        <td style="font-weight:500">${esc(x.nombre || '—')}</td>
+        <td style="font-family:var(--mono,monospace);font-size:11px">${Number(x.tamano_bytes ?? 0)}</td>
+        <td style="font-size:11px;color:var(--text-sec)">${_isoLocal(x.fecha)}</td></tr>`).join('') : '';
+      const canPrune = __isAdmin();
+      el.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px">${cards}</div>
+        ${bRows ? `<div style="border:1px solid var(--border);border-radius:6px;margin-bottom:16px"><table>
+          <tr><th>${__t('ret_name')}</th><th>${__t('ret_size')}</th><th>${__t('ret_mtime')}</th></tr>${bRows}</table></div>` : ''}
+        ${canPrune ? `
+        <div class="sc" id="ret-prune-box">
+          <div class="sl">🗑️ ${__t('ret_prune_title')}</div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center">
+            <label style="font-size:12px;color:var(--text-sec)" data-i18n="ret_days">${__t('ret_days')}</label>
+            <select id="ret-days" onchange="retInvalidate()" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:12px">
+              <option value="7">7</option><option value="30" selected>30</option><option value="90">90</option><option value="365">365</option>
+            </select>
+            <button class="btn btn-o btn-sm" onclick="retPruneDry()" id="ret-dry-btn">${__t('ret_dry_btn')}</button>
+          </div>
+          <div id="ret-prune-out" style="margin-top:10px;font-size:12px"></div>
+        </div>` : `<div style="font-size:11px;color:var(--text-ter);margin-bottom:12px">${__t('ret_viewer_note')}</div>`}`;
+    }
+
+    function retInvalidate() { _retPreview = null; const o = document.getElementById('ret-prune-out'); if (o) o.innerHTML = ''; }
+    function retDet(body, fb) { return _detText(body, fb); }
+
+    async function retPruneDry() {
+      const out = document.getElementById('ret-prune-out'); if (!out) return;
+      const dias = Number(document.getElementById('ret-days')?.value || 0);
+      if (!dias) { out.innerHTML = `<div style="color:var(--orange)">${__t('ret_pick_days')}</div>`; return; }
+      out.innerHTML = '<div class="sp" style="margin:12px auto"></div>';
+      let body = null, r;
+      try {
+        r = await fetch(`${A}/retention/audit-prune`, { method: 'POST', headers: h(), body: JSON.stringify({ dias, dry_run: true }), signal: AbortSignal.timeout(15000) });
+        try { body = await r.json(); } catch (e) { }
+        if (!r.ok) {
+          out.innerHTML = r.status === 422
+            ? `<div style="color:var(--orange)">${esc(_detText(body, 'HTTP 422'))}</div>`
+            : npGray(`${__t('np_unverified')} · ${esc(_detText(body, 'HTTP ' + r.status))}`);
+          return;
+        }
+        _retPreview = { dias, borraria: Number(body.borraria ?? 0) };
+        const muestras = Array.isArray(body.muestras) ? body.muestras : [];
+        const mrows = muestras.map(m => `<tr>
+          <td style="font-size:11px">${_isoLocal(m.timestamp)}</td>
+          <td style="font-size:11px;font-family:var(--mono,monospace)">${esc(String(m.action || '—'))}</td>
+          <td style="font-size:11px">${esc(String(m.username || '—'))}</td></tr>`).join('');
+        out.innerHTML = `
+          <div class="bt" style="margin-bottom:8px">${__t('ret_dry_result').replace('{n}', String(_retPreview.borraria)).replace('{d}', String(dias))}</div>
+          ${mrows ? `<div style="border:1px solid var(--border);border-radius:6px;overflow:hidden"><table style="font-size:11px"><tr><th>${__t('ret_col_ts')}</th><th>${__t('ret_col_action')}</th><th>${__t('ret_col_user')}</th></tr>${mrows}</table></div>` : ''}
+          <div style="font-size:11px;color:var(--text-ter);margin-top:4px">${__t('ret_still_skip')}</div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <button class="btn btn-p btn-sm" onclick="retPruneConfirm()">${__t('ret_exec_btn')}</button>
+            <button class="btn btn-o btn-sm" onclick="retInvalidate()">${__t('ret_cancel_btn')}</button>
+          </div>`;
+      } catch (e) {
+        out.innerHTML = npGray(`${__t('np_unverified')} · ${esc(e.message)}`);
+      }
+    }
+
+    async function retPruneConfirm() {
+      const out = document.getElementById('ret-prune-out'); if (!out) return;
+      if (!_retPreview) return; // sin simulación previa no hay segunda llamada (exigida por contrato)
+      out.innerHTML = `<div class="bt" style="margin-bottom:10px;border-left-color:var(--red)">${__t('ret_confirm_msg').replace('{n}', String(_retPreview.borraria)).replace('{d}', String(_retPreview.dias))}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-p btn-sm" style="background:var(--red)" onclick="retPruneExec()">${__t('ret_exec_now')}</button>
+          <button class="btn btn-o btn-sm" onclick="retInvalidate()">${__t('ret_cancel_btn')}</button>
+        </div>`;
+    }
+
+    async function retPruneExec() {
+      const out = document.getElementById('ret-prune-out'); if (!out || !_retPreview) return;
+      out.innerHTML = '<div class="sp" style="margin:12px auto"></div>';
+      let body = null, r;
+      try {
+        r = await fetch(`${A}/retention/audit-prune`, { method: 'POST', headers: h(), body: JSON.stringify({ dias: _retPreview.dias, dry_run: false }), signal: AbortSignal.timeout(30000) });
+        try { body = await r.json(); } catch (e) { }
+        if (!r.ok) {
+          out.innerHTML = npGray(`${__t('np_unverified')} · ${esc(_detText(body, 'HTTP ' + r.status))}`);
+          return;
+        }
+        toast(`${__t('ret_done').replace('{n}', String(body.borrados ?? 0))}`, 's');
+        out.innerHTML = `<div class="bt" style="margin-bottom:8px">${__t('ret_done').replace('{n}', String(body.borrados ?? 0))}</div><div style="font-size:11px;color:var(--text-ter)">${__t('ret_kept').replace('{n}', String(body.kept ?? 0))}</div>`;
+        _retPreview = null;
+        loadRetention();
+      } catch (e) {
+        out.innerHTML = npGray(`${__t('np_unverified')} · ${esc(e.message)}`);
+      }
+    }
+
+    // ── SCOPES RBAC (contrato rbac-site.md; PUT /api/admin/users/{username}) ──
+    function userScopeBadge(u) {
+      const g = u.scope_group, s = u.scope_sites;
+      if (g == null && s == null) return `<span class="badge" style="background:var(--surface);color:var(--text-sec)">${__t('scp_all')}</span>`;
+      if (g == null && Array.isArray(s) && !s.length) return `<span class="badge" style="background:rgba(239,68,68,.15);color:var(--red)">${__t('scp_none')}</span>`;
+      const parts = [];
+      if (g) parts.push(esc(g));
+      if (Array.isArray(s)) s.forEach(x => { if (!parts.some(xx => xx.toLowerCase() === esc(x).toLowerCase())) parts.push(esc(x)); });
+      return `<span class="badge" style="background:rgba(59,130,246,.15);color:var(--accent)">${parts.join(' + ')}</span>`;
+    }
+
+    async function userScopePanel(username) {
+      const box = document.getElementById(`sc-panel-${username}`); if (!box) return;
+      if (box.style.display !== 'none') { box.style.display = 'none'; return; }
+      let users = null;
+      try {
+        const r = await fetch(`${A}/admin/users`, { headers: h() });
+        if (r.ok) { const j = await r.json(); users = Array.isArray(j) ? j : (j.users || []); }
+      } catch (e) { }
+      const u = (users || []).find(x => x.username === username) || {};
+      if (!_r4Groups) {
+        try { const rg = await fetch(`${A}/groups`, { headers: h(), signal: AbortSignal.timeout(10000) }); if (rg.ok) _r4Groups = await rg.json(); } catch (e) { }
+      }
+      const glist = Array.isArray(_r4Groups) ? _r4Groups.map(g => g.name).filter(Boolean) : [];
+      const opt = (v, cur) => `<option value="${escAttr(v)}" ${cur === v ? 'selected' : ''}>${esc(v)}</option>`;
+      box.style.display = 'block';
+      box.innerHTML = `
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px;margin-top:6px">
+          <b style="font-size:12px">${__t('scp_title')}</b> <span style="font-size:11px;color:var(--text-ter)">@${esc(username)}</span>
+          ${glist.length ? '' : `<div style="font-size:11px;color:var(--text-ter);margin-top:4px">${__t('scp_groups_unverified')}</div>`}
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <select id="sc-g-${escAttr(username)}" style="flex:1;min-width:140px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:12px">
+              <option value="">— ${__t('scp_no_main')} —</option>
+              ${glist.map(g => opt(g, u.scope_group || '')).join('')}
+            </select>
+          </div>
+          ${glist.length ? `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+            ${glist.map(g => `<label style="font-size:11px;color:var(--text-sec)"><input type="checkbox" class="sc-s-${escAttr(username)}" value="${escAttr(g)}" ${(u.scope_sites || []).some(x => String(x).toLowerCase() === g.toLowerCase()) ? 'checked' : ''}> ${esc(g)}</label>`).join('')}
+          </div>` : ''}
+          <div style="font-size:11px;color:var(--text-ter);margin-top:6px">${__t('scp_note')}</div>
+          <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+            <button class="btn btn-p btn-sm" onclick="userScopeSave('${escAttr(username)}')">${__t('scp_save')}</button>
+            <button class="btn btn-o btn-sm" onclick="userScopeClear('${escAttr(username)}')">${__t('scp_clear')}</button>
+            <button class="btn btn-o btn-sm" onclick="userScopePanel('${escAttr(username)}')">${__t('dw_close')}</button>
+          </div>
+          <div id="sc-out-${escAttr(username)}" style="margin-top:8px;font-size:11px"></div>
+        </div>`;
+    }
+
+    async function userScopeSave(username) {
+      const out = document.getElementById(`sc-out-${username}`); if (!out) return;
+      const g = document.getElementById(`sc-g-${username}`)?.value;
+      const sites = Array.from(document.querySelectorAll(`.sc-s-${CSS.escape(username)}:checked`)).map(x => x.value);
+      const body = { scope_group: g || null, scope_sites: sites.length ? sites : null };
+      try {
+        const r = await fetch(`${A}/admin/users/${encodeURIComponent(username)}`, { method: 'PUT', headers: h(), body: JSON.stringify(body) });
+        let b = null; try { b = await r.json(); } catch (e) { }
+        if (!r.ok) { out.innerHTML = `<div style="color:var(--orange)">${esc(_detText(b, 'HTTP ' + r.status))}</div>`; return; }
+        toast(`${__t('scp_saved')}. ${__t('scp_relogin')}`, 's');
+        loadUsers(); // refresco completo: el badge refleja el 200 real del backend
+      } catch (e) {
+        out.innerHTML = `<div style="color:var(--orange)">${__t('np_unverified')} · ${esc(e.message)}</div>`;
+      }
+    }
+
+    async function userScopeClearConfirm(username) {
+      const out = document.getElementById(`sc-out-${username}`); if (!out) return;
+      out.innerHTML = `<div class="bt" style="margin-bottom:8px;border-left-color:var(--orange)">${__t('scp_clear_confirm')}</div>
+        <div style="display:flex;gap:8px"><button class="btn btn-p btn-sm" onclick="userScopeClearExec('${escAttr(username)}')">${__t('al_sil_yes')}</button>
+        <button class="btn btn-o btn-sm" onclick="userScopePanelClose('${escAttr(username)}')">${__t('al_sil_no')}</button></div>`;
+    }
+    function userScopePanelClose(username) {
+      const box = document.getElementById(`sc-panel-${username}`);
+      const out = document.getElementById(`sc-out-${username}`);
+      if (out) out.innerHTML = '';
+      if (box) box.style.display = 'none';
+    }
+    async function userScopeClear(username) { userScopeClearConfirm(username); }
+    async function userScopeClearExec(username) {
+      const out = document.getElementById(`sc-out-${username}`); if (!out) return;
+      try {
+        const r = await fetch(`${A}/admin/users/${encodeURIComponent(username)}`, { method: 'PUT', headers: h(), body: JSON.stringify({ scope_group: null, scope_sites: null }) });
+        let b = null; try { b = await r.json(); } catch (e) { }
+        if (!r.ok) { out.innerHTML = `<div style="color:var(--orange)">${esc(_detText(b, 'HTTP ' + r.status))}</div>`; return; }
+        toast(`${__t('scp_cleared')}`, 's');
+        loadUsers();
+      } catch (e) {
+        out.innerHTML = `<div style="color:var(--orange)">${__t('np_unverified')} · ${esc(e.message)}</div>`;
       }
     }
   </script>
