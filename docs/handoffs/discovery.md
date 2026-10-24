@@ -268,8 +268,15 @@ usuario decide; el backend no las copia solo).
       "motivo": "Plataforma no identificada. Indica el driver manualmente para importar."
     }
   ],
+  "rechazados": [
+    {
+      "device_id": "switch-edge-05",
+      "ip": "192.0.2.53",
+      "error": "device fuera de tu scope: Edge"
+    }
+  ],
   "resumen": {
-    "solicitados": 3,
+    "solicitados": 4,
     "creados": 1,
     "ya_existian": 1,
     "fallidos": 1
@@ -282,11 +289,21 @@ Reglas aplicadas por candidato (nunca aborta el lote):
 1. IP inválida → `fallidos` «Dirección IP inválida.».
 2. IP ya registrada por `hostname` → `ya_existian` (no se vuelve a crear).
 3. IP fuera del último escaneo → `fallidos` «No está en el último escaneo…».
-4. Sin driver (ni forzado ni sugerido) → `fallidos` «Plataforma no identificada…».
-5. `id` = slug de `nombre_sugerido`; si colisiona se añade `-2`, `-3`, …
-6. El equipo se crea con `hostname = ip`, `port = 22`, `protocol = "ssh"`,
+4. Grupo destino fuera del scope del token → `rechazados` con
+   `{device_id, ip, error}`; no se registra. El `device_id` es el que se
+   habría asignado (aún no existe). Sin `group`, un token restringido recibe
+   `device fuera de tu scope: sin grupo`.
+5. Sin driver (ni forzado ni sugerido) → `fallidos` «Plataforma no identificada…».
+6. `id` = slug de `nombre_sugerido`; si colisiona se añade `-2`, `-3`, …
+7. El equipo se crea con `hostname = ip`, `port = 22`, `protocol = "ssh"`,
    `tags = ["discovery"]` y `description = "Descubierto vía LLDP|CDP desde <origen>"`.
-7. Cualquier excepción de registro → `fallidos` con el motivo; HTTP sigue en 200.
+8. Cualquier excepción de registro → `fallidos` con el motivo; HTTP sigue en 200.
+
+**Scope:** el grupo destino es único para todo el lote (`body.group`), así que
+la comprobación es uniforme. Los rechazos por scope se informan por dispositivo
+en `rechazados`; si **todos** los candidatos quedan fuera de scope (sin altas,
+existentes ni fallidos), la respuesta es `403` con el `detail` estándar, sin
+lote parcial. Un token sin claims mantiene el acceso legado.
 
 **El último escaneo no se modifica.** Los candidatos siguen en
 `estado: "propuesto"` después de importar y un segundo import de la misma IP
@@ -298,9 +315,10 @@ responde `ya_existian`. Para refrescar la tabla, la UI debe volver a escanear.
 |---|---|---|
 | `401` | Sin token o inválido | `{"detail": "..."}` |
 | `403` | Rol menor que `operator` | `{"detail": "Acceso denegado…"}` |
+| `403` | Todos los candidatos fuera del scope (`device fuera de tu scope: <grupo>`) | `{"detail": "device fuera de tu scope: ..."}` |
 | `422` | `candidates` vacío, `tipo`/`driver` fuera del enum | Validación de FastAPI |
 
-Los fallos por candidato van dentro del `200`, en `fallidos`.
+Los fallos por candidato van dentro del `200`, en `fallidos` o `rechazados`.
 
 ---
 

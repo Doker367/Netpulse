@@ -18,6 +18,11 @@ def _headers(role: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def _scoped_headers(role: str = "operator", **claims) -> dict[str, str]:
+    token = create_access_token({"sub": "scoped", "role": role, **claims})
+    return {"Authorization": f"Bearer {token}"}
+
+
 VIEWER = _headers("viewer")
 OPERATOR = _headers("operator")
 
@@ -405,3 +410,142 @@ def test_import_requiere_operator(client, monkeypatch):
 def test_scan_y_candidates_requieren_token(client):
     assert client.post("/api/discovery/scan", json={"metodo": "lldp"}).status_code in (401, 403)
     assert client.get("/api/discovery/candidates").status_code in (401, 403)
+
+
+# ── RBAC por grupo en la importación ─────────────────────────
+
+
+def _patch_lldp_dos_vecinos(monkeypatch):
+    def fake_lldp(device_id):
+        result = napalm_svc.NapalmResult(device_id)
+        result.success = True
+        result.data = {
+            "Gi0/1": [{"hostname": "juniper-edge-01", "port": "Gi0/2"}],
+            "Gi0/2": [{"hostname": "nuevo-edge", "port": "Gi0/3"}],
+        }
+        return result
+
+    monkeypatch.setattr(napalm_svc, "get_lldp_neighbors", fake_lldp)
+    _patch_resolution(
+        monkeypatch,
+        {"juniper-edge-01": "10.0.0.50", "nuevo-edge": "10.0.0.60"},
+    )
+
+
+def test_import_scope_grupo_autorizado_crea(client, monkeypatch):
+    _patch_inventory(monkeypatch, [CORE])
+    _patch_resolution(monkeypatch, {"juniper-edge-01": "10.0.0.50"})
+    monkeypatch.setattr(napalm_svc, "get_lldp_neighbors", _lldp_ok)
+    assert _scan(client, ["core-01"]).status_code == 200
+
+    captured: dict = {}
+
+    def fake_add(device):
+        captured.update(device)
+        return {**device, "id": device["id"]}
+
+    monkeypatch.setattr(inventory_svc, "add_device", fake_add)
+
+    response = client.post(
+        "/api/discovery/import",
+        json={"candidates": ["10.0.0.50"], "group": "core"},
+        headers=_scoped_headers(scope_group="Core"),
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["resumen"]["creados"] == 1
+    assert body["rechazados"] == []
+    # Se escribe el grupo solicitado (mismo nombre), validado sin distinguir
+    # mayúsculas contra el scope.
+    assert captured["group"] == "core"
+
+
+def test_import_scope_parcial_rechaza_por_dispositivo(client, monkeypatch):
+    _patch_inventory(monkeypatch, [CORE, EXISTING])
+    _patch_lldp_dos_vecinos(monkeypatch)
+    assert _scan(client, ["core-01"]).status_code == 200
+
+    def _must_not_add(_device):
+        raise AssertionError("no debe registrarse nada fuera de scope")
+
+    monkeypatch.setattr(inventory_svc, "add_device", _must_not_add)
+
+    response = client.post(
+        "/api/discovery/import",
+        json={"candidates": ["10.0.0.50", "10.0.0.60"], "group": "Edge"},
+        headers=_scoped_headers(scope_group="Core"),
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["creados"] == []
+    assert body["ya_existian"][0]["id"] == "existing-01"
+    assert body["rechazados"] == [{
+        "device_id": "nuevo-edge",
+        "ip": "10.0.0.60",
+        "error": "device fuera de tu scope: Edge",
+    }]
+    assert body["resumen"]["solicitados"] == 2
+    assert body["resumen"]["creados"] == 0
+
+
+def test_import_scope_todos_fuera_devuelve_403(client, monkeypatch):
+    _patch_inventory(monkeypatch, [CORE])
+    _patch_resolution(monkeypatch, {"juniper-edge-01": "10.0.0.50"})
+    monkeypatch.setattr(napalm_svc, "get_lldp_neighbors", _lldp_ok)
+    assert _scan(client, ["core-01"]).status_code == 200
+
+    def _must_not_add(_device):
+        raise AssertionError("no debe registrarse fuera de scope")
+
+    monkeypatch.setattr(inventory_svc, "add_device", _must_not_add)
+
+    response = client.post(
+        "/api/discovery/import",
+        json={"candidates": ["10.0.0.50"], "group": "Edge"},
+        headers=_scoped_headers(scope_group="Core"),
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "device fuera de tu scope: Edge"
+
+
+def test_import_scope_sin_grupo_rechaza(client, monkeypatch):
+    _patch_inventory(monkeypatch, [CORE])
+    _patch_resolution(monkeypatch, {"juniper-edge-01": "10.0.0.50"})
+    monkeypatch.setattr(napalm_svc, "get_lldp_neighbors", _lldp_ok)
+    assert _scan(client, ["core-01"]).status_code == 200
+
+    response = client.post(
+        "/api/discovery/import",
+        json={"candidates": ["10.0.0.50"]},
+        headers=_scoped_headers(scope_group="Core"),
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "device fuera de tu scope: sin grupo"
+
+    # La lectura sigue siendo global para el mismo token restringido.
+    assert client.get("/api/discovery/candidates",
+                      headers=_scoped_headers(role="viewer", scope_group="Core")).status_code == 200
+
+
+def test_import_token_legado_conserva_acceso(client, monkeypatch):
+    _patch_inventory(monkeypatch, [CORE])
+    _patch_resolution(monkeypatch, {"juniper-edge-01": "10.0.0.50"})
+    monkeypatch.setattr(napalm_svc, "get_lldp_neighbors", _lldp_ok)
+    assert _scan(client, ["core-01"]).status_code == 200
+
+    captured: dict = {}
+
+    def fake_add(device):
+        captured.update(device)
+        return {**device, "id": device["id"]}
+
+    monkeypatch.setattr(inventory_svc, "add_device", fake_add)
+
+    response = client.post(
+        "/api/discovery/import",
+        json={"candidates": ["10.0.0.50"], "group": "Edge"},
+        headers=OPERATOR,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["rechazados"] == []
+    assert captured["group"] == "Edge"

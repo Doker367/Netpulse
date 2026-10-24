@@ -390,3 +390,71 @@ def test_servidor_cierra_canal_si_el_cliente_se_va(client, admin_token):
             assert ws.receive_json()["type"] == "connected"
     assert chan.closed is True
     assert fake.closed is True
+
+
+# ── RBAC por grupo: el shell es una operación ───────────────
+
+
+def _scoped_token(group: str = "DMZ", role: str = "operator") -> str:
+    return create_access_token(
+        {"sub": "scoped", "role": role, "scope_group": group}
+    )
+
+
+def test_scope_fuera_json_no_abre_ssh(client):
+    token = _scoped_token("DMZ")
+    with patch("app.services.napalm_svc._find_device",
+               return_value=_device(group="Core")), \
+         patch("paramiko.SSHClient") as ssh_client:
+        with _connect(client, token, fmt="json") as ws:
+            error = ws.receive_json()
+            closed = ws.receive_json()
+            assert error == {
+                "type": "error",
+                "code": "forbidden",
+                "detail": "device fuera de tu scope: Core",
+            }
+            assert closed == {
+                "type": "closed",
+                "code": "forbidden",
+                "reason": "equipo fuera de tu alcance",
+            }
+            with pytest.raises(WebSocketDisconnect) as exc:
+                ws.receive_json()
+            assert exc.value.code == 4403
+    ssh_client.assert_not_called()
+
+
+def test_scope_fuera_legacy_no_abre_ssh(client):
+    token = _scoped_token("DMZ")
+    with patch("app.services.napalm_svc._find_device",
+               return_value=_device(group="Core")), \
+         patch("paramiko.SSHClient") as ssh_client:
+        with _connect(client, token) as ws:
+            line = ws.receive_text()
+    assert "device fuera de tu scope: Core" in line
+    ssh_client.assert_not_called()
+
+
+def test_scope_sin_grupo_rechaza(client):
+    token = _scoped_token("DMZ")
+    with patch("app.services.napalm_svc._find_device", return_value=_device()), \
+         patch("paramiko.SSHClient") as ssh_client:
+        with _connect(client, token, fmt="json") as ws:
+            error = ws.receive_json()
+    assert error["code"] == "forbidden"
+    assert error["detail"] == "device fuera de tu scope: sin grupo"
+    ssh_client.assert_not_called()
+
+
+def test_scope_autorizado_abre_shell(client):
+    chan = FakeChannel()
+    fake = FakeSSHClient(channel=chan)
+    with patch("app.services.napalm_svc._find_device",
+               return_value=_device(group="Core")), \
+         patch("paramiko.SSHClient", return_value=fake):
+        with _connect(client, _scoped_token("core"), fmt="json") as ws:
+            assert ws.receive_json()["type"] == "connected"
+            ws.send_json({"type": "close"})
+            assert ws.receive_json()["code"] == "operator"
+    assert fake.closed is True

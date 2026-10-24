@@ -7,6 +7,12 @@ Autenticación: el WebSocket no pasa por las dependencias HTTP, así que el
 JWT se recibe como query param ``?token=`` y se valida con ``verify_token``.
 Solo SSH directo (paramiko); dispositivos solo-SNMP no lo soportan.
 
+RBAC por grupo: además del rol, un token con ``scope_group``/``scope_sites``
+solo puede abrir shell en equipos de sus grupos. La comprobación usa el
+``group`` real del inventario y se hace antes de invocar paramiko; el rechazo
+llega como ``error``/``closed`` con código ``forbidden`` y cierre WS 4403
+(sin abrir SSH).
+
 Protocolo dual (retro-compatible):
 - Sin ``?fmt`` (o con cualquier valor distinto de ``json``): modo **legacy**
   de texto plano, idéntico al que consume la UI actual (líneas "Conectando
@@ -33,6 +39,7 @@ import anyio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.core.security import verify_token
+from app.middleware.rbac import scope_error
 from app.services import napalm_svc
 
 logger = logging.getLogger(__name__)
@@ -207,6 +214,7 @@ def _closed_reason(code: str) -> str:
         "unreachable": "equipo inalcanzable",
         "operator": "cerrado por el operador",
         "device_not_found": "equipo no encontrado",
+        "forbidden": "equipo fuera de tu alcance",
         "internal": "error interno",
     }.get(code, "fin de sesión")
 
@@ -285,6 +293,33 @@ async def terminal(websocket: WebSocket, device_id: str) -> None:
     host = device.get("hostname", "") or device.get("ip", "") or ""
     port, ignored_api_port = _resolve_ssh_port(device)
     driver = str(device.get("driver") or "")
+
+    # Abrir una shell es una operación, no lectura: un token restringido no
+    # puede obtener PTY de un equipo fuera de su grupo. Se comprueba el grupo
+    # real del inventario ANTES de tocar paramiko. El device ya está resuelto,
+    # así que no se duplica la lógica device→grupo.
+    scope_detail = scope_error(payload, device.get("group"))
+    if scope_detail:
+        await websocket.accept()
+        logger.warning("[terminal] acceso fuera de scope a %s: %s", device_id, scope_detail)
+        if json_mode:
+            await _send_event(
+                websocket,
+                {"type": "error", "code": "forbidden", "detail": scope_detail},
+            )
+            await _send_event(
+                websocket,
+                {
+                    "type": "closed",
+                    "code": "forbidden",
+                    "reason": _closed_reason("forbidden"),
+                },
+            )
+        else:
+            await websocket.send_text(f"⚠️ {scope_detail}\r\n")
+        await websocket.close(code=4403)
+        return
+
     username = creds.get("username") or "admin"
     password = creds.get("password", "") or ""
 
