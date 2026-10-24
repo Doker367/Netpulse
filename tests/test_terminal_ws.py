@@ -115,6 +115,7 @@ def test_legacy_envia_linea_conectando(client, admin_token):
             line = ws.receive_text()
             assert line == "Conectando a 10.0.0.1:22 como admin...\r\n"
             assert fake.connect_kwargs["port"] == 22
+            assert fake.connect_kwargs["timeout"] == 30.0
         assert fake.closed is True
 
 
@@ -136,6 +137,40 @@ def test_legacy_sin_fmt_envia_output_plano(client, admin_token):
 def test_token_invalido_cierra_4401(client):
     with pytest.raises(WebSocketDisconnect) as exc:
         with _connect(client, "token-invalido", fmt="json") as ws:
+            ws.receive_json()
+    assert exc.value.code == 4401
+
+
+def test_auth_rechazada_acepta_antes_de_cerrar_4401():
+    """Regresión 7F: el 4401 solo llega si el upgrade se acepta primero."""
+
+    class FakeWebSocket:
+        def __init__(self, token):
+            self.query_params = {"token": token}
+            self.calls = []
+
+        async def accept(self):
+            self.calls.append("accept")
+
+        async def close(self, code=1000):
+            self.calls.append(("close", code))
+
+    ws = FakeWebSocket("token-invalido")
+    with patch("app.services.napalm_svc._find_device") as find_device, \
+         patch("paramiko.SSHClient") as ssh_client:
+        import asyncio
+
+        asyncio.run(terminal_router.terminal(ws, "dev1"))
+
+    assert ws.calls == ["accept", ("close", 4401)]
+    find_device.assert_not_called()
+    ssh_client.assert_not_called()
+
+
+def test_rol_no_permitido_acepta_y_cierra_4401(client):
+    token = create_access_token({"sub": "viewer", "role": "viewer"})
+    with pytest.raises(WebSocketDisconnect) as exc:
+        with _connect(client, token, fmt="json") as ws:
             ws.receive_json()
     assert exc.value.code == 4401
 
@@ -246,6 +281,31 @@ def test_idle_timeout_por_defecto_900(monkeypatch):
     assert terminal_router._idle_timeout_s() == 900.0
     monkeypatch.setenv("NETPULSE_TERM_IDLE_S", "2.5")
     assert terminal_router._idle_timeout_s() == 2.5
+
+
+def test_connect_timeout_por_defecto_y_env(monkeypatch):
+    monkeypatch.delenv("NETPULSE_TERM_CONNECT_TIMEOUT_S", raising=False)
+    assert terminal_router._connect_timeout_s() == 30.0
+    monkeypatch.setenv("NETPULSE_TERM_CONNECT_TIMEOUT_S", "basura")
+    assert terminal_router._connect_timeout_s() == 30.0
+    monkeypatch.setenv("NETPULSE_TERM_CONNECT_TIMEOUT_S", "0")
+    assert terminal_router._connect_timeout_s() == 30.0
+    monkeypatch.setenv("NETPULSE_TERM_CONNECT_TIMEOUT_S", "45")
+    assert terminal_router._connect_timeout_s() == 45.0
+
+
+def test_kex_incompleto_no_se_reporta_como_auth():
+    code, detail = terminal_router._classify_connect_error(
+        paramiko.SSHException("No existing session"),
+        device_id="mikrotik-edge-01",
+        host="10.0.0.20",
+        port=2225,
+        driver="ros",
+        ignored_api_port=None,
+    )
+    assert code == "ssh_connect"
+    assert "negociación SSH" in detail
+    assert "credenciales" not in detail
 
 
 # ── Puerto SSH honesto ──────────────────────────────────────

@@ -51,10 +51,16 @@ _API_PORTS_BY_DRIVER: dict[str, frozenset[int]] = {
 }
 
 _SSH_DEFAULT_PORT = 22
-_CONNECT_TIMEOUT = 10
+# El ``timeout`` de ``SSHClient.connect`` es el que espera el *kex* SSH, no
+# solo el TCP. RouterOS emulado del laboratorio tarda 8–26 s en negociar
+# DH-GEX (ver docs/handoffs/terminal.md); con 10 s el kex se agotaba y
+# paramiko devolvía el engañoso "No existing session". 30 s cubre el lab y
+# sigue siendo un límite razonable para un terminal interactivo.
+_CONNECT_TIMEOUT_S = 30.0
 _BANNER_TIMEOUT = 15
 _AUTH_TIMEOUT = 15
 _IDLE_DEFAULT_S = 900.0
+_CONNECT_TIMEOUT_ENV = "NETPULSE_TERM_CONNECT_TIMEOUT_S"
 
 
 def _as_port(value) -> int | None:
@@ -120,6 +126,20 @@ def _idle_timeout_s() -> float:
     return value if value > 0 else _IDLE_DEFAULT_S
 
 
+def _connect_timeout_s() -> float:
+    """Timeout de conexión/kex SSH desde ``NETPULSE_TERM_CONNECT_TIMEOUT_S``.
+
+    Default 30 s: RouterOS emulado puede tardar >10 s en el kex. Valores no
+    numéricos o ``<= 0`` vuelven al default.
+    """
+    raw = os.getenv(_CONNECT_TIMEOUT_ENV, "")
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return _CONNECT_TIMEOUT_S
+    return value if value > 0 else _CONNECT_TIMEOUT_S
+
+
 def _short_cause(exc: BaseException) -> str:
     """Causa corta y sin credenciales para mostrar al operador."""
     text = str(exc).strip() or exc.__class__.__name__
@@ -162,6 +182,16 @@ def _classify_connect_error(
             + note,
         )
 
+    if isinstance(exc, paramiko.SSHException) and "no existing session" in str(exc).lower():
+        # paramiko devuelve este texto cuando el kex no terminó a tiempo (el
+        # transporte sigue "active" pero sin claves). No es auth rechazada.
+        return (
+            "ssh_connect",
+            f"La negociación SSH con {device_id} ({host}:{port}) no se completó "
+            f"en {_connect_timeout_s():g} s (kex lento o algoritmos incompatibles)."
+            + note,
+        )
+
     return (
         "ssh_connect",
         f"No se pudo conectar a {device_id} ({host}:{port}): {_short_cause(exc)}"
@@ -192,6 +222,11 @@ async def terminal(websocket: WebSocket, device_id: str) -> None:
     token = websocket.query_params.get("token", "")
     payload = verify_token(token) if token else None
     if not payload or payload.get("role") not in _ALLOWED_ROLES:
+        # Uvicorn rechaza el upgrade con HTTP 403 si se cierra el WebSocket
+        # ANTES de accept(): el cliente nunca vería el código 4401. Se acepta
+        # y se cierra de inmediato (sin inventario ni SSH) para que el cierre
+        # viaje como frame WS con el código que la UI espera.
+        await websocket.accept()
         await websocket.close(code=4401)
         return
 
@@ -263,7 +298,7 @@ async def terminal(websocket: WebSocket, device_id: str) -> None:
         await asyncio.to_thread(
             client.connect, host,
             port=port, username=username, password=password,
-            timeout=_CONNECT_TIMEOUT, banner_timeout=_BANNER_TIMEOUT,
+            timeout=_connect_timeout_s(), banner_timeout=_BANNER_TIMEOUT,
             auth_timeout=_AUTH_TIMEOUT,
             look_for_keys=False, allow_agent=False,
         )
