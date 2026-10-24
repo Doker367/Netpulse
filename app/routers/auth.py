@@ -1,8 +1,9 @@
 """NetPulse — Router de Autenticación.
 
 Endpoints:
-- POST /api/auth/login  — validar credenciales, devolver JWT
-- GET  /api/auth/me     — info del usuario autenticado
+- POST /api/auth/login   — validar credenciales, devolver JWT
+- POST /api/auth/refresh — renovar un JWT aún válido (rotación stateless)
+- GET  /api/auth/me      — info del usuario autenticado
 """
 
 import yaml
@@ -64,6 +65,20 @@ def _get_users() -> dict[str, dict]:
     return _users_cache
 
 
+def _token_claims(user: dict) -> dict:
+    """Claims del JWT para un usuario de config/users.yaml.
+
+    Login y refresh comparten esta función para que el contrato del token sea
+    idéntico: sub, role y, solo si están definidos, scope_group/scope_sites.
+    """
+    claims = {"sub": user["username"], "role": user["role"]}
+    # Sin asignación, el token no incluye el claim (acceso no restringido).
+    for field in ("scope_group", "scope_sites"):
+        if user.get(field) is not None:
+            claims[field] = user[field]
+    return claims
+
+
 # ── Endpoints ─────────────────────────────────────────────────
 
 @router.post("/login", response_model=TokenResponse)
@@ -86,15 +101,50 @@ def login(request: Request, body: LoginRequest):
         )
 
     # Generar token JWT
-    claims = {"sub": user["username"], "role": user["role"]}
-    # Sin asignación, el token conserva exactamente los claims anteriores.
-    for field in ("scope_group", "scope_sites"):
-        if user.get(field) is not None:
-            claims[field] = user[field]
-    token = create_access_token(data=claims)
+    token = create_access_token(data=_token_claims(user))
 
     netpulse_auth_total.labels(status="success").inc()
     return TokenResponse(access_token=token)
+
+
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    dependencies=[Depends(JWTBearer(auto_error=False))],
+)
+def refresh_token(user: dict = Depends(get_current_user)):
+    """Renueva la sesión con un JWT de usuario todavía válido.
+
+    Emite un token nuevo con la misma expiración completa, recalculando los
+    claims desde config/users.yaml: si el rol o el scope cambiaron desde que se
+    emitió el token original, el token renovado refleja el valor actual. Un
+    usuario eliminado de la configuración no puede renovar.
+
+    No hay estado en servidor: el token anterior sigue siendo válido hasta su
+    propio `exp` (ver docs/handoffs/auth-session.md).
+    """
+    username = user.get("sub")
+
+    # JWTBearer también acepta API keys np_ (sin exp ni usuario de config):
+    # no deben poder convertirse en un JWT de sesión.
+    if not isinstance(username, str) or username.startswith("apikey:"):
+        raise HTTPException(
+            status_code=401,
+            detail="La renovación de sesión solo acepta tokens JWT de usuario",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Re-leer el usuario actual: el refresh es el punto donde se re-evalúan
+    # rol y scope, en lugar de prorrogar privilegios ya retirados.
+    current = _get_users().get(username)
+    if current is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Usuario no encontrado para renovar la sesión",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return TokenResponse(access_token=create_access_token(data=_token_claims(current)))
 
 
 @router.get("/me", response_model=UserInfo, dependencies=[Depends(JWTBearer())])
