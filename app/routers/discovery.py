@@ -11,11 +11,11 @@ from __future__ import annotations
 import logging
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from app.middleware.auth import JWTBearer
-from app.middleware.rbac import requires_role
+from app.middleware.rbac import get_current_user, requires_role, scope_error
 from app.models.schemas import DeviceDriver, DeviceType
 from app.services import discovery_svc
 
@@ -131,17 +131,34 @@ def candidates():
     "/import",
     dependencies=[Depends(JWTBearer()), Depends(requires_role("operator"))],
 )
-def import_candidates(request: ImportRequest):
+def import_candidates(request: ImportRequest, http_request: Request):
     """Registra candidatos del último escaneo mediante ``inventory_svc.add_device``.
 
     Es la misma función de registro que usa ``POST /api/devices``. El
-    resultado separa ``creados``, ``ya_existian`` y ``fallidos`` (con motivo).
+    resultado separa ``creados``, ``ya_existian``, ``fallidos`` (con motivo) y
+    ``rechazados`` (fuera de scope, con el ``device_id`` que se habría creado).
+
+    El grupo destino es único para todo el lote (``body.group``); si se omite,
+    el equipo se crearía sin grupo y un token restringido no puede operarlo.
+    Los rechazados se informan por dispositivo; solo se responde 403 cuando
+    **todos** los candidatos quedan fuera de scope (sin altas ni existentes).
     """
-    return discovery_svc.import_candidates(
+    user = get_current_user(http_request)
+    result = discovery_svc.import_candidates(
         request.candidates,
         username=request.username,
         password=request.password,
         group=request.group,
         tipo=request.tipo,
         driver=request.driver,
+        authorize=lambda group: scope_error(user, group),
     )
+    rejected = result.get("rechazados") or []
+    if (
+        rejected
+        and not result["creados"]
+        and not result["ya_existian"]
+        and not result["fallidos"]
+    ):
+        raise HTTPException(403, rejected[0]["error"])
+    return result
