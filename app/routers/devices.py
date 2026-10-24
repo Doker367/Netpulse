@@ -7,10 +7,10 @@ import asyncio
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.middleware.auth import JWTBearer
-from app.middleware.rbac import requires_role
+from app.middleware.rbac import get_current_user, requires_role, requires_scope
 from app.models.schemas import DeviceCreate, DeviceResponse, DeviceUpdate
 from app.services import inventory_svc
 
@@ -237,8 +237,9 @@ def get_one(device_id: str):
     status_code=201,
     dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
 )
-def create(device: DeviceCreate):
+def create(device: DeviceCreate, request: Request):
     """Agrega un dispositivo al inventario."""
+    requires_scope(group=device.group, request=request)
     try:
         dump = device.model_dump()
         # Convert enums to plain strings for YAML serialization
@@ -256,8 +257,11 @@ def create(device: DeviceCreate):
     response_model=DeviceResponse,
     dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
 )
-def update(device_id: str, updates: DeviceUpdate):
-    """Actualiza un dispositivo existente."""
+def update(device_id: str, updates: DeviceUpdate, request: Request):
+    """Actualiza un dispositivo existente; mover de grupo exige ambos scopes."""
+    requires_scope(device_id=device_id, request=request)
+    if updates.group is not None:
+        requires_scope(group=updates.group, request=request)
     upd = updates.model_dump(exclude_none=True)
     if hasattr(upd.get("driver"), "value"):
         upd["driver"] = upd["driver"].value
@@ -274,8 +278,9 @@ def update(device_id: str, updates: DeviceUpdate):
     status_code=204,
     dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
 )
-def delete(device_id: str):
+def delete(device_id: str, request: Request):
     """Elimina un dispositivo del inventario."""
+    requires_scope(device_id=device_id, request=request)
     if not inventory_svc.delete_device(device_id):
         raise HTTPException(404, f"Dispositivo '{device_id}' no encontrado")
 
@@ -285,6 +290,9 @@ def delete(device_id: str):
     response_model=list[DeviceResponse],
     dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
 )
-def init_lab():
+def init_lab(request: Request):
     """Inicializa el inventario con los 5 dispositivos del laboratorio."""
+    # Este servicio crea equipos en varios grupos: no se puede ejecutar a medias.
+    if get_current_user(request).get("scope_group") is not None or get_current_user(request).get("scope_sites") is not None:
+        raise HTTPException(403, "Inicialización global del laboratorio requiere acceso sin scope")
     return inventory_svc.add_lab_devices()

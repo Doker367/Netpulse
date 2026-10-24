@@ -1,0 +1,4 @@
+# Dependencias mínimas del colector remoto (nodo del site).
+# No instala napalm/netmiko/psutil: la sonda es stdlib.
+httpx==0.28.1
+PyYAML==6.0.2

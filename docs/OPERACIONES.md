@@ -239,3 +239,14 @@ Métricas por dispositivo que faltan (estándar NOC):
   NTP sync/offset.
 - Óptica (fibra): potencia TX/RX dBm, temperatura SFP, bias current.
 - Umbrales típicos óptica: RX < -20 dBm (10G), < -14 dBm (1G).
+
+---
+
+## Custodia y rotación de la clave Fernet
+
+`config/.fernet_key` cifra todas las credenciales del inventario (`config/devices.yaml`). Quien la pierde, pierde el acceso a esas credenciales; quien la obtiene, puede descifrarlas. Trátala como el secreto más crítico del sistema.
+
+- **Respaldo**: guarda una copia en el gestor de secretos del equipo (o cifrada fuera del servidor). Nunca en el repo ni solo en el mismo host.
+- **Ensayo**: al menos una vez, verifica que puedes restaurar la clave en un entorno limpio y arrancar la API.
+- **Rotación** (trimestral, o tras cualquier sospecha de filtrado): con la API detenida, ejecuta `.venv/bin/python scripts/rotate_fernet.py`. El script re-cifra todos los valores de `devices.yaml` con una clave nueva y deja copias de la clave anterior (`config/.fernet_key.rotated-*`, ignorada por git) y del inventario (`backups/`). Tras verificar arranque y un facts/ping, destruye la copia de la clave antigua.
+- **Sospecha de filtración**: rota la clave **y cambia las contraseñas de los equipos** — la clave protege el almacenamiento, no credenciales que ya pudieron salir.

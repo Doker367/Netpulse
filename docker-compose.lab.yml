@@ -32,8 +32,12 @@ services:
     ports:
       - "2222:22"    # SSH para NAPALM
     networks:
-      lab-net:
+      lab-net:                 # eth0 = gestión (primer orden → eth0)
         ipv4_address: 172.30.0.10
+      core-net:                # eth1 = segmento Core cisco↔juniper
+        ipv4_address: 172.30.1.10
+      access-net:              # eth2 = segmento Access cisco↔switch
+        ipv4_address: 172.30.2.10
     restart: unless-stopped
 
   # ----------------------------------------------------------
@@ -58,6 +62,10 @@ services:
     networks:
       lab-net:
         ipv4_address: 172.30.0.11
+      core-net:                # eth1 = segmento Core cisco↔juniper
+        ipv4_address: 172.30.1.11
+      dmz-net:                 # eth2 = segmento DMZ juniper↔mikrotik
+        ipv4_address: 172.30.3.11
     restart: unless-stopped
 
   # ----------------------------------------------------------
@@ -69,14 +77,21 @@ services:
     container_name: netpulse-mikrotik
     hostname: mikrotik-edge-01
     privileged: true
+    volumes:
+      # El /routeros completo (disco .vdi + scripts del entrypoint) vive
+      # FUERA del contenedor: al hacer up --force-recreate la configuración
+      # del RouterOS (API 8728, usuarios, LLDP...) sobrevive. Para resetear
+      # de fábrica: borra docker/routeros/rootfs/ y vuelve a crearla con
+      #   docker create tmp vaerh/routeros && docker cp tmp:/routeros/. docker/routeros/rootfs/
+      - ./docker/routeros/rootfs:/routeros
     ports:
       - "2225:22"     # SSH (admin sin password)
       - "8728:8728"   # API (NAPALM usa este)
       - "8291:8291"   # Winbox
     networks:
-      lab-net:
-        ipv4_address: 172.30.0.13
-    restart: unless-stopped
+      dmz-net:                 # ÚNICA red del ROS (imagen qemu de 1 NIC):
+        ipv4_address: 172.30.3.13   # ether1 = segmento DMZ juniper↔mikrotik.
+    restart: unless-stopped      # LLDP aquí = enlace real en el mapa.
 
   # ----------------------------------------------------------
   # Arista vEOS 4.27.3F — eAPI en 443, SSH en 2226
@@ -121,8 +136,10 @@ services:
     ports:
       - "2224:22"
     networks:
-      lab-net:
+      lab-net:                 # eth0 = gestión (primer orden → eth0)
         ipv4_address: 172.30.0.12
+      access-net:              # eth1 = segmento Access cisco↔switch
+        ipv4_address: 172.30.2.12
     restart: unless-stopped
 
 networks:
@@ -131,3 +148,18 @@ networks:
     ipam:
       config:
         - subnet: 172.30.0.0/24
+  core-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.1.0/24
+  access-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.2.0/24
+  dmz-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.3.0/24

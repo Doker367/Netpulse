@@ -23,8 +23,8 @@ run: ## Arranca la API NetPulse en primer plano (requiere .env)
 stop: ## Detiene API, contenedores y Colima
 	bash scripts/stop_all.sh
 
-smoke: ## Comprueba que la API responde (requiere "make run" en otra terminal)
-	@curl -fsS http://127.0.0.1:$(PORT)/api/health && echo
+smoke: ## Pruebas en vivo de la API y los módulos de la Ola 1 (requiere "make run")
+	NETPULSE_URL=http://127.0.0.1:$(PORT) bash scripts/smoke_ola1.sh
 
 test: ## Corre la suite de tests
 	$(PY) -m pytest tests -q

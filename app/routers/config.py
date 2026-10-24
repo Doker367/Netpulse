@@ -6,14 +6,14 @@ Endpoints para backup, diff, y restauración de configuraciones.
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import PlainTextResponse
 
 from app.middleware.auth import JWTBearer
-from app.middleware.rbac import requires_role
+from app.middleware.rbac import get_current_user, partition_device_scope, requires_role, requires_scope
 from app.core.settings import BACKUP_DIR
 from app.models.schemas import ConfigBackup, ConfigDiff, ConfigDiffRequest, ConfigDeployRequest, ConfigDeployResponse, ConfigDryRunResponse, ConfigRollbackResponse
-from app.services import backup_offsite_svc, napalm_svc
+from app.services import backup_offsite_svc, inventory_svc, napalm_svc
 
 router = APIRouter(prefix="/api/config", tags=["Config"])
 
@@ -33,17 +33,28 @@ def offsite_status():
     "/offsite/export",
     dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
 )
-def offsite_export(device_id: Optional[str] = None):
-    """Exporta los backups locales al destino offsite (todos o uno)."""
-    return backup_offsite_svc.export_all(device_id)
+def offsite_export(request: Request, device_id: Optional[str] = None):
+    """Exporta backups; sin device_id solo exporta dispositivos autorizados."""
+    if device_id is not None:
+        requires_scope(device_id=device_id, request=request)
+        return backup_offsite_svc.export_all(device_id)
+    # export_all(None) exportaría archivos de TODOS los grupos.
+    user = get_current_user(request)
+    if user.get("scope_group") is None and user.get("scope_sites") is None:
+        return backup_offsite_svc.export_all(None)
+    allowed, rejected = partition_device_scope(request, [d["id"] for d in inventory_svc.list_devices()])
+    return {"total": len(allowed) + len(rejected), "results": [
+        {"device_id": did, "result": backup_offsite_svc.export_all(did)} for did in allowed
+    ], "errors": rejected}
 
 
 @router.post(
     "/{device_id}/save",
     dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
 )
-def save_config(device_id: str):
+def save_config(device_id: str, request: Request):
     """Guarda la running-config a persistente (write memory / save)."""
+    requires_scope(device_id=device_id, request=request)
     result = napalm_svc.save_config(device_id)
     return {
         "device_id": device_id,
@@ -88,8 +99,9 @@ def get_running_config(device_id: str):
     response_model=dict,
     dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
 )
-def backup(device_id: str):
+def backup(device_id: str, request: Request):
     """Hace backup de la running-config a disco."""
+    requires_scope(device_id=device_id, request=request)
     result = napalm_svc.backup_config(device_id)
     if not result.success:
         return ConfigBackup(
@@ -109,8 +121,9 @@ def backup(device_id: str):
     response_model=ConfigDiff,
     dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
 )
-def diff_config(device_id: str, body: ConfigDiffRequest):
+def diff_config(device_id: str, body: ConfigDiffRequest, request: Request):
     """Compara running-config con una configuración propuesta."""
+    requires_scope(device_id=device_id, request=request)
     result = napalm_svc.get_config(device_id, retrieve="running")
     if not result.success:
         return ConfigBackup(
@@ -164,11 +177,12 @@ def raw_config(device_id: str):
     response_model=ConfigDryRunResponse,
     dependencies=[Depends(JWTBearer()), Depends(requires_role("operator"))],
 )
-def deploy_dry_run(device_id: str, body: ConfigDeployRequest):
+def deploy_dry_run(device_id: str, body: ConfigDeployRequest, request: Request):
     """Dry-run: compara la config candidata con la running sin hacer cambios.
     
     Solo muestra el diff. No modifica el dispositivo.
     """
+    requires_scope(device_id=device_id, request=request)
     result = napalm_svc.compare_config(device_id, body.candidate_config)
     if not result.success:
         return ConfigBackup(
@@ -186,7 +200,7 @@ def deploy_dry_run(device_id: str, body: ConfigDeployRequest):
     response_model=ConfigDeployResponse,
     dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
 )
-def deploy_config(device_id: str, body: ConfigDeployRequest):
+def deploy_config(device_id: str, body: ConfigDeployRequest, request: Request):
     """Deploy completo: backup + compare + commit.
     
     Flujo:
@@ -196,6 +210,7 @@ def deploy_config(device_id: str, body: ConfigDeployRequest):
     4. Si commit falla, auto-rollback
     5. Backup post-deploy (auditoría)
     """
+    requires_scope(device_id=device_id, request=request)
     result = napalm_svc.deploy_config(device_id, body.candidate_config)
     return ConfigDeployResponse(
         device_id=result["device_id"],
@@ -211,7 +226,7 @@ def deploy_config(device_id: str, body: ConfigDeployRequest):
     response_model=ConfigRollbackResponse,
     dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
 )
-def rollback_device_config(device_id: str):
+def rollback_device_config(device_id: str, request: Request):
     """Rollback: revierte a la configuración anterior.
     
     Estrategia en cascada:
@@ -219,6 +234,7 @@ def rollback_device_config(device_id: str):
     2. discard_config() si hay candidato pendiente
     3. Restauración desde último backup en disco
     """
+    requires_scope(device_id=device_id, request=request)
     result = napalm_svc.rollback_config(device_id)
     return ConfigRollbackResponse(
         device_id=device_id,

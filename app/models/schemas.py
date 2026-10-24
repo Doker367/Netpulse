@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 
 
 # ── Device Inventory ────────────────────────────────────────
@@ -638,7 +638,30 @@ class UserInfo(BaseModel):
 # ── Admin User Management ────────────────────────────────────
 
 
-class UserCreate(BaseModel):
+class UserScope(BaseModel):
+    """Alcance de escritura: None/None conserva acceso global legado."""
+    scope_group: Optional[str] = Field(default=None, min_length=1, description="Un grupo de dispositivos autorizado")
+    scope_sites: Optional[list[str]] = Field(default=None, description="Grupos autorizados adicionales (sites)")
+
+    @field_validator("scope_group", mode="before")
+    @classmethod
+    def validate_group(cls, value):
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            raise ValueError("scope_group debe ser un grupo no vacío")
+        return value
+
+    @field_validator("scope_sites", mode="before")
+    @classmethod
+    def validate_sites(cls, value):
+        if value is not None and (
+            not isinstance(value, list)
+            or any(not isinstance(site, str) or not site.strip() for site in value)
+        ):
+            raise ValueError("scope_sites solo acepta una lista de grupos no vacíos")
+        return value
+
+
+class UserCreate(UserScope):
     """Datos para crear un nuevo usuario del sistema."""
     model_config = ConfigDict(
         json_schema_extra={
@@ -677,7 +700,7 @@ class UserCreate(BaseModel):
     )
 
 
-class UserUpdate(BaseModel):
+class UserUpdate(UserScope):
     """Campos actualizables de un usuario (todos opcionales)."""
     model_config = ConfigDict(
         json_schema_extra={
@@ -708,7 +731,7 @@ class UserUpdate(BaseModel):
     )
 
 
-class UserResponse(BaseModel):
+class UserResponse(UserScope):
     """Información de un usuario SIN contraseña."""
     model_config = ConfigDict(
         json_schema_extra={
@@ -901,6 +924,97 @@ class BulkDeployResponse(BaseModel):
     success: int = Field(..., description="Exitosos", examples=[2])
     failed: int = Field(..., description="Fallidos", examples=[0])
     results: list[BulkDeployDeviceResult] = Field(default_factory=list, description="Resultados individuales")
+
+
+# ── Retención / housekeeping ─────────────────────────────────
+
+class RetentionPruneRequest(BaseModel):
+    """La confirmación dry_run siempre se envía explícitamente."""
+    model_config = ConfigDict(strict=True)
+    dias: int = Field(..., gt=0, description="Edad mínima en días de eventos a borrar", examples=[90])
+    dry_run: bool = Field(..., description="True: vista previa; False: confirmar purga", examples=[True])
+
+    @model_validator(mode="before")
+    @classmethod
+    def require_dry_run_key(cls, value):
+        if isinstance(value, dict) and "dry_run" not in value:
+            raise ValueError("se requiere dry_run: obtén primero la lista de lo que se borraría")
+        return value
+
+    @field_validator("dry_run", mode="before")
+    @classmethod
+    def require_explicit_dry_run(cls, value):
+        if value is None:
+            raise ValueError("se requiere dry_run: obtén primero la lista de lo que se borraría")
+        return value
+
+    @field_validator("dias", mode="before")
+    @classmethod
+    def require_positive_integer_days(cls, value):
+        if type(value) is not int or value <= 0:
+            raise ValueError("dias debe ser un entero positivo")
+        return value
+
+
+class RetentionPrometheus(BaseModel):
+    retention_time: Optional[str] = Field(..., description="Flag de retención temporal de TSDB")
+    retention_size: Optional[str] = Field(..., description="Flag de retención por tamaño de TSDB")
+    configurado: bool = Field(..., description="Se midió al menos una política de TSDB")
+    estado: str = Field(..., description="con datos, sin medir o no disponible: causa")
+
+
+class RetentionAudit(BaseModel):
+    registros: Optional[int] = Field(..., description="Eventos observados; null sin base de datos")
+    mas_viejo: Optional[str] = Field(..., description="Timestamp UTC del evento más viejo")
+    estado: str = Field(..., description="con datos, sin medir o no disponible: causa")
+
+
+class RetentionBackups(BaseModel):
+    archivos: int = Field(..., description="Archivos observados en la carpeta de backups")
+    uso_bytes: int = Field(..., description="Suma de bytes de archivos observados")
+    mas_viejo: Optional[str] = Field(..., description="Última modificación UTC más antigua")
+    ruta: Optional[str] = Field(..., description="Ruta solo cuando hay backups observados")
+    estado: str = Field(..., description="con datos o backups no configurados")
+
+
+class RetentionInventoryResponse(BaseModel):
+    prometheus: RetentionPrometheus
+    audit: RetentionAudit
+    backups: RetentionBackups
+
+
+class RetentionBackupItem(BaseModel):
+    nombre: str
+    tamano_bytes: int
+    fecha: str
+
+
+class RetentionBackupsResponse(RetentionBackups):
+    backups: list[RetentionBackupItem] = Field(..., description="Lista observada; vacía solo con estado explícito")
+
+
+class RetentionAuditSample(BaseModel):
+    timestamp: str
+    action: str
+    device_id: Optional[str]
+    username: Optional[str]
+    details: str
+    ip_address: str
+    success: bool
+    session_id: str
+    path: str
+    method: str
+    response_status: Optional[int]
+
+
+class RetentionDryRunResponse(BaseModel):
+    borraria: int
+    muestras: list[RetentionAuditSample] = Field(..., description="Hasta cinco eventos antiguos")
+
+
+class RetentionPruneResponse(BaseModel):
+    borrados: int
+    kept: int = Field(..., description="Eventos conservados, incluido el evento de la purga")
 
 
 # ── Health ──────────────────────────────────────────────────

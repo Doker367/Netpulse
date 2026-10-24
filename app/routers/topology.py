@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import requires_role
-from app.services import inventory_svc, napalm_svc
+from app.services import geoip_svc, inventory_svc, napalm_svc
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/topology", tags=["Topology"])
@@ -46,15 +46,17 @@ def topology_map():
     tiempo global, para que un equipo caído no congele la vista.
     """
     devices = inventory_svc.list_devices()
-    nodes = [
-        {
+    nodes = []
+    for d in devices:
+        dev_ip = str(d.get("hostname", "") or "")
+        nodes.append({
             "id": d["id"],
             "driver": d.get("driver", "?"),
             "type": d.get("type", "router"),
             "group": d.get("group", ""),
-        }
-        for d in devices
-    ]
+            "ip": dev_ip,
+            "geo": geoip_svc.lookup(dev_ip) if dev_ip else None,
+        })
 
     def _fetch_lldp(dev_id):
         try:

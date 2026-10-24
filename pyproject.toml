@@ -4,7 +4,7 @@
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-exclude = [".venv", "backups", "reports", "docs"]
+exclude = [".venv", "backups", "reports", "docs", "docker"]
 
 [tool.ruff.lint]
 # pragmático: errores de código (undefined/unused/bug) + bare except

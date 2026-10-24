@@ -14,9 +14,6 @@ El ICMP se lanza con 1 paquete y timeout corto para no penalizar el ciclo.
 
 import logging
 import os
-import platform
-import re
-import subprocess
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -24,6 +21,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.services import host_metrics_svc, inventory_svc, metrics_history_svc, metrics_svc, napalm_svc
+from app.services.collectors import probe_svc
 
 logger = logging.getLogger(__name__)
 
@@ -48,58 +46,28 @@ def is_running() -> bool:
     return _thread is not None and _thread.is_alive()
 
 
-def _icmp_ping(host: str, timeout: int = 2) -> tuple[float, float]:
-    """Ping ICMP desde el servidor NetPulse al host indicado.
-
-    Returns:
-        ``(latencia_ms, perdida_pct)``; ``(0.0, 100.0)`` si no hay respuesta.
-    """
-    if not host:
-        return 0.0, 100.0
-    if platform.system() == "Windows":
-        cmd = ["ping", "-n", "1", "-w", "1000", host]
-    elif platform.system() == "Darwin":
-        cmd = ["ping", "-c", "1", "-t", "1", host]
-    else:
-        cmd = ["ping", "-c", "1", "-W", "1", host]
-    try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-    except (subprocess.TimeoutExpired, OSError):
-        return 0.0, 100.0
-    out = proc.stdout or ""
-    if proc.returncode != 0:
-        return 0.0, 100.0
-    m = re.search(r"time[=<]([\d.]+)\s*ms", out)
-    return (float(m.group(1)), 0.0) if m else (0.0, 0.0)
-
-
 def _probe_latency(device: dict, timeout: float = 1.5) -> tuple[float, float]:
-    """Sondea la conectividad y mide latencia/pérdida real según el protocolo.
+    """Adaptador del poller central sobre la primitiva ``probe_svc``.
 
-    Devuelve (latency_ms, loss_pct).
+    Conserva el contrato histórico ``(latency_ms, loss_pct)`` que consume
+    ``collect_device`` y ``/api/system/devices``: TCP sin respuesta se codifica
+    como pérdida 100 %, aunque el colector remoto no use esa codificación.
     """
     if not device:
         return 0.0, 100.0
-    host = device.get("hostname", "")
-    port = int(device.get("port", 22))
-    protocol = (device.get("protocol") or "ssh").lower()
-    driver = (device.get("driver") or "").lower()
-
-    if protocol == "snmp" or driver == "snmp" or port == 161:
-        return _icmp_ping(host, timeout=int(timeout))
-
-    # Fast TCP check para dispositivos SSH / API (evita falso ping localhost en contenedores)
-    import socket
-    start = time.monotonic()
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.settimeout(timeout)
-    try:
-        sock.connect((host, port))
-        sock.close()
-        rtt = round((time.monotonic() - start) * 1000, 1)
-        return max(0.1, rtt), 0.0
-    except Exception:
-        return 0.0, 100.0
+    result = probe_svc.probe(
+        device.get("hostname", ""),
+        port=int(device.get("port", 22)),
+        protocol=(device.get("protocol") or "ssh").lower(),
+        driver=(device.get("driver") or "").lower(),
+        timeout_ms=int(timeout * 1000),
+    )
+    if result.ok and result.reachable:
+        return float(result.latency_ms or 0.0), float(result.packet_loss_pct or 0.0)
+    if result.packet_loss_pct is not None:
+        return 0.0, float(result.packet_loss_pct)
+    # Compatibilidad legacy: TCP/DNS/permiso sin respuesta cuentan como 100 %.
+    return 0.0, 100.0
 
 
 def _metrics_from_resources(data: dict) -> dict:

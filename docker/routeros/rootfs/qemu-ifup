@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+QEMU_BRIDGE="qemubr1"
+ip link set dev $1 up
+ip link set dev $1 master $QEMU_BRIDGE
+# El kernel no reenvía frames LLDP (ether 0x88cc / 01:80:c2:00:00:0e) por un
+# bridge sin el bit 14 de group_fwd_mask — sin esto el mapa de NetPulse no ve
+# el enlace ether1↔juniper en el segmento DMZ.
+echo 0x4000 > /sys/devices/virtual/net/$QEMU_BRIDGE/bridge/group_fwd_mask

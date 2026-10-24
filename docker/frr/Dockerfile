@@ -9,18 +9,25 @@
 # ============================================================
 FROM frrouting/frr:latest
 
-RUN apk add --no-cache openssh \
+COPY admin-shell /usr/local/bin/admin-shell
+COPY frr-entrypoint.sh /usr/local/bin/frr-entrypoint.sh
+
+# NOTA llddpd alpine: su opción -I/exclusión de interfaces está rota en la 1.0.14
+# (cualquier patrón deja 0 interfaces). Por eso NO usamos -I: lldpd anuncia en
+# todas las interfaces y la política de anuncio en el segmento de gestión la
+# maneja scripts/lab-net-lldp.sh (group_fwd_mask del bridge de Docker).
+RUN apk add --no-cache openssh lldpd iputils \
     && ssh-keygen -A \
-    && adduser -D -s /usr/bin/vtysh admin \
+    && adduser -D -s /usr/local/bin/admin-shell admin \
     && echo 'admin:admin' | chpasswd \
     && echo 'root:frr' | chpasswd \
     && addgroup admin frr 2>/dev/null || true \
     && addgroup admin frrvty 2>/dev/null || true \
-    && echo '/usr/bin/vtysh' >> /etc/shells \
+    && adduser admin lldpd 2>/dev/null || true \
+    && echo '/usr/local/bin/admin-shell' >> /etc/shells \
+    && chmod 755 /usr/local/bin/admin-shell \
     && sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config \
     && sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-
-COPY frr-entrypoint.sh /usr/local/bin/frr-entrypoint.sh
 RUN chmod +x /usr/local/bin/frr-entrypoint.sh
 
 CMD ["/usr/local/bin/frr-entrypoint.sh"]

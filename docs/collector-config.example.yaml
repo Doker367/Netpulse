@@ -1,0 +1,46 @@
+# Ejemplo de configuración del colector remoto. Copiar al nodo del site.
+# La API key NO se escribe aquí: usar NETPULSE_COLLECTOR_API_KEY o api_key_file.
+
+schema_version: 1
+
+site_id: site-lima
+collector_id: collector-lima-01
+
+central:
+  base_url: https://noc.example.net
+  api_key_env: NETPULSE_COLLECTOR_API_KEY
+  api_key_file: null
+  verify_tls: true
+  ca_file: null
+  timeout_s: 10
+
+probe:
+  interval_s: 60
+  timeout_ms: 1500
+  workers: 8
+  icmp_count: 1
+
+buffer:
+  path: /var/lib/netpulse-collector/buffer.sqlite3
+  max_rows: 500000
+  max_age_hours: 72
+  synced_retention_hours: 6
+  min_free_mb: 200
+
+sync:
+  interval_s: 30
+  heartbeat_s: 60
+  batch_max_samples: 200
+  backoff_base_s: 5
+  backoff_max_s: 300
+
+devices:
+  - id: sw-access-01
+    hostname: 10.10.0.11
+    port: 22
+    protocol: ssh
+    driver: ios
+  - id: fw-edge-01
+    hostname: 10.10.0.1
+    port: 161
+    protocol: snmp
