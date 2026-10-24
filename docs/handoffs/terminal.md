@@ -7,6 +7,8 @@ sin cambios. Aquí está el comportamiento exacto del WebSocket para migrarlo.
 - Router: `app/routers/terminal.py`
 - Endpoint: `WS /ws/terminal/{device_id}`
 - Autenticación: query `?token=<JWT>` (rol `admin` u `operator`).
+- RBAC por grupo: con `scope_group`/`scope_sites`, solo se abre shell en
+  equipos de los grupos autorizados (ver §2.1).
 - El modo se elige **solo** con la query `fmt`:
   - `?fmt` ausente (o cualquier valor distinto de `json`) → **modo legacy**,
     texto plano, comportamiento actual de `main`.
@@ -29,6 +31,7 @@ Sin `fmt=json` el servidor habla exactamente como antes:
 | Chunks de texto del PTY (stdout y stderr) | Según llegan del equipo. |
 | `⚠️ paramiko no disponible: ...\r\n` | Falta la librería en el servidor. |
 | `⚠️ Dispositivo '<id>' no encontrado\r\n` | Id inexistente. |
+| `⚠️ device fuera de tu scope: <grupo>\r\n` | El token no autoriza el grupo del equipo; cierra con 4403. |
 | `⚠️ No se pudo conectar: <detalle>\r\n` | Fallo de SSH (el detalle puede incluir la nota de puerto API). |
 
 Mensajes del cliente que entiende el modo legacy (sin cambios):
@@ -67,6 +70,20 @@ caducada»: renovar token o volver al login, **sin** reintentar en bucle.
 > `websockets` recibe `ConnectionClosed.code == 4401`. El cierre no autentica
 > nada por sí solo: no se crea sesión, no se consulta el inventario y no se
 > abre ningún SSH.
+
+### 2.1 Fuera de scope (grupo)
+
+El rol es necesario pero no suficiente: si el JWT trae `scope_group` y/o
+`scope_sites`, el equipo resuelto debe pertenecer a un grupo autorizado (los
+dispositivos sin grupo no lo están). La comprobación ocurre después de
+resolver el inventario y **antes** de invocar paramiko: no se abre SSH.
+
+- Modo JSON: `error` con `code: "forbidden"` y `detail`
+  `device fuera de tu scope: <grupo>` (o `…: sin grupo`), seguido de `closed`
+  con `code: "forbidden"` y `reason: "equipo fuera de tu alcance"`.
+- Modo legacy: una línea `⚠️ device fuera de tu scope: <grupo>\r\n`.
+- En ambos modos el cierre WS es **4403**. Un token sin claims conserva el
+  acceso legado completo.
 
 ---
 
@@ -136,6 +153,7 @@ que el cliente ya se haya desconectado).
 | `ssh_connect` | No se pudo abrir el transporte SSH (DNS, timeout, conexión rechazada, red). | `No se pudo conectar a <device> (<host>:<port>): <causa>` o `Tiempo de espera agotado conectando a ...`. Puede terminar con la nota de puerto API (§6). |
 | `ssh_auth` | El equipo rechazó usuario/contraseña. | `Autenticación SSH fallida en <device>: revisa las credenciales.` |
 | `unsupported` | Falta paramiko en el servidor (o el equipo no permite abrir PTY). | `paramiko no disponible en el servidor: <causa>` |
+| `forbidden` | El token no autoriza el grupo del equipo. | `device fuera de tu scope: <grupo>` o `device fuera de tu scope: sin grupo`. |
 | `internal` | Fallo no clasificable. | Texto corto; registrar para soporte. |
 
 `detail` no contiene credenciales ni traceback.
@@ -156,6 +174,7 @@ debe **dejar de reintentar** según la tabla de §7.
 | `unreachable` | `equipo inalcanzable` | Falló la conexión (`ssh_connect` o `ssh_auth`); el `error` previo explica la causa. |
 | `operator` | `cerrado por el operador` | El cliente envió `{"type":"close"}` (botón «Cerrar sesión»). |
 | `device_not_found` | `equipo no encontrado` | Id inexistente; el `error` previo lo explica. |
+| `forbidden` | `equipo fuera de tu alcance` | El token no autoriza el grupo del equipo; el `error` previo lo explica. |
 | `internal` | `error interno` | Fallo interno del servidor. |
 
 Si el cliente se desconecta por su cuenta (cierra la pestaña, `ws.close()`),
@@ -258,6 +277,7 @@ N s (kex lento o algoritmos incompatibles)». `ssh_auth` se reserva para
 | `error` `ssh_auth` | Banner **Credenciales SSH rechazadas** + `detail`. No reintentar en bucle; ofrecer «Revisar credenciales». |
 | `error` `ssh_connect`/`closed` `unreachable` | Banner **No se pudo conectar** + `detail`. Si menciona «puerto API», añadir «El inventario apunta a la API, no a SSH». Reintento manual o backoff. |
 | `error` `device_not_found` | Banner **Equipo no encontrado**; recargar inventario. Sin reintento. |
+| `error` `forbidden` / cierre `4403` | Banner **Equipo fuera de tu alcance**: el equipo no pertenece a los grupos del token. Sin reintento; contactar al admin. |
 | `error` `unsupported` | Banner **Terminal no disponible en el servidor**; no reintentar. |
 | `error` `internal` | Banner **Fallo interno**; registrar para soporte. |
 | `closed` `eof` | «Sesión finalizada por el equipo.» Reconectar solo por acción del operador (el PTY murió). |
@@ -268,8 +288,8 @@ N s (kex lento o algoritmos incompatibles)». `ssh_auth` se reserva para
 
 Reconexión recomendada: backoff exponencial **1 s, 2 s, 4 s, 8 s, 16 s,
 máximo 30 s**, con jitter; máximo ~5 intentos automáticos. No reconectar
-automáticamente tras `operator`, `device_not_found`, `unsupported`, `ssh_auth`
-ni 4401. Al reconectar, limpiar el buffer de xterm y pedir un prompt nuevo
+automáticamente tras `operator`, `device_not_found`, `forbidden`, `unsupported`,
+`ssh_auth`, 4401 ni 4403. Al reconectar, limpiar el buffer de xterm y pedir un prompt nuevo
 (la sesión SSH anterior ya no existe).
 
 ---
