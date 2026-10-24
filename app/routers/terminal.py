@@ -192,6 +192,11 @@ async def terminal(websocket: WebSocket, device_id: str) -> None:
     token = websocket.query_params.get("token", "")
     payload = verify_token(token) if token else None
     if not payload or payload.get("role") not in _ALLOWED_ROLES:
+        # Uvicorn rechaza el upgrade con HTTP 403 si se cierra el WebSocket
+        # ANTES de accept(): el cliente nunca vería el código 4401. Se acepta
+        # y se cierra de inmediato (sin inventario ni SSH) para que el cierre
+        # viaje como frame WS con el código que la UI espera.
+        await websocket.accept()
         await websocket.close(code=4401)
         return
 

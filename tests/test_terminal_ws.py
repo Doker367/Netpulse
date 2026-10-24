@@ -140,6 +140,40 @@ def test_token_invalido_cierra_4401(client):
     assert exc.value.code == 4401
 
 
+def test_auth_rechazada_acepta_antes_de_cerrar_4401():
+    """Regresión 7F: el 4401 solo llega si el upgrade se acepta primero."""
+
+    class FakeWebSocket:
+        def __init__(self, token):
+            self.query_params = {"token": token}
+            self.calls = []
+
+        async def accept(self):
+            self.calls.append("accept")
+
+        async def close(self, code=1000):
+            self.calls.append(("close", code))
+
+    ws = FakeWebSocket("token-invalido")
+    with patch("app.services.napalm_svc._find_device") as find_device, \
+         patch("paramiko.SSHClient") as ssh_client:
+        import asyncio
+
+        asyncio.run(terminal_router.terminal(ws, "dev1"))
+
+    assert ws.calls == ["accept", ("close", 4401)]
+    find_device.assert_not_called()
+    ssh_client.assert_not_called()
+
+
+def test_rol_no_permitido_acepta_y_cierra_4401(client):
+    token = create_access_token({"sub": "viewer", "role": "viewer"})
+    with pytest.raises(WebSocketDisconnect) as exc:
+        with _connect(client, token, fmt="json") as ws:
+            ws.receive_json()
+    assert exc.value.code == 4401
+
+
 def test_device_inexistente_json(client, admin_token):
     with patch("app.services.napalm_svc._find_device", return_value=None):
         with _connect(client, admin_token, fmt="json") as ws:
