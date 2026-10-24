@@ -49,15 +49,24 @@ timeout de inactividad también aplica, pero cierra en silencio (sin evento).
 ## 2) Cierre de autenticación (ambos modos)
 
 Si el token falta, es inválido o el rol no es `admin`/`operator`, el servidor
-cierra **antes de aceptar** con:
+**acepta el upgrade y cierra inmediatamente después** con:
 
 ```
 close code = 4401
 ```
 
-No hay `error` ni `closed`: el navegador solo ve el cierre 4401. La UI debe
-tratarlo como «sesión caducada»: renovar token o volver al login, **sin**
-reintentar en bucle.
+No se busca inventario, no se abre SSH y no hay `error` ni `closed`: el
+navegador recibe el frame de cierre 4401 y debe tratarlo como «sesión
+caducada»: renovar token o volver al login, **sin** reintentar en bucle.
+
+> **Por qué accept + close (tarjeta 7F):** si el servidor cierra el WebSocket
+> *antes* de `accept()`, uvicorn rechaza el upgrade con **HTTP 403** y el
+> cliente nunca ve el código 4401. La versión anterior del contrato prometía
+> un 4401 imposible por la red. Ahora el handshake se completa (HTTP 101) y el
+> cierre viaja como frame WS. Verificado con uvicorn real: cliente
+> `websockets` recibe `ConnectionClosed.code == 4401`. El cierre no autentica
+> nada por sí solo: no se crea sesión, no se consulta el inventario y no se
+> abre ningún SSH.
 
 ---
 
@@ -122,7 +131,7 @@ que el cliente ya se haya desconectado).
 
 | `code` | Significado | `detail` (español, mostrable tal cual) |
 |---|---|---|
-| `auth` | Token inválido. **Reservado**: hoy el cierre 4401 ocurre antes del `accept`, así que no se emite como evento. | — |
+| `auth` | Token inválido. **Reservado**: la autenticación se rechaza antes de abrir sesión con el cierre WS 4401 (ver §2), así que no se emite como evento. | — |
 | `device_not_found` | El id no existe en el inventario. | `Dispositivo '<id>' no encontrado.` |
 | `ssh_connect` | No se pudo abrir el transporte SSH (DNS, timeout, conexión rechazada, red). | `No se pudo conectar a <device> (<host>:<port>): <causa>` o `Tiempo de espera agotado conectando a ...`. Puede terminar con la nota de puerto API (§6). |
 | `ssh_auth` | El equipo rechazó usuario/contraseña. | `Autenticación SSH fallida en <device>: revisa las credenciales.` |
@@ -222,6 +231,22 @@ realmente usado (nunca `8728` para un RouterOS con `port: 8728` sin
 Para el laboratorio: añadir `cli_port: 2225` (o `ssh_port: 2225`) al MikroTik
 en `config/devices.yaml`; eso está fuera de la zona de esta tarjeta.
 
+### 6.1 Timeout de conexión y kex SSH
+
+`SSHClient.connect(timeout=...)` de paramiko **no es solo el timeout TCP**:
+también es el tiempo máximo que se espera el *kex* SSH. El valor por defecto
+es **30 s**, configurable con `NETPULSE_TERM_CONNECT_TIMEOUT_S` (valores no
+numéricos o `<= 0` vuelven a 30). `banner_timeout` y `auth_timeout` siguen en
+15 s.
+
+Motivo (diagnóstico 7F): el RouterOS emulado del laboratorio tarda **8–26 s**
+en negociar `diffie-hellman-group-exchange-sha256`; con el timeout anterior de
+10 s el kex se agotaba y paramiko devolvía `No existing session`. Ese mensaje
+**no significa credenciales rechazadas**: se traduce a `error` con
+`code: "ssh_connect"` y el detalle «La negociación SSH ... no se completó en
+N s (kex lento o algoritmos incompatibles)». `ssh_auth` se reserva para
+`AuthenticationException` real.
+
 ---
 
 ## 7) Qué mostrar y cómo reconectar (UI 7C)
@@ -259,12 +284,74 @@ ni 4401. Al reconectar, limpiar el buffer de xterm y pedir un prompt nuevo
 - Logging con el logger `app.routers.terminal`: dispositivo, host, puerto y
   usuario; **nunca** password ni el JWT.
 
-## 9) Pendientes explícitos
+### 8.1 Redacción de tokens en logs (tarjeta 7F)
 
-- **Verificación real en laboratorio** (SSH real, MikroTik/RouterOS e IOL):
-  los tests usan `TestClient` y paramiko mockeado. No se abrió ninguna sesión
-  real.
-- **UI 7C**: este documento es el contrato; el frontend sigue en modo legacy.
+El JWT viaja en la query `?token=` y uvicorn registra la URL al aceptar el
+upgrade (`uvicorn.error`), incluso con `--no-access-log`. Para que no quede en
+claro, `app/main.py` instala `app.core.logging_redaction.install_log_redaction()`
+al importar la app:
+
+- Redacta `token=<valor>` → `token=***` en el mensaje formateado y en los
+  argumentos de **todos** los `LogRecord` (factory global), así que cubre
+  `uvicorn.access`, `uvicorn.error`, el root y handlers creados después.
+- Conserva el resto de la URL (`&fmt=json`, host, ruta) y no rompe
+  `logger.info("... token=%s", arg)` (los placeholders de formato se respetan).
+- Es idempotente. Si un despliegue configura el logging *después* de importar
+  la app y reemplaza la factory de `logging`, debe llamar
+  `install_log_redaction()` al final de esa configuración.
+
+Regresión: `tests/test_log_redaction.py` (URL simulada en `uvicorn.error`,
+`uvicorn.access` y root; el secreto no aparece). Además, recomendación de
+despliegue: configurar el proxy inverso para **no** registrar query strings en
+`/ws/` (p. ej. en nginx, `map $request_uri $loggable` o un `access_log` con
+`$uri` en vez de `$request_uri`). La redacción de la app es la última línea de
+defensa, no la única.
+
+---
+
+## 9) MikroTik SSH: diagnóstico 7F (lab real)
+
+El fallo `ssh_connect: No existing session` de la verificación 7E **no era
+autenticación rechazada** y no requiere credenciales distintas.
+
+- Lab: `netpulse-mikrotik` (`vaerh/routeros`), host `127.0.0.1:2225`,
+  usuario `admin`, contraseña vacía. OpenSSH autentica con método `none`
+  («Authenticated ... using "none"»); `admin/admin` y la contraseña vacía dan
+  el mismo resultado.
+- El banner `SSH-2.0-ROSSSH` se negocia y el kex **sí** se completa, pero
+  tarda **8–26 s** (medido: 8.4, 9.7, 12, 17, 18, 25.6 s) porque paramiko no
+  ofrece `curve25519-sha256` (solo el alias `@libssh.org`, que ROS no anuncia)
+  y cae en `diffie-hellman-group-exchange-sha256`.
+- `SSHClient.connect(timeout=10)` agotaba el kex; `start_client()` retorna por
+  timeout, el transporte queda activo pero sin claves y
+  `get_remote_server_key()` lanza el engañoso `No existing session`. No se
+  emite `ssh_auth` porque no hubo rechazo de credenciales.
+- Fix aplicado: timeout por defecto **30 s** (`NETPULSE_TERM_CONNECT_TIMEOUT_S`,
+  §6.1) y clasificación honesta del error de kex. Verificado en vivo con
+  uvicorn real: `connected` con `port: 2225`, `user: admin`, y cierre
+  `operator` al pedirlo el cliente. No se activó ningún fallback de auth
+  (`none`/keyboard-interactive): paramiko ya autentica con `none` una vez que
+  el kex termina.
+
+Riesgo residual: si el kex supera los 30 s (RouterOS muy cargado), el operador
+verá el error de negociación y podrá reintentar; no se presenta como
+credenciales. El valor es configurable por entorno.
+
+---
+
+## 10) Pendientes explícitos
+
+- **UI 7C**: este documento es el contrato; el frontend sigue en modo legacy
+  (fuera de la zona de 7F). Falta validar en navegador el banner de 4401 y la
+  reconexión.
+- **IOL/otros equipos**: la sesión real verificada en 7F es MikroTik (kex
+  lento) e IOL/Cisco en 7E (FRR). Arista vEOS y equipos reales no se
+  verificaron en esta tarjeta.
+- **Proxy**: la redacción de la app cubre los logs de uvicorn; cada despliegue
+  debe revisar además su proxy/config de journald para no persistir query
+  strings de `/ws/` (§8.1).
 - `_resolve_ssh_port` está duplicado a propósito en `terminal.py` (misma
   lógica que `app/routers/sftp.py`) para no acoplar routers. Si cambia el
   criterio, actualizar ambos.
+- El techo de sesiones concurrentes, corte durante el kex y reconexiones
+  repetidas no forman parte de la evidencia 7F.
