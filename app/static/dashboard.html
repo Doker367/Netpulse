@@ -1468,6 +1468,38 @@
       color: var(--accent);
       text-decoration: underline;
     }
+    /* SFTP: breadcrumb y estados de acción (solo clases nuevas, sin tocar las existentes) */
+    .sftp-crumb-btn {
+      background: none;
+      border: 0;
+      padding: 2px 5px;
+      color: var(--text-secondary);
+      font-family: var(--mono);
+      font-size: 11px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .sftp-crumb-btn:hover {
+      color: var(--accent);
+      background: var(--surface);
+      text-decoration: underline;
+    }
+    .sftp-crumb-btn[aria-current="page"] {
+      color: var(--text);
+      font-weight: 700;
+      cursor: default;
+      text-decoration: none;
+      background: none;
+    }
+    .sftp-crumb-sep {
+      color: var(--text-ter);
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+    .sftp-row button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
 
   </style>
   <link rel="stylesheet" href="/static/overview.css?v=3">
@@ -2068,22 +2100,48 @@
 
         <!-- PANEL 2: SFTP FILE MANAGER -->
         <div id="term-pane-sftp" style="display:none;flex-direction:column;gap:12px">
+          <!-- Banner persistente por causa (401/403/404/501/502/504): un fallo nunca se pinta como listado -->
+          <div id="sftp-banner" role="alert" aria-live="polite" style="display:none;background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--text-ter);border-radius:var(--radius-lg);padding:12px 16px;gap:12px;align-items:flex-start">
+            <div style="flex:1;min-width:0">
+              <div id="sftp-banner-title" style="font-size:12px;font-weight:700;margin-bottom:4px"></div>
+              <div id="sftp-banner-text" style="font-size:12px;color:var(--text-secondary);line-height:1.5;word-break:break-word"></div>
+              <div id="sftp-banner-detail" style="display:none;font-family:var(--mono);font-size:10px;color:var(--text-ter);margin-top:6px;line-height:1.45;word-break:break-word"></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+              <button id="sftp-banner-action" type="button" class="btn btn-o btn-sm" style="display:none;padding:5px 12px;font-size:11px"></button>
+              <button id="sftp-banner-close" type="button" class="btn btn-o btn-sm" onclick="sftpHideBanner()" style="padding:5px 10px;font-size:11px" data-i18n="sftp_close">Cerrar</button>
+            </div>
+          </div>
+
+          <!-- Progreso honesto: fetch no informa porcentaje, así que se muestra estado + spinner -->
+          <div id="sftp-progress" role="status" aria-live="polite" style="display:none;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px 16px;font-size:12px;color:var(--text-secondary)">
+            <span class="sp" id="sftp-progress-spinner" style="width:14px;height:14px;flex-shrink:0"></span>
+            <span id="sftp-progress-text" style="word-break:break-word"></span>
+          </div>
+
           <!-- SFTP Action Bar -->
           <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
             <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:320px">
-              <span style="font-size:11px;color:var(--text-muted);font-weight:700">RUTA REMOTA:</span>
-              <button class="btn btn-o btn-sm" onclick="sftpNavUp()" title="Subir nivel de directorio" style="padding:6px 12px;font-size:11px"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 19V5m-7 7 7-7 7 7"/></svg> Subir nivel</button>
+              <span style="font-size:11px;color:var(--text-muted);font-weight:700" data-i18n="sftp_route_label">RUTA REMOTA:</span>
+              <button class="btn btn-o btn-sm" onclick="sftpNavUp()" title="Subir nivel de directorio" style="padding:6px 12px;font-size:11px" data-i18n="sftp_up_level" data-i18n-title="sftp_up_hint"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 19V5m-7 7 7-7 7 7"/></svg> Subir nivel</button>
               <div style="position:relative;flex:1">
-                <input type="text" id="sftp-path-input" value="/" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 12px;font-family:var(--mono);font-size:12px" onkeydown="if(event.key==='Enter')sftpLoadDir(this.value)">
+                <input type="text" id="sftp-path-input" value="/" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 12px;font-family:var(--mono);font-size:12px" onkeydown="if(event.key==='Enter')sftpLoadDir(this.value)" aria-label="Ruta remota" data-i18n-aria="sftp_path_aria">
               </div>
-              <button class="btn btn-o btn-sm" onclick="sftpLoadDir(document.getElementById('sftp-path-input').value)" style="padding:6px 14px;font-size:11px"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg> Ir / Recargar</button>
+              <button class="btn btn-o btn-sm" onclick="sftpLoadDir(document.getElementById('sftp-path-input').value)" style="padding:6px 14px;font-size:11px"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg> <span data-i18n="sftp_go">Ir / Recargar</span></button>
             </div>
             <div style="display:flex;align-items:center;gap:8px">
+              <button class="btn btn-o btn-sm" id="sftp-refresh-btn" onclick="sftpRefresh()" title="Recargar la carpeta actual" data-i18n-title="sftp_refresh_hint" style="padding:6px 12px;font-size:11px"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg> <span data-i18n="sftp_refresh">Refrescar</span></button>
               <input type="file" id="sftp-file-input" style="display:none" onchange="sftpUploadSelectedFile(this.files)">
-              <button class="btn btn-p btn-sm" onclick="document.getElementById('sftp-file-input').click()" style="padding:7px 18px;font-weight:600;font-size:12px">
-                <svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Subir Archivo
+              <button class="btn btn-p btn-sm" id="sftp-upload-btn" onclick="document.getElementById('sftp-file-input').click()" style="padding:7px 18px;font-weight:600;font-size:12px">
+                <svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> <span data-i18n="sftp_upload">Subir Archivo</span>
               </button>
             </div>
+          </div>
+
+          <!-- Breadcrumb navegable de la ruta remota -->
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-lg);padding:8px 14px">
+            <span style="font-size:10px;color:var(--text-muted);font-weight:700;letter-spacing:.5px" data-i18n="sftp_crumb_label">RUTA:</span>
+            <div id="sftp-breadcrumb" style="display:flex;align-items:center;gap:2px;flex-wrap:wrap;min-width:0"></div>
           </div>
 
           <!-- SFTP File Table & Dropzone -->
@@ -3298,6 +3356,110 @@
       scp_relogin: 'El usuario debe iniciar sesión de nuevo para recibir el nuevo scope en su token.', scp_cleared: 'Scope quitado'
     });
 
+    // i18n — SFTP (estados honestos por causa, contrato docs/handoffs/sftp-ui.md)
+    Object.assign(I18N.en, {
+      sftp_close: 'Dismiss', sftp_route_label: 'REMOTE PATH:', sftp_up_level: 'Up one level',
+      sftp_go: 'Go / Reload', sftp_refresh: 'Refresh', sftp_upload: 'Upload file',
+      sftp_crumb_label: 'PATH:', sftp_blocked_hint: 'SFTP is not available on this device',
+      sftp_up_hint: 'Go up one directory level', sftp_refresh_hint: 'Reload the current folder',
+      sftp_path_aria: 'Remote path',
+      sftp_summary: '{n} items ({d} folders, {f} files) in {p}',
+      sftp_summary_empty: 'Empty folder at {p}',
+      sftp_summary_none: 'Not verified — no listing',
+      sftp_summary_loading: 'Reading folder…',
+      sftp_loading: 'Connecting over SFTP and reading the directory…',
+      sftp_list_fail: 'Could not read this folder',
+      sftp_list_fail_d: 'No empty listing is shown: the contents of this folder are not verified.',
+      sftp_empty_title: 'Empty folder',
+      sftp_empty_detail: 'The device answered: this folder has no files.',
+      sftp_no_dev_title: 'No device selected',
+      sftp_no_dev_text: 'Pick a device in the header to browse its files over SFTP.',
+      sftp_select_dev: 'Select a device first', sftp_busy: 'Another transfer is still running…',
+      sftp_open: 'Open', sftp_download: 'Download',
+      sftp_up_start: 'Uploading {f} ({s})…',
+      sftp_up_ok: 'File uploaded',
+      sftp_up_fail: 'Upload failed',
+      sftp_up_unconfirmed: 'The server did not confirm the upload',
+      sftp_up_unconfirmed_title: 'Upload not confirmed',
+      sftp_dl_start: 'Downloading {f}…',
+      sftp_dl_ok: 'Downloaded: {f}',
+      sftp_dl_fail: 'Download failed',
+      sftp_err_generic: 'SFTP error',
+      sftp_err_auth_title: 'SSH authentication failed',
+      sftp_err_auth_text: 'The device rejected the username/password from the inventory. Check the credentials — retrying with the same ones will fail again.',
+      sftp_err_501_title: 'SFTP is not supported by this device',
+      sftp_err_501_text: 'This device does not offer SFTP — use Terminal or Commands for CLI.',
+      sftp_open_terminal: 'Open Terminal',
+      sftp_err_502_title: 'Could not connect',
+      sftp_err_504_title: 'SSH not responding',
+      sftp_err_504_text: 'Timed out connecting to {d} — unverified.',
+      sftp_err_403_read: 'Permission denied while reading',
+      sftp_err_403_up: 'Permission denied while writing',
+      sftp_err_404_dev: 'Device not found',
+      sftp_err_404_file: 'File not found',
+      sftp_reload_dir: 'Reload folder',
+      sftp_err_400_title: 'Path not accessible',
+      sftp_back_last: 'Back to last folder',
+      sftp_err_500_title: 'Internal SFTP failure',
+      sftp_err_500_text: 'The server could not complete the operation. Report this to support.',
+      sftp_err_generic_title: 'SFTP error',
+      sftp_err_api_title: 'No connection to NetPulse',
+      sftp_err_api_text: 'The request did not reach the API. No listing is shown because the result is unknown.',
+      sftp_err_badres_title: 'Unreadable SFTP response',
+      sftp_err_badres_text: 'The server answered 200 but without a valid listing, so the folder is not verified.'
+    });
+    Object.assign(I18N.es, {
+      sftp_close: 'Cerrar', sftp_route_label: 'RUTA REMOTA:', sftp_up_level: 'Subir nivel',
+      sftp_go: 'Ir / Recargar', sftp_refresh: 'Refrescar', sftp_upload: 'Subir Archivo',
+      sftp_crumb_label: 'RUTA:', sftp_blocked_hint: 'SFTP no disponible en este equipo',
+      sftp_up_hint: 'Subir un nivel de directorio', sftp_refresh_hint: 'Recargar la carpeta actual',
+      sftp_path_aria: 'Ruta remota',
+      sftp_summary: '{n} elementos ({d} carpetas, {f} archivos) en {p}',
+      sftp_summary_empty: 'Carpeta vacía en {p}',
+      sftp_summary_none: 'Sin verificar — sin listado',
+      sftp_summary_loading: 'Leyendo carpeta…',
+      sftp_loading: 'Conectando por SFTP y leyendo directorio…',
+      sftp_list_fail: 'No se pudo leer esta carpeta',
+      sftp_list_fail_d: 'No se muestra un listado vacío: el contenido de esta carpeta no está verificado.',
+      sftp_empty_title: 'Carpeta vacía',
+      sftp_empty_detail: 'El equipo respondió: la carpeta no tiene archivos.',
+      sftp_no_dev_title: 'Sin equipo seleccionado',
+      sftp_no_dev_text: 'Elige un equipo en la cabecera para explorar sus archivos por SFTP.',
+      sftp_select_dev: 'Selecciona un dispositivo primero', sftp_busy: 'Aún hay una transferencia en curso…',
+      sftp_open: 'Abrir', sftp_download: 'Descargar',
+      sftp_up_start: 'Subiendo {f} ({s})…',
+      sftp_up_ok: 'Archivo subido',
+      sftp_up_fail: 'Falló la subida',
+      sftp_up_unconfirmed: 'El servidor no confirmó la subida',
+      sftp_up_unconfirmed_title: 'Subida no confirmada',
+      sftp_dl_start: 'Descargando {f}…',
+      sftp_dl_ok: 'Descargado: {f}',
+      sftp_dl_fail: 'Falló la descarga',
+      sftp_err_generic: 'Error SFTP',
+      sftp_err_auth_title: 'Autenticación SSH fallida',
+      sftp_err_auth_text: 'Revisa las credenciales del equipo: rechazó el usuario/contraseña del inventario. Reintentar con las mismas volverá a fallar.',
+      sftp_err_501_title: 'SFTP no soportado por este equipo',
+      sftp_err_501_text: 'Este equipo no ofrece SFTP — usa Terminal o Comandos para CLI.',
+      sftp_open_terminal: 'Abrir Terminal',
+      sftp_err_502_title: 'No se pudo conectar',
+      sftp_err_504_title: 'Sin respuesta SSH',
+      sftp_err_504_text: 'Tiempo de espera agotado conectando a {d} — sin verificar.',
+      sftp_err_403_read: 'Permiso denegado al leer',
+      sftp_err_403_up: 'Permiso denegado al escribir',
+      sftp_err_404_dev: 'Equipo no encontrado',
+      sftp_err_404_file: 'Archivo no encontrado',
+      sftp_reload_dir: 'Recargar carpeta',
+      sftp_err_400_title: 'Ruta no accesible',
+      sftp_back_last: 'Volver a la última carpeta',
+      sftp_err_500_title: 'Fallo interno de SFTP',
+      sftp_err_500_text: 'El servidor no pudo completar la operación. Regístralo para soporte.',
+      sftp_err_generic_title: 'Error SFTP',
+      sftp_err_api_title: 'Sin conexión con NetPulse',
+      sftp_err_api_text: 'La petición no llegó a la API. No se muestra listado porque el resultado es desconocido.',
+      sftp_err_badres_title: 'Respuesta SFTP ilegible',
+      sftp_err_badres_text: 'El servidor respondió 200 pero sin un listado válido; la carpeta no está verificada.'
+    });
+
     function setLang(lang) {
       currentLang = lang;
       localStorage.setItem('np_lang', lang);
@@ -3309,6 +3471,15 @@
           setIconText(el, label);
           if (decoration && !label.includes('<svg')) el.prepend(decoration, ' ');
         }
+      });
+      // Tooltips y etiquetas accesibles (atributos) también se traducen.
+      document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        if (I18N[lang] && I18N[lang][key]) el.title = I18N[lang][key];
+      });
+      document.querySelectorAll('[data-i18n-aria]').forEach(el => {
+        const key = el.getAttribute('data-i18n-aria');
+        if (I18N[lang] && I18N[lang][key]) el.setAttribute('aria-label', I18N[lang][key]);
       });
       const sel = document.getElementById('lang-select');
       if (sel) sel.value = lang;
@@ -3334,7 +3505,19 @@
         const url = typeof input === 'string' ? input : (input && input.url) || '';
         if (resp && resp.status === 401 && t && !_np401Done && url.startsWith(A)
           && !url.includes('/auth/login') && !url.includes('/auth/refresh') && !url.includes('/auth/me')) {
-          sessionExpired();
+          // Excepción deliberada: /api/sftp/ usa 401 para «autenticación SSH fallida del equipo»
+          // (contrato docs/handoffs/sftp-ui.md), no para sesión caducada. Se comprueba el `detail`
+          // para no confundir ambos casos.
+          if (!url.includes('/sftp/')) {
+            sessionExpired();
+          } else {
+            let deviceAuth = false;
+            try {
+              const body = await resp.clone().json();
+              deviceAuth = /autenticaci[oó]n ssh/i.test(String((body && body.detail) || ''));
+            } catch (e) { deviceAuth = false; }
+            if (!deviceAuth) sessionExpired();
+          }
         }
       } catch (e) { }
       return resp;
@@ -7052,6 +7235,10 @@
     let _term = null, _fitAddon = null, _termWs = null;
     let _currentTermTab = 'terminal';
     let _sftpCurrentPath = '/';
+    let _sftpDeviceId = null;   // equipo del último listado (para limpiar estado al cambiar)
+    let _sftpBlocked = false;   // 501: el equipo no ofrece SFTP → sin subir/descargar
+    let _sftpBusy = false;      // una transferencia a la vez
+    let _sftpLastGoodPath = '/';
 
     function switchTermTab(tab) {
       _currentTermTab = tab;
@@ -7283,52 +7470,289 @@
       return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
+    // ── SFTP: utilidades de ruta, banner honesto y progreso ──
+    function _sftpNormPath(p) {
+      let s = String(p == null ? '/' : p).trim();
+      if (!s) return '/';
+      if (s.charAt(0) !== '/') s = '/' + s;
+      s = s.replace(/\/{2,}/g, '/');
+      if (s.length > 1) s = s.replace(/\/+$/, '');
+      return s || '/';
+    }
+
+    function _sftpJoin(dir, name) {
+      const d = String(dir || '/').replace(/\/+$/, '');
+      return `${d}/${String(name)}`;
+    }
+
+    // Argumento seguro para onclick: encodeURIComponent deja pasar ' y por eso se sustituye.
+    function _sftpArg(v) { return encodeURIComponent(String(v)).replace(/'/g, '%27'); }
+
+    function _sftpSetSummary(text) {
+      const el = document.getElementById('sftp-summary');
+      if (el) el.textContent = text;
+    }
+
+    function _sftpProgress(text) {
+      const box = document.getElementById('sftp-progress');
+      const txt = document.getElementById('sftp-progress-text');
+      if (txt) txt.textContent = text;
+      if (box) box.style.display = 'flex';
+    }
+
+    function _sftpProgressDone() {
+      const box = document.getElementById('sftp-progress');
+      if (box) box.style.display = 'none';
+      const txt = document.getElementById('sftp-progress-text');
+      if (txt) txt.textContent = '';
+    }
+
+    function sftpHideBanner() {
+      const box = document.getElementById('sftp-banner');
+      if (box) box.style.display = 'none';
+      const detail = document.getElementById('sftp-banner-detail');
+      if (detail) { detail.textContent = ''; detail.style.display = 'none'; }
+      const action = document.getElementById('sftp-banner-action');
+      if (action) { action.style.display = 'none'; action.onclick = null; action.textContent = ''; }
+    }
+
+    // tone: 'gray' (no verificable / sin respuesta), 'warn' (credenciales o permisos), 'error', 'ok'
+    function sftpShowBanner(tone, title, text, detail, actionLabel, actionFn) {
+      const box = document.getElementById('sftp-banner');
+      if (!box) return;
+      const tones = {
+        gray: { border: 'var(--text-ter)', bg: 'var(--panel)', title: 'var(--text)' },
+        warn: { border: 'var(--orange)', bg: 'rgba(249,115,22,0.08)', title: 'var(--orange)' },
+        error: { border: 'var(--red)', bg: 'rgba(239,68,68,0.08)', title: 'var(--red)' },
+        ok: { border: 'var(--green)', bg: 'rgba(16,185,129,0.08)', title: 'var(--green)' }
+      };
+      const c = tones[tone] || tones.gray;
+      box.style.display = 'flex';
+      box.style.borderLeftColor = c.border;
+      box.style.background = c.bg;
+      const titleEl = document.getElementById('sftp-banner-title');
+      const textEl = document.getElementById('sftp-banner-text');
+      const detailEl = document.getElementById('sftp-banner-detail');
+      if (titleEl) { titleEl.textContent = title || ''; titleEl.style.color = c.title; }
+      if (textEl) textEl.textContent = text || '';
+      if (detailEl) {
+        const showDetail = !!detail && detail !== text;
+        detailEl.textContent = showDetail ? detail : '';
+        detailEl.style.display = showDetail ? 'block' : 'none';
+      }
+      const action = document.getElementById('sftp-banner-action');
+      if (action) {
+        if (actionLabel && actionFn) {
+          action.style.display = 'inline-block';
+          action.textContent = actionLabel;
+          action.onclick = (ev) => { if (ev) ev.preventDefault(); actionFn(); };
+        } else {
+          action.style.display = 'none';
+          action.onclick = null;
+          action.textContent = '';
+        }
+      }
+    }
+
+    // 501: no se ofrece reintentar SFTP; subir/descargar quedan deshabilitados hasta cambiar de equipo.
+    function sftpSetTransferEnabled(on) {
+      _sftpBlocked = !on;
+      const up = document.getElementById('sftp-upload-btn');
+      if (up) {
+        up.disabled = !on;
+        up.title = on ? '' : __t('sftp_blocked_hint');
+      }
+      const inp = document.getElementById('sftp-file-input');
+      if (inp) inp.disabled = !on;
+      document.querySelectorAll('.sftp-dl-btn').forEach(btn => {
+        btn.disabled = !on;
+        btn.title = on ? '' : __t('sftp_blocked_hint');
+      });
+    }
+
+    function sftpRenderBreadcrumb(path) {
+      const el = document.getElementById('sftp-breadcrumb');
+      if (!el) return;
+      const parts = _sftpNormPath(path).split('/').filter(Boolean);
+      let acc = '';
+      let html = `<button type="button" class="sftp-crumb-btn" onclick="sftpLoadDir('/')"${parts.length ? '' : ' aria-current="page"'}>/</button>`;
+      parts.forEach((part, i) => {
+        acc += '/' + part;
+        const last = i === parts.length - 1;
+        html += `<span class="sftp-crumb-sep" aria-hidden="true">/</span>`;
+        html += `<button type="button" class="sftp-crumb-btn" onclick="sftpLoadDir(decodeURIComponent('${_sftpArg(acc)}'))"${last ? ' aria-current="page"' : ''}>${esc(part)}</button>`;
+      });
+      el.innerHTML = html;
+    }
+
+    function _sftpNotice(title, text, opts) {
+      const o = opts || {};
+      const color = o.color || 'var(--text-ter)';
+      const titleColor = o.titleColor || 'var(--text-secondary)';
+      return `<div style="padding:44px 24px;text-align:center">
+        <div style="font-size:28px;margin-bottom:10px;color:${color}">${o.icon || ''}</div>
+        <div style="font-size:13px;font-weight:700;color:${titleColor};margin-bottom:6px">${esc(title)}</div>
+        <div style="font-size:11px;color:var(--text-ter);line-height:1.6;max-width:620px;margin:0 auto">${esc(text)}</div>
+      </div>`;
+    }
+
+    const _SFTP_ICON_WARN = '<svg class="ic" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 3 10 18H2Z"/><path d="M12 9v4M12 17h.01"/></svg>';
+    const _SFTP_ICON_FOLDER = '<svg class="ic" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+
+    // Un fallo nunca deja el listado vacío como si fuera éxito: bloque explícito + resumen «sin verificar».
+    function _sftpClearList(reason) {
+      const listContainer = document.getElementById('sftp-file-list');
+      if (listContainer) {
+        listContainer.innerHTML = _sftpNotice(__t('sftp_list_fail'), reason || __t('sftp_list_fail_d'), {
+          icon: _SFTP_ICON_WARN, color: 'var(--red)', titleColor: 'var(--red)'
+        });
+      }
+      _sftpSetSummary(__t('sftp_summary_none'));
+    }
+
+    // Traduce código HTTP + `detail` literal del contrato a banner (título, texto y acción).
+    function _sftpErrorInfo(status, detail, ctx) {
+      const dev = document.getElementById('term-dev')?.value || '';
+      const op = (ctx && ctx.op) || 'list';
+      const path = (ctx && ctx.path) || _sftpCurrentPath || '/';
+      const d = detail || __t('sftp_err_generic');
+      if (status === 401) {
+        return { tone: 'warn', title: __t('sftp_err_auth_title'), text: __t('sftp_err_auth_text'), detail: d };
+      }
+      if (status === 501) {
+        return {
+          tone: 'gray', title: __t('sftp_err_501_title'), text: __t('sftp_err_501_text'), detail: d,
+          actionLabel: __t('sftp_open_terminal'), action: () => switchTermTab('terminal')
+        };
+      }
+      if (status === 502) {
+        return { tone: 'gray', title: __t('sftp_err_502_title'), text: d, detail: '' };
+      }
+      if (status === 504) {
+        return { tone: 'gray', title: __t('sftp_err_504_title'), text: __t('sftp_err_504_text').replace('{d}', dev || '—'), detail: d };
+      }
+      if (status === 403) {
+        const writing = op === 'upload';
+        return {
+          tone: 'warn',
+          title: writing ? __t('sftp_err_403_up') : __t('sftp_err_403_read'),
+          text: d,
+          detail: ''
+        };
+      }
+      if (status === 404) {
+        if (/dispositivo/i.test(d)) return { tone: 'warn', title: __t('sftp_err_404_dev'), text: d, detail: '' };
+        return {
+          tone: 'warn', title: __t('sftp_err_404_file'), text: d, detail: '',
+          actionLabel: __t('sftp_reload_dir'), action: () => sftpRefresh()
+        };
+      }
+      if (status === 400) {
+        const info = { tone: 'warn', title: __t('sftp_err_400_title'), text: d, detail: '' };
+        if (_sftpLastGoodPath && _sftpLastGoodPath !== path) {
+          info.actionLabel = __t('sftp_back_last');
+          info.action = () => sftpLoadDir(_sftpLastGoodPath);
+        }
+        return info;
+      }
+      if (status === 500) {
+        return { tone: 'error', title: __t('sftp_err_500_title'), text: d, detail: __t('sftp_err_500_text') };
+      }
+      return { tone: 'gray', title: __t('sftp_err_generic_title'), text: d, detail: '' };
+    }
+
+    function sftpApplyError(status, detail, ctx) {
+      const info = _sftpErrorInfo(status, detail, ctx);
+      sftpShowBanner(info.tone, info.title, info.text, info.detail, info.actionLabel, info.action);
+      if (status === 501) sftpSetTransferEnabled(false);
+      return info;
+    }
+
     async function sftpLoadDir(path) {
       const devId = document.getElementById('term-dev')?.value;
+      const listContainer = document.getElementById('sftp-file-list');
+      if (!listContainer) return;
+
       if (!devId) {
-        toast('Selecciona un dispositivo primero', 'w');
+        _sftpDeviceId = null;
+        _sftpBusy = false;
+        sftpSetTransferEnabled(true);
+        sftpHideBanner();
+        _sftpProgressDone();
+        _sftpCurrentPath = '/';
+        sftpRenderBreadcrumb('/');
+        _sftpSetSummary(__t('sftp_summary_none'));
+        listContainer.innerHTML = _sftpNotice(__t('sftp_no_dev_title'), __t('sftp_no_dev_text'), { icon: _SFTP_ICON_FOLDER });
         return;
       }
-      path = path || '/';
+
+      // Cambiar de equipo limpia el estado y vuelve a «/»: nunca se deja visible el listado de otro equipo.
+      if (_sftpDeviceId !== devId) {
+        _sftpDeviceId = devId;
+        _sftpBlocked = false;
+        _sftpBusy = false;
+        sftpSetTransferEnabled(true);
+        sftpHideBanner();
+        _sftpProgressDone();
+        _sftpLastGoodPath = '/';
+        path = '/';
+      }
+
+      path = _sftpNormPath(path || '/');
       _sftpCurrentPath = path;
       const pathInput = document.getElementById('sftp-path-input');
       if (pathInput) pathInput.value = path;
-
-      const listContainer = document.getElementById('sftp-file-list');
-      const summaryEl = document.getElementById('sftp-summary');
-      if (!listContainer) return;
-
-      listContainer.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-ter)"><div class="sp" style="margin:0 auto 12px"></div>Conectando por SFTP y leyendo directorio...</div>';
+      sftpRenderBreadcrumb(path);
+      sftpHideBanner();
+      _sftpSetSummary(__t('sftp_summary_loading'));
+      listContainer.innerHTML = `<div style="padding:44px 24px;text-align:center;color:var(--text-ter)"><div class="sp" style="margin:0 auto 12px"></div>${esc(__t('sftp_loading'))}</div>`;
 
       try {
         const res = await fetch(`${A}/sftp/${encodeURIComponent(devId)}/list?path=${encodeURIComponent(path)}`, {
           headers: h()
         });
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.detail || 'Error al listar directorio');
+          const body = await res.json().catch(() => null);
+          const detail = _detText(body, __t('sftp_err_generic'));
+          _sftpClearList(detail);
+          sftpApplyError(res.status, detail, { op: 'list', path });
+          return; // 401/403/404/501/502/504/…: jamás se pintan items
         }
-        const data = await res.json();
-        const items = data.items || [];
-
-        if (summaryEl) {
-          const dirs = items.filter(x => x.is_dir).length;
-          const files = items.length - dirs;
-          summaryEl.textContent = `${items.length} elementos (${dirs} carpetas, ${files} archivos) en ${path}`;
-        }
-
-        if (items.length === 0) {
-          listContainer.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-ter)">Carpeta vacía</div>';
+        const data = await res.json().catch(() => null);
+        if (!data || data.success !== true || !Array.isArray(data.items)) {
+          _sftpClearList(__t('sftp_err_badres_text'));
+          sftpShowBanner('error', __t('sftp_err_badres_title'), __t('sftp_err_badres_text'), '', '', null);
           return;
         }
+
+        const items = data.items;
+        _sftpLastGoodPath = path;
+        sftpSetTransferEnabled(true);
+
+        if (items.length === 0) {
+          _sftpSetSummary(__t('sftp_summary_empty').replace('{p}', path));
+          listContainer.innerHTML = _sftpNotice(__t('sftp_empty_title'), __t('sftp_empty_detail'), {
+            icon: _SFTP_ICON_FOLDER, color: 'var(--text-ter)', titleColor: 'var(--text-secondary)'
+          });
+          return;
+        }
+
+        const dirCount = items.filter(x => x.is_dir).length;
+        const fileCount = items.length - dirCount;
+        _sftpSetSummary(__t('sftp_summary')
+          .replace('{n}', String(items.length))
+          .replace('{d}', String(dirCount))
+          .replace('{f}', String(fileCount))
+          .replace('{p}', path));
 
         listContainer.innerHTML = items.map(item => {
           const isDir = item.is_dir;
           const icon = isDir ? '<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' : '<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>';
-          const clickHandler = isDir ? `onclick="sftpOpenDir('${esc(item.name)}')"` : '';
-          const actionBtn = isDir ?
-            `<button class="btn btn-o btn-xs" onclick="sftpOpenDir('${esc(item.name)}')" style="padding:3px 8px;font-size:10px">Abrir</button>` :
-            `<button class="btn btn-p btn-xs" onclick="sftpDownloadFile('${esc(item.name)}')" style="padding:3px 8px;font-size:10px" title="Descargar archivo"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M12 3v12m-5-5 5 5 5-5"/></svg> Descargar</button>`;
+          const nameArg = `decodeURIComponent('${_sftpArg(item.name)}')`;
+          const clickHandler = isDir ? `onclick="sftpOpenDir(${nameArg})"` : '';
+          const actionBtn = isDir
+            ? `<button class="btn btn-o btn-xs" onclick="sftpOpenDir(${nameArg})" style="padding:3px 8px;font-size:10px">${esc(__t('sftp_open'))}</button>`
+            : `<button class="btn btn-p btn-xs sftp-dl-btn" onclick="sftpDownloadFile(${nameArg})" style="padding:3px 8px;font-size:10px" title="${escAttr(__t('sftp_download'))}"${_sftpBlocked ? ' disabled' : ''}><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M12 3v12m-5-5 5 5 5-5"/></svg> ${esc(__t('sftp_download'))}</button>`;
 
           return `
             <div class="sftp-row ${isDir ? 'sftp-dir' : ''}" ${clickHandler}>
@@ -7343,20 +7767,19 @@
         }).join('');
 
       } catch (err) {
-        listContainer.innerHTML = `
-          <div style="padding:40px;text-align:center;color:var(--red)">
-            <div style="font-size:24px;margin-bottom:8px"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 3 10 18H2Z"/><path d="M12 9v4M12 17h.01"/></svg></div>
-            <b>Error SFTP:</b> ${esc(err.message)}
-          </div>
-        `;
-        toast('Error SFTP: ' + err.message, 'e');
+        // Red caída o respuesta ilegible: estado honesto, nunca un listado vacío de éxito.
+        _sftpClearList(__t('sftp_list_fail_d'));
+        sftpShowBanner('error', __t('sftp_err_api_title'), __t('sftp_err_api_text'), (err && err.message) ? String(err.message) : '', '', null);
+        toast(__t('sftp_err_api_title'), 'e');
       }
     }
 
+    function sftpRefresh() {
+      sftpLoadDir(_sftpCurrentPath || '/');
+    }
+
     function sftpOpenDir(dirName) {
-      let cur = _sftpCurrentPath.replace(/\/+$/, '');
-      const newPath = cur ? `${cur}/${dirName}` : `/${dirName}`;
-      sftpLoadDir(newPath);
+      sftpLoadDir(_sftpJoin(_sftpCurrentPath || '/', dirName));
     }
 
     function sftpNavUp() {
@@ -7372,11 +7795,21 @@
       if (!files || !files.length) return;
       const file = files[0];
       const devId = document.getElementById('term-dev')?.value;
-      if (!devId) { toast('Selecciona un dispositivo', 'w'); return; }
+      const input = document.getElementById('sftp-file-input');
+      const upBtn = document.getElementById('sftp-upload-btn');
 
-      toast(`Subiendo '${file.name}' (${_formatBytes(file.size)})...`, 'i');
+      if (!devId) { toast(__t('sftp_select_dev'), 'w'); if (input) input.value = ''; return; }
+      if (_sftpBlocked) { toast(__t('sftp_blocked_hint'), 'w'); if (input) input.value = ''; return; }
+      if (_sftpBusy) { toast(__t('sftp_busy'), 'w'); if (input) input.value = ''; return; }
+
+      const curPath = _sftpCurrentPath || '/';
+      const targetPath = _sftpNormPath(_sftpJoin(curPath, file.name));
+      _sftpBusy = true;
+      if (upBtn) upBtn.disabled = true;
+      sftpHideBanner();
+      _sftpProgress(__t('sftp_up_start').replace('{f}', file.name).replace('{s}', _formatBytes(file.size)));
+
       try {
-        const curPath = _sftpCurrentPath || '/';
         const res = await fetch(`${A}/sftp/${encodeURIComponent(devId)}/upload?remote_dir=${encodeURIComponent(curPath)}&filename=${encodeURIComponent(file.name)}`, {
           method: 'POST',
           headers: {
@@ -7386,17 +7819,31 @@
           body: file
         });
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.detail || 'Error al subir archivo');
+          // Sin 2xx no hay éxito: se muestra el `detail` literal del backend.
+          const body = await res.json().catch(() => null);
+          const detail = _detText(body, __t('sftp_up_fail'));
+          sftpApplyError(res.status, detail, { op: 'upload', path: targetPath });
+          toast(detail, 'e');
+          return;
         }
-        const data = await res.json();
-        toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> ${data.message || 'Archivo subido con éxito'}`, 's');
-        sftpLoadDir(_sftpCurrentPath);
+        const data = await res.json().catch(() => null);
+        if (!data || data.success !== true) {
+          const detail = _detText(data, __t('sftp_up_unconfirmed'));
+          sftpShowBanner('error', __t('sftp_up_unconfirmed_title'), detail, '', '', null);
+          toast(detail, 'e');
+          return;
+        }
+        toast(data.message || __t('sftp_up_ok'), 's');
+        await sftpLoadDir(curPath);
       } catch (err) {
-        toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Error en subida: ${err.message}`, 'e');
+        const msg = (err && err.message) ? String(err.message) : '';
+        sftpShowBanner('error', __t('sftp_err_api_title'), __t('sftp_err_api_text'), msg, '', null);
+        toast(`${__t('sftp_up_fail')}${msg ? ': ' + msg : ''}`, 'e');
       } finally {
-        const input = document.getElementById('sftp-file-input');
+        _sftpBusy = false;
+        _sftpProgressDone();
         if (input) input.value = '';
+        sftpSetTransferEnabled(!_sftpBlocked);
       }
     }
 
@@ -7409,35 +7856,67 @@
       }
     }
 
+    function _sftpFilenameFromCd(cd, fallback) {
+      if (cd) {
+        const star = /filename\*=UTF-8''([^;]+)/i.exec(cd);
+        if (star && star[1]) {
+          try { return decodeURIComponent(star[1].trim().replace(/^"|"$/g, '')); } catch (e) { /* usa el nombre del listado */ }
+        }
+        const plain = /filename="?([^";]+)"?/i.exec(cd);
+        if (plain && plain[1]) return plain[1].trim();
+      }
+      return fallback;
+    }
+
+    function _sftpSaveBlob(blob, name) {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        window.URL.revokeObjectURL(url);
+        if (a.parentNode) a.parentNode.removeChild(a);
+      }, 1000);
+    }
+
     async function sftpDownloadFile(filename) {
       const devId = document.getElementById('term-dev')?.value;
-      if (!devId) { toast('Selecciona un dispositivo', 'w'); return; }
+      if (!devId) { toast(__t('sftp_select_dev'), 'w'); return; }
+      if (_sftpBlocked) { toast(__t('sftp_blocked_hint'), 'w'); return; }
+      if (_sftpBusy) { toast(__t('sftp_busy'), 'w'); return; }
 
-      let cur = (_sftpCurrentPath || '/').replace(/\/+$/, '');
-      const fullPath = cur ? `${cur}/${filename}` : `/${filename}`;
+      const fullPath = _sftpNormPath(_sftpJoin(_sftpCurrentPath || '/', filename));
+      _sftpBusy = true;
+      sftpHideBanner();
+      _sftpProgress(__t('sftp_dl_start').replace('{f}', filename));
 
-      toast(`Descargando '${filename}'...`, 'i');
       try {
         const res = await fetch(`${A}/sftp/${encodeURIComponent(devId)}/download?remote_path=${encodeURIComponent(fullPath)}`, {
           headers: h()
         });
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.detail || 'Error en descarga');
+          // Cualquier código distinto de 200 es JSON con `detail`: no se guarda blob ni se finge descarga.
+          const body = await res.json().catch(() => null);
+          const detail = _detText(body, __t('sftp_dl_fail'));
+          sftpApplyError(res.status, detail, { op: 'download', path: fullPath });
+          toast(detail, 'e');
+          return;
         }
         const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> '${filename}' descargado exitosamente`, 's');
+        const name = _sftpFilenameFromCd(res.headers.get('Content-Disposition'), filename);
+        _sftpSaveBlob(blob, name);
+        toast(__t('sftp_dl_ok').replace('{f}', name), 's');
       } catch (err) {
-        toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Error descargando: ${err.message}`, 'e');
+        const msg = (err && err.message) ? String(err.message) : '';
+        sftpShowBanner('error', __t('sftp_err_api_title'), __t('sftp_err_api_text'), msg, '', null);
+        toast(`${__t('sftp_dl_fail')}${msg ? ': ' + msg : ''}`, 'e');
+      } finally {
+        _sftpBusy = false;
+        _sftpProgressDone();
+        sftpSetTransferEnabled(!_sftpBlocked);
       }
     }
 
