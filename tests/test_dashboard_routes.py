@@ -64,7 +64,7 @@ def test_dashboard_overview_keeps_real_status_and_actions():
     assert 'id="grid"' in html
     assert 'onclick="showAddDevicePanel()"' in html
     assert 'onclick="swView(\'topology\')"' in html
-    assert '/static/overview.css?v=2' in html
+    assert '/static/overview.css?v=3' in html
     css = client.get("/static/overview.css")
     assert css.status_code == 200
     assert "#v-dashboard .ops-hero" in css.text
