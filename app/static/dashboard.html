@@ -2523,7 +2523,8 @@
                 <label
                   style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px">Hostname
                   / ID</label>
-                <input id="inv-id" type="text" placeholder="ej: sw-core-01"
+                <!-- Si el ID ya existe (upsert 409→PUT), al salir del campo se precarga el grupo actual del equipo. -->
+                <input id="inv-id" type="text" placeholder="ej: sw-core-01" onblur="invPreloadGroup()"
                   style="width:100%;background:var(--bg);border:1px solid var(--border);padding:8px 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px;box-sizing:border-box">
               </div>
 
@@ -2564,6 +2565,26 @@
                     <option value="ros">MikroTik RouterOS</option>
                   </optgroup>
                 </select>
+              </div>
+
+              <!-- Grupo: se envía en POST/PUT /api/devices (DeviceCreate.group). El <select> se
+                   llena con GET /api/groups (la misma llamada de la vista Grupos); si no responde
+                   queda el aviso gris y texto libre. Vacío no bloquea el alta: es un aviso veraz. -->
+              <div>
+                <label
+                  style="display:block;font-size:10px;text-transform:uppercase;color:var(--text-muted);margin-bottom:4px"
+                  for="inv-group" data-i18n="inv_group">Grupo</label>
+                <select id="inv-group" onchange="invGroupChanged()"
+                  style="width:100%;background:var(--bg);border:1px solid var(--border);padding:8px 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px;box-sizing:border-box">
+                  <option value="">— Sin grupo —</option>
+                </select>
+                <input id="inv-group-text" type="text" placeholder="Nombre del grupo (texto libre)"
+                  oninput="invGroupChanged()"
+                  style="display:none;width:100%;background:var(--bg);border:1px solid var(--border);padding:8px 12px;border-radius:var(--radius-sm);color:var(--text);font-size:12px;box-sizing:border-box;margin-top:6px">
+                <div id="inv-group-note" style="display:none;font-size:10px;color:var(--text-ter);margin-top:6px"
+                  data-i18n="inv_group_unverified">Lista de grupos no verificable — escribe el grupo a mano</div>
+                <div id="inv-group-empty-note" style="display:none;font-size:10px;color:var(--orange);margin-top:6px"
+                  data-i18n="inv_group_empty_warn">Equipo sin grupo: los usuarios con scope no podrán operarlo</div>
               </div>
 
               <div>
@@ -3586,6 +3607,26 @@
       cmd_open_console: 'Abrir en consola'
     });
 
+    // Alta de equipo con grupo + estado recordado de vistas (Tarjeta 9B/9C)
+    Object.assign(I18N.en, {
+      inv_group: 'Group',
+      inv_group_none: '— No group —',
+      inv_group_manual_opt: 'Type group manually…',
+      inv_group_unverified: 'Group list not verifiable — type the group manually',
+      inv_group_empty_warn: 'Device without a group: users with scope will not be able to operate it',
+      inv_403_nocreate: '403 — device NOT created. Backend detail:',
+      rep_filters_restored: 'Filters restored from your last visit (per user). No report was run automatically — use “Consult last” or “Regenerate”.'
+    });
+    Object.assign(I18N.es, {
+      inv_group: 'Grupo',
+      inv_group_none: '— Sin grupo —',
+      inv_group_manual_opt: 'Escribir grupo a mano…',
+      inv_group_unverified: 'Lista de grupos no verificable — escribe el grupo a mano',
+      inv_group_empty_warn: 'Equipo sin grupo: los usuarios con scope no podrán operarlo',
+      inv_403_nocreate: '403 — el equipo NO se creó. Detail del backend:',
+      rep_filters_restored: 'Filtros restaurados de tu última visita (por usuario). No se lanzó ningún reporte automáticamente — usa «Consultar último» o «Regenerar».'
+    });
+
     function setLang(lang) {
       currentLang = lang;
       localStorage.setItem('np_lang', lang);
@@ -3930,8 +3971,40 @@
       const dd = document.getElementById('user-dd');
       if (dd) dd.classList.remove('open');
     });
+    // ── ESTADO RECORDADO DE VISTAS (por usuario) ──
+    // Filtros e IDs guardados en localStorage con prefijo por username, para no
+    // mezclar usuarios en un navegador compartido. JAMÁS se guardan datos sensibles
+    // (solo fechas, nombre de grupo, device_ids y site_id). Se limpian en logout()
+    // junto con np_token (logout y sessionExpired pasan por aquí).
+    function _npStateKey(key) {
+      const u = (currentUser && currentUser.username) || '';
+      return `np_u:${u}:${key}`;
+    }
+    function _npStateGet(key) {
+      try {
+        const raw = localStorage.getItem(_npStateKey(key));
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) { return null; }
+    }
+    function _npStateSet(key, value) {
+      try { localStorage.setItem(_npStateKey(key), JSON.stringify(value)); } catch (e) { }
+    }
+    function _npStateClear() {
+      const prefix = `np_u:${(currentUser && currentUser.username) || ''}:`;
+      try {
+        const borran = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith(prefix)) borran.push(k);
+        }
+        borran.forEach(k => localStorage.removeItem(k));
+      } catch (e) { }
+    }
     function logout() {
       stopRefresh();
+      _npStateClear(); // filtros recordados del usuario, junto con np_token
+      repState = null; // el estado en memoria no debe colarse al siguiente usuario
+      _invGroupsCache = null;
       t = ''; currentUser = null; localStorage.removeItem('np_token');
       if (window._rInt) { clearInterval(window._rInt); window._rInt = null }
       if (window._mInt) { clearInterval(window._mInt); window._mInt = null }
@@ -4467,6 +4540,7 @@
             port: i.port || 22,
             type: i.type || i.protocol || 'device',
             protocol: i.protocol || 'ssh',
+            group: i.group || null, // necesario para precargar el grupo en el alta (Tarjeta 9B/9C)
             tags: i.tags || []
           }));
         } else {
@@ -6566,6 +6640,92 @@
       fields.style.display = (sel && (sel.value === 'telnet' || sel.value === 'ssh')) ? 'flex' : 'none';
     }
 
+    // ── GRUPO EN EL ALTA (Tarjeta 9B/9C) ──
+    // El <select> del formulario "Nuevo Dispositivo" usa la MISMA llamada que la vista
+    // Grupos: GET /api/groups (200 para viewer con [{name, description, device_count}]).
+    // Si falla: opción vacía + aviso gris "lista no verificable" + texto libre.
+    // El grupo vacío NO bloquea el alta: solo avisa (los usuarios con scope no podrán operarlo).
+    let _invGroupsCache = null; // null = sin cargar; false = no verificable; array = nombres
+    function _invGroupEls() {
+      return {
+        sel: document.getElementById('inv-group'),
+        txt: document.getElementById('inv-group-text'),
+        note: document.getElementById('inv-group-note'),
+        empty: document.getElementById('inv-group-empty-note')
+      };
+    }
+    function _invGroupSetManual(txtVal) {
+      const els = _invGroupEls();
+      if (!els.sel) return;
+      els.sel.value = '__manual__';
+      if (els.txt) els.txt.value = txtVal || '';
+      invGroupChanged();
+    }
+    function invGroupChanged() {
+      const els = _invGroupEls();
+      if (!els.sel) return;
+      const manual = els.sel.value === '__manual__';
+      if (els.txt) els.txt.style.display = manual ? '' : 'none';
+      const val = manual ? ((els.txt && els.txt.value.trim()) || '') : els.sel.value;
+      if (els.empty) els.empty.style.display = val ? 'none' : '';
+    }
+    async function invRefreshGroups() {
+      const els = _invGroupEls();
+      if (!els.sel || _invGroupsCache) { invGroupChanged(); return; }
+      // Conservar lo que el operador ya escribió entre recargas de la vista.
+      const keepManual = els.sel.value === '__manual__';
+      const keepTxt = (els.txt && els.txt.value) || '';
+      const keepSel = els.sel.value || '';
+      try {
+        const r = await fetch(`${A}/groups`, { headers: h(), signal: AbortSignal.timeout(15000) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const groups = await r.json();
+        const names = (Array.isArray(groups) ? groups : []).map(g => g.name).filter(Boolean);
+        _invGroupsCache = names;
+        els.sel.innerHTML = `<option value="">${esc(__t('inv_group_none'))}</option>`
+          + names.map(n => `<option value="${escAttr(n)}">${esc(n)}</option>`).join('')
+          + `<option value="__manual__">${esc(__t('inv_group_manual_opt'))}</option>`;
+        if (els.txt) els.txt.style.display = 'none';
+        if (els.note) els.note.style.display = 'none';
+        if (keepManual && keepTxt.trim()) _invGroupSetManual(keepTxt);
+        else if (keepSel && names.includes(keepSel)) els.sel.value = keepSel;
+      } catch (e) {
+        _invGroupsCache = false; // lista de grupos no verificable: select vacío + texto libre
+        els.sel.innerHTML = `<option value="">${esc(__t('inv_group_none'))}</option>`
+          + `<option value="__manual__">${esc(__t('inv_group_manual_opt'))}</option>`;
+        if (els.txt) els.txt.style.display = '';
+        if (els.note) els.note.style.display = '';
+      }
+      invGroupChanged();
+    }
+    function invReadGroup(container) {
+      const get = id => (container.querySelector('#' + id) || document.getElementById(id));
+      const sel = get('inv-group');
+      const txt = get('inv-group-text');
+      if (!sel) return '';
+      const val = (sel.value === '__manual__') ? ((txt && txt.value.trim()) || '') : (sel.value || '').trim();
+      return val;
+    }
+    function invPreloadGroup() {
+      // El formulario es upsert (ID existente → 409 → PUT). Si el ID coincide con un
+      // equipo del inventario, precargamos su grupo actual para no descartarlo al actualizar.
+      const idEl = document.getElementById('inv-id');
+      if (!idEl || !idEl.value.trim()) return;
+      const d = devices.find(x => x && x.id === idEl.value.trim());
+      if (!d || !d.group) return;
+      const els = _invGroupEls();
+      if (!els.sel) return;
+      const has = Array.from(els.sel.options).some(o => o.value === d.group);
+      if (_invGroupsCache === false) _invGroupSetManual(d.group);
+      else if (has) { els.sel.value = d.group; invGroupChanged(); }
+      else if (_invGroupsCache === null) invRefreshGroups().then(() => {
+        const after = _invGroupEls();
+        if (after.sel && Array.from(after.sel.options).some(o => o.value === d.group)) { after.sel.value = d.group; invGroupChanged(); }
+        else _invGroupSetManual(d.group);
+      });
+      else _invGroupSetManual(d.group);
+    }
+
     async function addInventoryDevice(triggerEl) {
       const container = _invContainer(triggerEl);
       const getVal = (id, fallback = '') => {
@@ -6581,6 +6741,12 @@
         driver: driver,
         protocol: protocol
       };
+
+      // Grupo (DeviceCreate.group / DeviceUpdate.group ya lo aceptan en el backend).
+      // Vacío = alta sin grupo: aviso veraz (no bloquea), los usuarios con scope no podrán operarlo.
+      const groupVal = invReadGroup(container);
+      if (groupVal) data.group = groupVal;
+      else toast(`${__t('inv_group_empty_warn')}`, 'w');
 
       if (!data.id || !data.hostname) {
         toast('ID / Hostname e IP son obligatorios', 'error');
@@ -6638,6 +6804,11 @@
           const hostEl = container.querySelector('#inv-host') || document.getElementById('inv-host');
           if (idEl) idEl.value = '';
           if (hostEl) hostEl.value = '';
+          const gSel = container.querySelector('#inv-group') || document.getElementById('inv-group');
+          if (gSel) gSel.value = '';
+          const gTxt = container.querySelector('#inv-group-text') || document.getElementById('inv-group-text');
+          if (gTxt) gTxt.value = '';
+          invGroupChanged();
           const panel = document.getElementById('add-device-panel');
           if (panel) panel.style.display = 'none';
           setTimeout(() => { loadInventory(); loadDev(); }, 1000);
@@ -6646,6 +6817,12 @@
           let errDetail = d.detail || d.error || 'Error desconocido';
           if (Array.isArray(d.detail)) {
             errDetail = d.detail.map(e => `${e.loc ? e.loc.join('.') : ''}: ${e.msg}`).join(', ');
+          }
+          // 403 por scope: el detail literal del backend gana, y se dice claro que el
+          // equipo NO se creó (estado honesto, nunca "equipo añadido" ante un fallo).
+          if (r.status === 403) {
+            toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> ${__t('inv_403_nocreate')} ${esc(errDetail)}`, 'error');
+            return;
           }
           toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Error: ${errDetail}`, 'error');
         }
@@ -6656,6 +6833,7 @@
 
     async function loadInventory() {
       const el = document.getElementById('inv-list'); if (!el) return;
+      invRefreshGroups(); // <select> de Grupo del formulario "Nuevo Dispositivo" (falla → fallback)
       el.innerHTML = '<div class="sp" style="margin:20px auto"></div>';
       try {
         const r = await fetch(`${A}/devices`, { headers: h() });
@@ -8743,8 +8921,12 @@
         </div>
         <div id="rep-results"><div class="sp"></div></div>`;
 
-      // Al volver a la vista se re-ejecuta la última consulta; primera entrada: caché (404 honesto si no existe).
-      if (repState) {
+      // Estado recordado (por usuario, Tarjeta 9B/9C): al entrar se rellenan los
+      // filtros sin lanzar consulta automática — el operador decide si consulta
+      // (cached GET) o regenera (POST). Solo en la primera visita sin nada
+      // guardado se mantiene el comportamiento actual (consultar caché).
+      const guardado = _npStateGet('rep');
+      if (repState && repState.regenerate === false) {
         const dd = document.getElementById('rep-desde'), hh = document.getElementById('rep-hasta');
         if (dd) dd.value = _ymd(new Date(repState.desde));
         if (hh) hh.value = _ymd(new Date(repState.hasta));
@@ -8752,10 +8934,30 @@
         if (g) g.value = repState.group || '';
         const ds = document.getElementById('rep-devs');
         if (ds) Array.from(ds.options).forEach(o => { o.selected = (repState.device_ids || []).includes(o.value); });
-        await repApply(repState.regenerate === true);
+        await repApply(false);
+      } else if (guardado && typeof guardado === 'object') {
+        _repFillRestored(guardado);
+        const res = document.getElementById('rep-results');
+        if (res) res.innerHTML = repBanner(__t('rep_filters_restored'), false);
+      } else if (repState) {
+        // La última consulta fue Regenerar (POST): se rellenan filtros sin reproducir el POST.
+        _repFillRestored(repState);
+        const res = document.getElementById('rep-results');
+        if (res) res.innerHTML = repBanner(__t('rep_filters_restored'), false);
       } else {
         await repApply(false);
       }
+    }
+
+    // Rellena los filtros de Reportes desde un estado guardado; no dispara ninguna consulta.
+    function _repFillRestored(st) {
+      const dd = document.getElementById('rep-desde'), hh = document.getElementById('rep-hasta');
+      if (dd && st.desde) dd.value = _ymd(new Date(st.desde));
+      if (hh && st.hasta) hh.value = _ymd(new Date(st.hasta));
+      const g = document.getElementById('rep-group');
+      if (g && st.group && Array.from(g.options).some(o => o.value === st.group)) g.value = st.group;
+      const ds = document.getElementById('rep-devs');
+      if (ds) Array.from(ds.options).forEach(o => { o.selected = ((st.device_ids || []).includes(o.value)); });
     }
 
     function repPreset(days) {
@@ -8825,6 +9027,8 @@
         }
         const data = await r.json();
         repState = { ...p, regenerate: regenerate === true };
+        // Recordar filtros por usuario (sin regenerate flag: no es un dato, ni falta que hace).
+        _npStateSet('rep', { desde: p.desde, hasta: p.hasta, group: p.group || '', device_ids: p.device_ids || [] });
         repRender(el, data, regenerate === true);
       } catch (e) {
         // Red caída / timeout: banner gris "no verificable", nunca un 0 % decorativo.
@@ -9264,6 +9468,10 @@
         return;
       }
       el.innerHTML = sites.map(s => _sitesCard(s)).join('');
+      // Estado recordado: si el operador dejó un site expandido se reexpande;
+      // los datos se re-cargan como hoy (fetch fresca en siteToggle).
+      const lastSite = _npStateGet('site');
+      if (lastSite && sites.some(s => String(s.site_id) === String(lastSite))) siteToggle(String(lastSite), true);
     }
 
     // Estados por device (§9.3, exactos). current=false NUNCA verde.
@@ -9316,7 +9524,12 @@
       const box = document.getElementById(`sites-devs-${siteId}`);
       const btn = document.getElementById(`sites-btn-${siteId}`);
       if (!box) return;
-      if (!force && box.style.display !== 'none') { box.style.display = 'none'; return; }
+      if (!force && box.style.display !== 'none') {
+        box.style.display = 'none';
+        _npStateSet('site', ''); // ningún site expandido
+        return;
+      }
+      _npStateSet('site', String(siteId || '')); // se reexpande al volver (Tarjeta 9B/9C)
       box.style.display = 'block';
       box.innerHTML = '<div class="sp" style="margin:12px auto"></div>';
       let body = null, r;
