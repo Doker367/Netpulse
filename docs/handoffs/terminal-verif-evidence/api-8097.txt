@@ -1,0 +1,39 @@
+INFO:     Started server process [12998]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8097 (Press CTRL+C to quit)
+INFO:     127.0.0.1:56983 - "WebSocket /ws/terminal/cisco-core-01?token=REDACTED" [accepted]
+INFO:     connection open
+INFO:paramiko.transport:Connected (version 2.0, client OpenSSH_9.0)
+INFO:paramiko.transport:Authentication (password) successful!
+INFO:app.routers.terminal:[terminal] sesión cisco-core-01 cerrada (eof, host=127.0.0.1:2222, user=admin)
+INFO:     127.0.0.1:56985 - "WebSocket /ws/terminal/cisco-core-01?token=REDACTED&fmt=json" [accepted]
+INFO:     connection open
+INFO:paramiko.transport:Connected (version 2.0, client OpenSSH_9.0)
+INFO:paramiko.transport:Authentication (password) successful!
+INFO:app.routers.terminal:[terminal] sesión cisco-core-01 cerrada (operator, host=127.0.0.1:2222, user=admin)
+INFO:     127.0.0.1:56987 - "WebSocket /ws/terminal/inexistente-7e?token=REDACTED&fmt=json" [accepted]
+INFO:     connection open
+WARNING:app.routers.terminal:[terminal] dispositivo no encontrado: inexistente-7e
+INFO:     127.0.0.1:56988 - "WebSocket /ws/terminal/cisco-core-01?token=REDACTED&fmt=json" 403
+INFO:     connection rejected (403 Forbidden)
+INFO:     127.0.0.1:56989 - "WebSocket /ws/terminal/mikrotik-edge-01?token=REDACTED&fmt=json" [accepted]
+INFO:     connection open
+INFO:paramiko.transport:Connected (version 2.0, client ROSSSH)
+WARNING:app.routers.terminal:[terminal] fallo conectando mikrotik-edge-01 (127.0.0.1:2225, driver=ros, api_ignored=None): No existing session
+THREAD_SNAPSHOT [('MainThread', 'threading', '_MainThread'), ('AnyIO worker thread', 'anyio._backends._asyncio', 'WorkerThread'), ('uvloop_0', 'threading', 'Thread'), ('Thread-7', 'paramiko.transport', 'Transport')]
+INFO:     127.0.0.1:57000 - "WebSocket /ws/terminal/cisco-core-01?token=REDACTED&fmt=json" [accepted]
+INFO:     connection open
+INFO:paramiko.transport:Connected (version 2.0, client OpenSSH_9.0)
+INFO:paramiko.transport:Authentication (password) successful!
+THREAD_SNAPSHOT [('MainThread', 'threading', '_MainThread'), ('AnyIO worker thread', 'anyio._backends._asyncio', 'WorkerThread'), ('uvloop_0', 'threading', 'Thread'), ('Thread-9', 'paramiko.transport', 'Transport')]
+INFO:app.routers.terminal:[terminal] sesión cisco-core-01 cerrada (eof, host=127.0.0.1:2222, user=admin)
+THREAD_SNAPSHOT [('MainThread', 'threading', '_MainThread'), ('AnyIO worker thread', 'anyio._backends._asyncio', 'WorkerThread'), ('uvloop_0', 'threading', 'Thread')]
+INFO:     127.0.0.1:57002 - "WebSocket /ws/terminal/inexistente-post-abort?token=REDACTED&fmt=json" [accepted]
+INFO:     connection open
+WARNING:app.routers.terminal:[terminal] dispositivo no encontrado: inexistente-post-abort
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:app.services.collectors.syslog_svc:Colector syslog detenido
+INFO:     Application shutdown complete.
+INFO:     Finished server process [12998]

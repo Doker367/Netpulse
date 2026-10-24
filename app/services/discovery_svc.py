@@ -33,7 +33,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeout
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from app.services import inventory_svc, napalm_svc
 
@@ -607,11 +607,18 @@ def import_candidates(
     group: Optional[str] = None,
     tipo: Any = None,
     driver: Any = None,
+    authorize: Optional[Callable[[Optional[str]], Optional[str]]] = None,
 ) -> dict[str, Any]:
     """Registra candidatos del último escaneo usando ``inventory_svc.add_device``.
 
     Es la misma función de registro que ``POST /api/devices``. Un fallo por
     candidato queda en ``fallidos``; nunca aborta el lote ni devuelve 500.
+
+    ``authorize`` recibe el grupo destino real (el que se escribirá en el
+    inventario) y devuelve el motivo de rechazo o ``None``. Los rechazados no
+    se registran y quedan en ``rechazados`` con ``{device_id, error}`` (el
+    ``device_id`` es el que se habría asignado; todavía no existe). Sin
+    ``authorize`` el comportamiento es el histórico.
     """
     last = get_last_scan()
     by_ip = {c["ip"]: c for c in (last or {}).get("candidatos", [])}
@@ -626,6 +633,7 @@ def import_candidates(
     created: list[dict[str, Any]] = []
     already: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
+    rejected: list[dict[str, Any]] = []
     seen: set[str] = set()
 
     for raw_ip in ips:
@@ -654,6 +662,24 @@ def import_candidates(
             })
             continue
 
+        name = candidate.get("nombre_sugerido") or ""
+        base = _slugify(name) or f"dev-{ip.replace('.', '-').replace(':', '-')}"
+        new_id = base
+        suffix = 2
+        while new_id in used_ids:
+            new_id = f"{base}-{suffix}"
+            suffix += 1
+
+        # El grupo destino es exactamente el que se escribirá en el inventario
+        # (``body.group``); un dispositivo sin grupo no es operable por un
+        # usuario restringido. Se valida antes de mirar driver o registrar nada.
+        if authorize is not None:
+            denial = authorize(group)
+            if denial:
+                rejected.append({"device_id": new_id, "ip": ip, "error": denial})
+                used_ids.add(new_id)
+                continue
+
         chosen_driver = fixed_driver or _normalize_driver(candidate.get("plataforma_sugerida"))
         if driver_was_given and not fixed_driver:
             failed.append({
@@ -667,14 +693,6 @@ def import_candidates(
                 "motivo": "Plataforma no identificada. Indica el driver manualmente para importar.",
             })
             continue
-
-        name = candidate.get("nombre_sugerido") or ""
-        base = _slugify(name) or f"dev-{ip.replace('.', '-').replace(':', '-')}"
-        new_id = base
-        suffix = 2
-        while new_id in used_ids:
-            new_id = f"{base}-{suffix}"
-            suffix += 1
 
         payload = {
             "id": new_id,
@@ -723,8 +741,9 @@ def import_candidates(
         "creados": created,
         "ya_existian": already,
         "fallidos": failed,
+        "rechazados": rejected,
         "resumen": {
-            "solicitados": len(created) + len(already) + len(failed),
+            "solicitados": len(created) + len(already) + len(failed) + len(rejected),
             "creados": len(created),
             "ya_existian": len(already),
             "fallidos": len(failed),

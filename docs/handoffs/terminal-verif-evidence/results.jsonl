@@ -1,0 +1,29 @@
+{"case": "login-8097", "real": {"http": 200, "token_obtenido": true}}
+{"case": "legacy", "real": "Conectando a 127.0.0.1:2222 como admin...\r\n"}
+{"case": "legacy-banner", "real": "Welcome to Alpine!\r\n\r\nThe Alpine Wiki contains a large amount of how-to guides and general\r\ninformation about administrating Alpine systems.\r\nSee <http://wiki.alpinelinux.org/>.\r\n\r\nYou can setup the system with the command: setup-alpine\r\n\r\nYou may change this message by editing /etc/motd.\r\n\r\n"}
+{"case": "legacy-banner", "real": "\r\nHello, this is FRRouting (version 8.4_git).\r\nCopyright 1996-2005 Kunihiro Ishiguro, et al.\r\n\r\ncisco-core-01# "}
+{"case": "legacy-command-response", "real": "\r\ncisco-core-01# "}
+{"case": "json", "real": {"type": "connected", "device": "cisco-core-01", "host": "127.0.0.1", "port": 2222, "user": "admin"}}
+{"case": "json-banner", "real": {"type": "output", "data": "Welcome to Alpine!\r\n\r\nThe Alpine Wiki contains a large amount of how-to guides and general\r\ninformation about administrating Alpine systems.\r\nSee <http://wiki.alpinelinux.org/>.\r\n\r\nYou can setup the system with the command: setup-alpine\r\n\r\nYou may change this message by editing /etc/motd.\r\n\r\n"}}
+{"case": "json-banner", "real": {"type": "output", "data": "\r\nHello, this is FRRouting (version 8.4_git).\r\nCopyright 1996-2005 Kunihiro Ishiguro, et al.\r\n\r\ncisco-core-01# "}}
+{"case": "json", "real": {"type": "pong", "ts": 1792863284.231436}}
+{"case": "json", "real": {"type": "output", "data": "show version\r\nFRRouting 8.4_git (cisco-core-01) on Linux(6.8.0-117-generic).\r\nCopyright 1996-2005 Kunihiro Ishiguro, et al.\r\nconfigured with:\r\n    '--prefix=/usr' '--sbindir=/usr/lib/frr' '--sysconfdir=/etc/frr' '--libdir=/usr/lib' '--localstatedir=/var/run/frr' '--enable-rpki' '--enable-vtysh' '--enable-multipath=64' '--enable-vty-group=frrvty' '--enable-user=frr' '--enable-group=frr' '--enable-pcre2posix' 'CC=gcc' 'CXX=g++'\r\ncisco-core-01# "}}
+{"case": "operator-close", "real": {"type": "closed", "code": "operator", "reason": "cerrado por el operador"}}
+{"case": "not-found", "real": {"type": "error", "code": "device_not_found", "detail": "Dispositivo 'inexistente-7e' no encontrado."}}
+{"case": "not-found", "real": {"type": "closed", "code": "device_not_found", "reason": "equipo no encontrado"}}
+{"case": "invalid-token", "real": {"exception": "InvalidStatus", "detail": "server rejected WebSocket connection: HTTP 403", "close_code": null}}
+{"case": "mikrotik", "real": {"type": "error", "code": "ssh_connect", "detail": "No se pudo conectar a mikrotik-edge-01 (127.0.0.1:2225): No existing session"}}
+{"case": "mikrotik", "real": {"type": "closed", "code": "unreachable", "reason": "equipo inalcanzable"}}
+{"case": "abrupt", "real": {"type": "connected", "device": "cisco-core-01", "host": "127.0.0.1", "port": 2222, "user": "admin"}}
+{"case": "abrupt", "real": "transport.abort sin close frame; snapshots antes/durante/después"}
+{"case": "post-abort", "real": {"type": "error", "code": "device_not_found", "detail": "Dispositivo 'inexistente-post-abort' no encontrado."}}
+{"case": "post-abort", "real": {"type": "closed", "code": "device_not_found", "reason": "equipo no encontrado"}}
+{"case": "login-8098", "real": {"http": 200, "token_obtenido": true}}
+{"case": "idle", "real": {"type": "connected", "device": "cisco-core-01", "host": "127.0.0.1", "port": 2222, "user": "admin"}}
+{"case": "idle", "real": {"type": "output", "data": "Welcome to Alpine!\r\n\r\nThe Alpine Wiki contains a large amount of how-to guides and general\r\ninformation about administrating Alpine systems.\r\nSee <http://wiki.alpinelinux.org/>.\r\n\r\nYou can setup the system with the command: setup-alpine\r\n\r\nYou may change this message by editing /etc/motd.\r\n\r\n"}}
+{"case": "idle", "real": {"type": "output", "data": "\r\nHello, this is FRRouting (version 8.4_git).\r\nCopyright 1996-2005 Kunihiro Ishiguro, et al.\r\n\r\ncisco-core-01# "}}
+{"case": "idle", "real": {"type": "closed", "code": "idle", "reason": "timeout de inactividad"}}
+{"case": "idle-duration", "real": 3.466}
+{"case": "process-cleanup", "real": {"pid": 12998, "returncode": -15}}
+{"case": "process-cleanup", "real": {"pid": 13015, "returncode": -15}}
+{"case": "config-cleanup", "real": {"/Users/doker/np-w7v/config/users.yaml": false, "/Users/doker/np-w7v/config/devices.yaml": false}}

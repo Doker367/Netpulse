@@ -1,0 +1,14 @@
+INFO:     Started server process [13015]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8098 (Press CTRL+C to quit)
+INFO:     127.0.0.1:57014 - "WebSocket /ws/terminal/cisco-core-01?token=REDACTED&fmt=json" [accepted]
+INFO:     connection open
+INFO:paramiko.transport:Connected (version 2.0, client OpenSSH_9.0)
+INFO:paramiko.transport:Authentication (password) successful!
+INFO:app.routers.terminal:[terminal] sesión cisco-core-01 cerrada (idle, host=127.0.0.1:2222, user=admin)
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:app.services.collectors.syslog_svc:Colector syslog detenido
+INFO:     Application shutdown complete.
+INFO:     Finished server process [13015]

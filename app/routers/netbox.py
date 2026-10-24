@@ -3,10 +3,19 @@
 Endpoints para consultar y sincronizar el inventario con NetBox.
 
 Todos los endpoints requieren rol **admin**.
-Si NetBox no está disponible, devuelven 503.
+Si NetBox no está configurado o no está disponible, devuelven 503 con un
+``detail`` en español que explica la causa.
+
+Endpoints de esta tarjeta (contrato completo en ``docs/handoffs/netbox-ui.md``):
+
+- ``GET  /api/netbox/status`` → checklist previo a sincronizar (no contacta NetBox).
+- ``POST /api/netbox/sync``   → importa dispositivos y devuelve un resumen estable.
 """
 
+import os
+import tempfile
 from typing import Optional
+from urllib.parse import urlparse, urlunparse
 
 import httpx
 import yaml
@@ -21,6 +30,7 @@ from app.core.settings import (
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import requires_role
 from app.models.schemas import UserRole
+from app.services.inventory_svc import invalidate_cache
 
 router = APIRouter(
     prefix="/api/netbox",
@@ -28,7 +38,80 @@ router = APIRouter(
     dependencies=[Depends(JWTBearer()), Depends(requires_role(UserRole.ADMIN))],
 )
 
-# ── Helpers ───────────────────────────────────────────────────
+# ── Errores estables ─────────────────────────────────────────
+
+#: ``detail`` literal cuando faltan URL o token. La UI puede compararlo.
+NETBOX_SIN_CONFIGURAR = (
+    "NetBox no configurado: define NETBOX_URL y NETBOX_TOKEN "
+    "(o crea config/.netbox_token)"
+)
+
+
+def _netbox_configured() -> bool:
+    """¿Hay URL y token utilizables? No contacta con NetBox."""
+    return bool((NETBOX_URL or "").strip() and (NETBOX_TOKEN or "").strip())
+
+
+def _require_netbox_configured() -> None:
+    """Aborta con 503 y un ``detail`` accionable si falta configuración."""
+    if not _netbox_configured():
+        raise HTTPException(status_code=503, detail=NETBOX_SIN_CONFIGURAR)
+
+
+def _short_cause(exc: Exception) -> str:
+    """Causa corta en español para un fallo de red/HTTP (sin traceback)."""
+    if isinstance(exc, httpx.TimeoutException):
+        return "tiempo de espera agotado"
+    text = str(exc).lower()
+    if "refused" in text:
+        return "conexión rechazada"
+    if "nodename" in text or "name or service" in text or "name resolution" in text:
+        return "host no resuelto"
+    if "unreachable" in text:
+        return "host no alcanzable"
+    if "certificate" in text or "ssl" in text:
+        return "error TLS"
+    message = str(exc).strip() or exc.__class__.__name__
+    return message[:120]
+
+
+def _netbox_unavailable(exc: Exception) -> HTTPException:
+    return HTTPException(
+        status_code=503,
+        detail=f"NetBox no disponible: {_short_cause(exc)}",
+    )
+
+
+def _netbox_status_error(exc: httpx.HTTPStatusError, prefix: str = "") -> HTTPException:
+    """Traduce un error HTTP de NetBox.
+
+    Un 5xx significa que NetBox está caído o mal: se devuelve 503 y no el
+    código crudo, para que la UI no lo confunda con un error del inventario.
+    Los 4xx (token inválido, permiso) se conservan: son accionables tal cual.
+    """
+    code = exc.response.status_code
+    if code >= 500:
+        return HTTPException(
+            status_code=503,
+            detail=f"NetBox no disponible: error {code} de NetBox",
+        )
+    return HTTPException(
+        status_code=code,
+        detail=f"{prefix}Error de NetBox: {exc.response.text[:300]}",
+    )
+
+
+def _masked_netbox_url(url: str) -> str:
+    """URL de NetBox sin credenciales embebidas (usuario/contraseña)."""
+    if not url:
+        return ""
+    parsed = urlparse(url)
+    if parsed.username is None and parsed.password is None:
+        return url
+    host = parsed.hostname or ""
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+    return urlunparse(parsed._replace(netloc=f"***@{host}"))
 
 
 def _netbox_headers() -> dict:
@@ -49,15 +132,9 @@ async def _netbox_get(path: str, params: dict | None = None) -> dict:
             resp.raise_for_status()
             return resp.json()
     except httpx.HTTPStatusError as e:
-        raise HTTPException(
-            status_code=e.response.status_code,
-            detail=f"Error de NetBox: {e.response.text[:300]}",
-        )
-    except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout):
-        raise HTTPException(
-            status_code=503,
-            detail="NetBox no está disponible",
-        )
+        raise _netbox_status_error(e)
+    except httpx.HTTPError as e:
+        raise _netbox_unavailable(e)
 
 
 async def _netbox_paginated(path: str, params: dict | None = None) -> list[dict]:
@@ -77,15 +154,9 @@ async def _netbox_paginated(path: str, params: dict | None = None) -> list[dict]
                 url = data.get("next")
                 merged_params = {}  # next URL ya incluye params
             except httpx.HTTPStatusError as e:
-                raise HTTPException(
-                    status_code=e.response.status_code,
-                    detail=f"Error de NetBox: {e.response.text[:300]}",
-                )
-            except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout):
-                raise HTTPException(
-                    status_code=503,
-                    detail="NetBox no está disponible",
-                )
+                raise _netbox_status_error(e)
+            except httpx.HTTPError as e:
+                raise _netbox_unavailable(e)
     return all_results
 
 
@@ -100,15 +171,9 @@ async def _netbox_post(path: str, body: dict) -> dict:
             resp.raise_for_status()
             return resp.json()
     except httpx.HTTPStatusError as e:
-        raise HTTPException(
-            status_code=e.response.status_code,
-            detail=f"Error de NetBox al crear: {e.response.text[:300]}",
-        )
-    except (httpx.ConnectError, httpx.TimeoutException, httpx.ConnectTimeout):
-        raise HTTPException(
-            status_code=503,
-            detail="NetBox no está disponible",
-        )
+        raise _netbox_status_error(e, prefix="al crear: ")
+    except httpx.HTTPError as e:
+        raise _netbox_unavailable(e)
 
 
 # ── Devices ───────────────────────────────────────────────────
@@ -279,6 +344,45 @@ async def list_vlans():
     ]
 
 
+# ── Estado / checklist ────────────────────────────────────────
+
+_STATUS_ALCANCE = (
+    "Dispositivos de NetBox → devices.yaml. Campos: id local 'netbox-<id>', "
+    "hostname (primary_ip sin máscara), driver (fabricante/modelo), type (rol), "
+    "tags (rol y site), description (comments), netbox_id, netbox_name y "
+    "netbox_url. Solo se importan dispositivos con primary_ip."
+)
+
+_STATUS_NO_HACE = [
+    "no borra dispositivos del inventario local (los equipos que no están en NetBox se conservan)",
+    "no sobrescribe credenciales locales (username, password, enable_password)",
+    "no cambia el id local de un equipo existente (solo lo asigna al crear)",
+    "no sobrescribe el puerto de un equipo ya existente (solo fija 22 al crear)",
+    "no escribe ni modifica nada en NetBox (para eso existe POST /api/netbox/sync/push)",
+    "no importa sites, racks, VLANs, prefijos ni direcciones IP (solo dispositivos)",
+]
+
+
+@router.get("/status")
+async def netbox_status():
+    """Checklist previo a sincronizar. **No contacta con NetBox.**
+
+    Devuelve si hay URL y token, la URL enmascarada y, sobre todo, qué hace y
+    qué no hace la sincronización. Un NetBox no configurado no es un error de
+    este endpoint: es ``configurado: false`` con un mensaje accionable.
+    """
+    configurado = _netbox_configured()
+    return {
+        "configurado": configurado,
+        "url_enmascarada": _masked_netbox_url(NETBOX_URL),
+        "tiene_token": bool((NETBOX_TOKEN or "").strip()),
+        "alcance": _STATUS_ALCANCE,
+        "no_hace": list(_STATUS_NO_HACE),
+        "sync_endpoint": "/api/netbox/sync",
+        "mensaje": "" if configurado else NETBOX_SIN_CONFIGURAR,
+    }
+
+
 # ── Sync ──────────────────────────────────────────────────────
 
 
@@ -290,65 +394,191 @@ def _read_devices_yaml() -> dict:
         return yaml.safe_load(f) or {"devices": [], "options": {}}
 
 
-def _write_devices_yaml(data: dict):
-    """Escribe el diccionario completo a devices.yaml."""
+def _write_devices_yaml(data: dict) -> None:
+    """Escribe devices.yaml de forma atómica (tmp + ``os.replace``).
+
+    Un fallo de escritura deja intacto el archivo anterior: nunca queda un
+    YAML a medias.
+    """
     DEVICES_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(DEVICES_FILE, "w", encoding="utf-8") as f:
-        yaml.dump(data, f, default_flow_style=False, allow_unicode=True)
+    fd, tmp_path = tempfile.mkstemp(dir=str(DEVICES_FILE.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            yaml.safe_dump(data, f, default_flow_style=False, allow_unicode=True)
+        os.replace(tmp_path, DEVICES_FILE)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+    finally:
+        invalidate_cache()
+
+
+def _build_local_entry(nb_dev: dict) -> dict:
+    """Convierte un dispositivo de NetBox en la entrada de devices.yaml."""
+    dev_name = nb_dev.get("name") or f"netbox-{nb_dev['id']}"
+    dev_id = f"netbox-{nb_dev['id']}"
+    return {
+        "id": dev_id,
+        "hostname": _extract_ip(nb_dev),
+        "port": 22,
+        "driver": _map_device_type_to_driver(nb_dev),
+        "type": _map_role_to_type(nb_dev),
+        "tags": _build_tags(nb_dev),
+        "description": nb_dev.get("comments") or "",
+        "netbox_id": nb_dev["id"],
+        "netbox_name": dev_name,
+        "netbox_url": f"{NETBOX_URL}/dcim/devices/{nb_dev['id']}/",
+    }
 
 
 @router.post("/sync")
 async def sync_from_netbox():
-    """Sincroniza desde NetBox → devices.yaml local.
+    """Sincroniza desde NetBox → devices.yaml local y devuelve un resumen.
 
-    NetBox es la fuente de verdad. Los dispositivos de NetBox se
-    reflejan en el inventario local.
+    NetBox es la fuente de verdad para los campos importados. Garantías:
+
+    - **Nunca borra** dispositivos locales: los que no están en NetBox se
+      conservan tal cual.
+    - **No toca credenciales** locales ni el puerto de un equipo existente.
+    - Los equipos de NetBox **sin primary_ip se saltan** con motivo: no se
+      inventa ``127.0.0.1``.
+    - Listas ordenadas por ``device_id`` (respuesta determinista).
+    - Escritura atómica; si falla, el inventario anterior queda intacto.
 
     Returns:
-        dict con contadores: ``{created: N, updated: N, skipped: N}``.
+        ``{status, solicitados, creados, actualizados, sin_cambios, saltados,
+        errores, inventario_total, netbox_total}``. Se mantienen además los
+        contadores legados ``created``/``updated``/``skipped`` para la UI
+        actual.
     """
+    _require_netbox_configured()
+
     netbox_devices = await _netbox_paginated("/dcim/devices/")
 
-    data = _read_devices_yaml()
-    existing = {d["id"]: d for d in data.get("devices", [])}
+    try:
+        data = _read_devices_yaml()
+    except (yaml.YAMLError, OSError) as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo leer el inventario local: {_short_cause(e)}",
+        )
 
-    created = 0
-    updated = 0
-    skipped = 0
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo leer el inventario local: devices.yaml no contiene un objeto",
+        )
+
+    local_devices = data.get("devices") or []
+    if not isinstance(local_devices, list):
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo leer el inventario local: 'devices' no es una lista",
+        )
+
+    existing = {
+        d["id"]: d
+        for d in local_devices
+        if isinstance(d, dict) and isinstance(d.get("id"), str) and d.get("id")
+    }
+
+    creados: list[str] = []
+    actualizados: list[str] = []
+    saltados: list[dict] = []
+    errores: list[dict] = []
+    sin_cambios = 0
 
     for nb_dev in netbox_devices:
-        dev_name = nb_dev.get("name") or f"netbox-{nb_dev['id']}"
-        dev_id = f"netbox-{nb_dev['id']}"
+        raw_id = nb_dev.get("id") if isinstance(nb_dev, dict) else None
+        dev_id = f"netbox-{raw_id}" if raw_id is not None else "netbox-?"
 
-        # Construir entrada local
-        local_entry = {
-            "id": dev_id,
-            "hostname": _extract_ip(nb_dev),
-            "port": 22,
-            "driver": _map_device_type_to_driver(nb_dev),
-            "type": _map_role_to_type(nb_dev),
-            "tags": _build_tags(nb_dev),
-            "description": nb_dev.get("comments") or "",
-            "netbox_id": nb_dev["id"],
-            "netbox_name": dev_name,
-            "netbox_url": f"{NETBOX_URL}/dcim/devices/{nb_dev['id']}/",
-        }
+        if not isinstance(nb_dev, dict):
+            errores.append({
+                "device_id": dev_id,
+                "detalle": "respuesta de NetBox inválida: el dispositivo no es un objeto",
+            })
+            continue
 
-        if dev_name in existing or dev_id in existing:
-            # Update existing
-            key = dev_name if dev_name in existing else dev_id
-            existing_device = existing[key]
-            for k, v in local_entry.items():
-                existing_device[k] = v
-            updated += 1
-        else:
+        primary_ip = nb_dev.get("primary_ip")
+        if not (isinstance(primary_ip, dict) and primary_ip.get("address")):
+            saltados.append({
+                "device_id": dev_id,
+                "motivo": "sin primary_ip en NetBox: no hay dirección de gestión para monitorizar",
+            })
+            continue
+
+        try:
+            local_entry = _build_local_entry(nb_dev)
+        except (KeyError, TypeError, AttributeError, ValueError) as e:
+            errores.append({
+                "device_id": dev_id,
+                "detalle": f"datos incompletos en NetBox: {e}",
+            })
+            continue
+
+        dev_name = local_entry["netbox_name"]
+        target = existing.get(dev_name) or existing.get(dev_id)
+
+        if target is None:
             existing[dev_id] = local_entry
-            created += 1
+            local_devices.append(local_entry)
+            creados.append(dev_id)
+            continue
 
-    data["devices"] = list(existing.values())
-    _write_devices_yaml(data)
+        # Actualización: solo campos importados; el puerto y el id local se
+        # respetan (cambiar el id rompería credenciales y referencias).
+        changed = False
+        for key, value in local_entry.items():
+            if key == "id" and target.get("id"):
+                continue
+            if key == "port":
+                if not target.get("port"):
+                    target["port"] = value
+                    changed = True
+                continue
+            if target.get(key) != value:
+                target[key] = value
+                changed = True
 
-    return {"created": created, "updated": updated, "skipped": skipped}
+        if changed:
+            actualizados.append(target.get("id") or dev_id)
+        else:
+            sin_cambios += 1
+
+    if creados or actualizados:
+        data["devices"] = local_devices
+        try:
+            _write_devices_yaml(data)
+        except OSError as e:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "No se pudo escribir el inventario local: "
+                    f"{_short_cause(e)}. No se aplicó ningún cambio."
+                ),
+            )
+
+    status = "partial" if (saltados or errores) else "ok"
+
+    return {
+        "status": status,
+        "solicitados": len(netbox_devices),
+        "creados": sorted(creados),
+        "actualizados": sorted(actualizados),
+        "sin_cambios": sin_cambios,
+        "saltados": sorted(saltados, key=lambda item: item["device_id"]),
+        "errores": sorted(errores, key=lambda item: item["device_id"]),
+        "inventario_total": len(local_devices),
+        "netbox_total": len(netbox_devices),
+        # Compatibilidad con la UI actual (dashboard.html): contadores legados.
+        "created": len(creados),
+        "updated": len(actualizados),
+        "skipped": len(saltados),
+    }
+
 
 
 @router.post("/sync/push")
