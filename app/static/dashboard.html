@@ -2289,6 +2289,7 @@
           <h2 style="font-size:18px;font-weight:600" data-i18n="view_sites">Sitios remotos</h2>
           <button class="btn btn-o btn-sm" onclick="loadSites()" data-i18n="btn_refresh"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg> Refresh</button>
         </div>
+        <div style="font-size:11px;color:var(--text-ter);margin:-12px 0 16px" data-i18n="help_sites">Muestra lo que mide el colector del sitio remoto — no es comparable con el sondeo central del Overview.</div>
         <div id="sites-content">
           <div class="empty"><div class="sp"></div></div>
         </div>
@@ -2484,6 +2485,7 @@
           <h2 style="font-size:18px;font-weight:600" data-i18n="view_reports">Reportes SLA</h2>
           <button class="btn btn-o btn-sm" onclick="loadReports()" data-i18n="btn_refresh"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg> Refresh</button>
         </div>
+        <div style="font-size:11px;color:var(--text-ter);margin:-12px 0 16px" data-i18n="help_reports">El SLA se calcula solo con las muestras observadas en tu ventana; la cobertura parcial y los huecos se muestran tal cual, nunca se interpolan.</div>
         <div id="rep-content">
           <div class="sp" style="margin:20px auto"></div>
         </div>
@@ -2666,6 +2668,7 @@
           <h2 style="font-size:16px;font-weight:600" data-i18n="view_retention"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg> Retención y housekeeping</h2>
           <button class="btn btn-o btn-sm" onclick="loadRetention()" data-i18n="btn_refresh"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg> Refresh</button>
         </div>
+        <div style="font-size:11px;color:var(--text-ter);margin:-12px 0 16px" data-i18n="help_retention">Muestra qué se guarda: auditoría y backups locales. La purga requiere antes una simulación — en la previsualización no se borra nada.</div>
         <div id="ret-content">
           <div class="empty"><div class="sp"></div></div>
         </div>
@@ -2676,6 +2679,7 @@
           <h2 style="font-size:16px;font-weight:600" data-i18n="view_admin"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg> Administración</h2>
           <button class="btn btn-o btn-sm" onclick="loadUsers()" aria-label="Actualizar"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></button>
         </div>
+        <div style="font-size:11px;color:var(--text-ter);margin:-12px 0 16px" data-i18n="help_scopes">El scope limita los grupos/sitios que puede ver un usuario; aplica en el próximo login del usuario, no sobre una sesión activa.</div>
         <div id="admin-content">
           <div class="empty">
             <div class="sp"></div>
@@ -3148,6 +3152,28 @@
       nb_sync_confirm_title: 'Confirm NetBox → inventory sync',
       nb_sync_run: 'Run sync', nb_cancel: 'Cancel', nb_sync_running: 'Synchronizing… this can take a while',
       nb_count_created: 'created', nb_count_updated: 'updated', nb_count_skipped: 'skipped',
+      nb_what_title: 'What is NetBox?',
+      nb_what_text: 'NetBox is the external source-of-truth inventory catalog of the network: which devices exist, where they are and which management IP they use. The sync imports those devices into NetPulse and updates existing ones; it NEVER deletes local devices and does not overwrite your credentials or the local id of an existing device.',
+      nb_what_detail: 'Scope and guarantees (reported by the server)',
+      nb_scope: 'What gets imported',
+      nb_no_hace: 'What it never does',
+      nb_checklist_title: 'Configuration checklist',
+      nb_check_cfg: 'Configured — URL and token set',
+      nb_check_token: 'Token available (NETBOX_TOKEN or config/.netbox_token)',
+      nb_check_url: 'NetBox URL (masked)',
+      nb_not_configured_title: 'NetBox is not configured',
+      nb_not_configured_vars: 'Variables on the server: NETBOX_URL · NETBOX_TOKEN (or the file config/.netbox_token)',
+      nb_sync_disabled_hint: 'Sync stays disabled until NETBOX_URL and NETBOX_TOKEN are set on the server',
+      nb_status_fail: 'Could not verify the NetBox configuration',
+      nb_sync_fail: 'Sync failed — nothing was verified',
+      nb_res_ok: 'Sync completed',
+      nb_res_partial: 'Partial sync: {n} devices were not imported',
+      nb_res_partial_hint: 'Fix those devices in NetBox and sync again — everything else is already in the local inventory.',
+      nb_count_unchanged: 'unchanged', nb_count_errors: 'errors',
+      nb_list_created: 'Created ({n})', nb_list_updated: 'Updated ({n})',
+      nb_list_skipped: 'Skipped ({n})', nb_list_errors: 'Errors ({n})',
+      nb_totals: 'Local inventory: {a} devices · NetBox: {b} devices',
+      nb_sites_checking: 'Checking whether NetBox answers…',
       comp_admin_required: 'Compliance requires the admin role',
       comp_baselines: 'Defined baselines', comp_no_baselines: 'No baselines defined yet: create one in step 1',
       comp_step1: 'Pick group', comp_step1_d: 'Type or choose the group this baseline applies to',
@@ -3181,6 +3207,28 @@
       nb_sync_confirm_title: 'Confirmar sincronización NetBox → inventario',
       nb_sync_run: 'Ejecutar sincronización', nb_cancel: 'Cancelar', nb_sync_running: 'Sincronizando… puede tardar un rato',
       nb_count_created: 'creados', nb_count_updated: 'actualizados', nb_count_skipped: 'omitidos',
+      nb_what_title: '¿Qué es NetBox?',
+      nb_what_text: 'NetBox es el catálogo externo de inventario (source of truth) de la red: qué equipos existen, dónde están y con qué IP de gestión. La sincronización importa esos equipos a NetPulse y actualiza los existentes; NUNCA borra equipos locales y no sobreescribe tus credenciales ni el id local de un equipo existente.',
+      nb_what_detail: 'Alcance y garantías (informadas por el servidor)',
+      nb_scope: 'Qué se importa',
+      nb_no_hace: 'Lo que nunca hace',
+      nb_checklist_title: 'Checklist de configuración',
+      nb_check_cfg: 'Configurado — URL y token definidos',
+      nb_check_token: 'Token disponible (NETBOX_TOKEN o config/.netbox_token)',
+      nb_check_url: 'URL de NetBox (enmascarada)',
+      nb_not_configured_title: 'NetBox no está configurado',
+      nb_not_configured_vars: 'Variables en el servidor: NETBOX_URL · NETBOX_TOKEN (o el archivo config/.netbox_token)',
+      nb_sync_disabled_hint: 'La sincronización queda deshabilitada hasta definir NETBOX_URL y NETBOX_TOKEN en el servidor',
+      nb_status_fail: 'No se pudo verificar la configuración de NetBox',
+      nb_sync_fail: 'La sincronización falló — nada quedó verificado',
+      nb_res_ok: 'Sincronización completada',
+      nb_res_partial: 'Sincronización parcial: {n} equipos no se importaron',
+      nb_res_partial_hint: 'Corrige esos equipos en NetBox y vuelve a sincronizar; el resto ya está en el inventario local.',
+      nb_count_unchanged: 'sin cambios', nb_count_errors: 'errores',
+      nb_list_created: 'Creados ({n})', nb_list_updated: 'Actualizados ({n})',
+      nb_list_skipped: 'Saltados ({n})', nb_list_errors: 'Errores ({n})',
+      nb_totals: 'Inventario local: {a} equipos · NetBox: {b} equipos',
+      nb_sites_checking: 'Verificando si NetBox responde…',
       comp_admin_required: 'Cumplimiento requiere rol admin',
       comp_baselines: 'Baselines definidos', comp_no_baselines: 'Sin baselines definidos aún: se crean en el paso 1',
       comp_step1: 'Elegir grupo', comp_step1_d: 'Escribe o elige el grupo al que aplica el baseline',
@@ -3217,7 +3265,12 @@
       rep_need_dates: 'Pick both window dates first', rep_bad_window: 'Invalid window: the start must be before the end',
       rep_future_clamped: 'Future dates are not allowed: the window end was trimmed to now',
       rep_window_max: 'The window may span at most 31 days', rep_groups_unverified: 'Group list not verifiable',
-      rep_state_nodata: 'No data'
+      rep_state_nodata: 'No data',
+      help_sites: 'Shows what the remote site collector measures (freshness, buffers and per-device state) — it is NOT comparable with the central polling of the Overview.',
+      help_retention: 'Shows what is kept: audit trail and local backups. Purging audit records requires a dry-run simulation first — the preview deletes nothing.',
+      help_reports: 'SLA is computed only on observed samples within your window: partial coverage and gaps are shown as-is, never interpolated.',
+      help_scopes: 'The scope limits which groups/sites a user can see. It applies on the user\'s NEXT login, not to an active session.',
+      dw_help: 'Queries LLDP/CDP neighbors from the origin devices you pick and proposes candidates — nothing is imported into the inventory without your explicit confirmation in step 4.'
     });
     Object.assign(I18N.es, {
       nav_reports: 'Reportes SLA', view_reports: 'Reportes SLA',
@@ -3240,7 +3293,12 @@
       rep_need_dates: 'Primero elige las dos fechas de la ventana', rep_bad_window: 'Ventana inválida: el inicio debe ser anterior al fin',
       rep_future_clamped: 'No se permiten fechas futuras: se recortó el final de la ventana a ahora',
       rep_window_max: 'La ventana puede cubrir 31 días como máximo', rep_groups_unverified: 'Lista de grupos no verificable',
-      rep_state_nodata: 'Sin datos'
+      rep_state_nodata: 'Sin datos',
+      help_sites: 'Muestra lo que mide el colector del sitio remoto (frescura, buffers y estado por equipo) — NO es comparable con el sondeo central del Overview.',
+      help_retention: 'Muestra qué se guarda: auditoría y backups locales. La purga de auditoría requiere antes una simulación (dry-run) — la previsualización no borra nada.',
+      help_reports: 'El SLA se calcula solo con las muestras observadas en tu ventana: la cobertura parcial y los huecos se muestran tal cual, nunca se interpolan.',
+      help_scopes: 'El scope limita los grupos/sitios que puede ver un usuario. Aplica en el PRÓXIMO login del usuario, no sobre una sesión activa.',
+      dw_help: 'Consulta los vecinos LLDP/CDP de los equipos origen que elijas y propone candidatos — nada se importa al inventario sin tu confirmación explícita en el paso 4.'
     });
     Object.assign(I18N.en, {
       dw_open: 'Discover devices', dw_title: 'Auto-discovery wizard',
@@ -3399,6 +3457,8 @@
       sftp_err_501_text: 'This device does not offer SFTP — use Terminal or Commands for CLI.',
       sftp_open_terminal: 'Open Terminal',
       sftp_err_502_title: 'Could not connect',
+      sftp_err_kex_title: 'Incomplete SSH negotiation',
+      sftp_err_kex_text: 'The device did not finish the SSH key exchange before the timeout — it is not a credentials problem. Do not retry in a loop: try once more in a few seconds or raise NETPULSE_SFTP_CONNECT_TIMEOUT_S on the server.',
       sftp_err_504_title: 'SSH not responding',
       sftp_err_504_text: 'Timed out connecting to {d} — unverified.',
       sftp_err_403_read: 'Permission denied while reading',
@@ -3450,6 +3510,8 @@
       sftp_err_501_text: 'Este equipo no ofrece SFTP — usa Terminal o Comandos para CLI.',
       sftp_open_terminal: 'Abrir Terminal',
       sftp_err_502_title: 'No se pudo conectar',
+      sftp_err_kex_title: 'Negociación SSH incompleta',
+      sftp_err_kex_text: 'El equipo no terminó el intercambio de claves SSH antes del timeout — no es un problema de credenciales. No reintentar en bucle: prueba una vez más en unos segundos o sube NETPULSE_SFTP_CONNECT_TIMEOUT_S en el servidor.',
       sftp_err_504_title: 'Sin respuesta SSH',
       sftp_err_504_text: 'Tiempo de espera agotado conectando a {d} — sin verificar.',
       sftp_err_403_read: 'Permiso denegado al leer',
@@ -6239,54 +6301,126 @@
       } catch (e) { toast(`${__t('grp_create_fail')}: ${e.message}`, 'error'); }
     }
 
-    // ── NETBOX (módulo dormido; /api/netbox/* es SOLO admin, 503 si NetBox caído) ──
-    // Contrato real: GET /api/netbox/sites → [{name, status, region, device_count}].
-    // POST /api/netbox/sync → {created, updated, skipped}. Sin "conflictos": no existen.
+    // ── NETBOX (contrato docs/handoffs/netbox-ui.md; /api/netbox/* es SOLO admin) ──
+    // GET  /api/netbox/status → checklist de configuración (no contacta a NetBox; 200 aunque no esté configurado).
+    // POST /api/netbox/sync   → {status: 'ok'|'partial', solicitados, creados[], actualizados[], sin_cambios,
+    //                            saltados: [{device_id, motivo}], errores: [{device_id, detalle}],
+    //                            inventario_total, netbox_total}.
+    // Reglas honestas: un fallo (503/5xx/4xx) muestra el detail literal y NUNCA "0 importados" como éxito;
+    // NetBox sin configurar no es un error del panel: banner gris + botón de sync deshabilitado.
+    // GET /api/netbox/sites sigue cargándose como lectura accesoria (tabla de sites si NetBox responde).
+    const NB_SVG_LOCK = '<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+    const NB_SVG_SYNC = '<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>';
+    const NB_SVG_OK = '<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="20 6 9 17 4 12"/></svg>';
+    const NB_SVG_NO = '<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-ter)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
     async function loadNetbox() {
       const el = document.getElementById('netbox-content'); if (!el || !t) return;
-      if (!__isAdmin()) { el.innerHTML = npGray(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> ${__t('nb_admin_required')}`); return; }
+      if (!__isAdmin()) { el.innerHTML = npGray(`${NB_SVG_LOCK} ${__t('nb_admin_required')}`); return; }
       el.innerHTML = '<div class="empty"><div class="sp"></div></div>';
+
+      // 1) Checklist de configuración (no contacta a NetBox; responde al instante).
+      let st = null;
+      try {
+        const r = await fetch(`${A}/netbox/status`, { headers: h(), signal: AbortSignal.timeout(10000) });
+        if (r.status === 403) { el.innerHTML = npGray(`${NB_SVG_LOCK} ${__t('nb_admin_required')}`); return; }
+        if (!r.ok) {
+          const b = await r.json().catch(() => null);
+          el.innerHTML = npGray(`${__t('nb_status_fail')} · ${esc(_detText(b, `HTTP ${r.status}`))}`);
+          return;
+        }
+        st = await r.json();
+      } catch (e) { el.innerHTML = npGray(`${__t('nb_status_fail')} · ${esc(e.message)}`); return; }
+      if (!st || typeof st !== 'object' || Array.isArray(st)) { el.innerHTML = npGray(__t('nb_status_fail')); return; }
+
+      const cfg = st.configurado === true, tok = st.tiene_token === true;
+      const row = (ok, label, extra) => `<div style="display:flex;align-items:center;gap:8px;padding:3px 0">${ok ? NB_SVG_OK : NB_SVG_NO}<span style="font-size:12px;color:var(--text-secondary)">${label}</span>${extra || ''}</div>`;
+      const checkRows = row(cfg, __t('nb_check_cfg'))
+        + row(tok, __t('nb_check_token'))
+        + row(cfg, __t('nb_check_url'), `<span style="font-family:var(--mono);font-size:11px;color:${cfg ? 'var(--text)' : 'var(--text-ter)'}">${esc(st.url_enmascarada || '—')}</span>`);
+
+      const noHace = Array.isArray(st.no_hace) ? st.no_hace.map(x => `<li style="margin:2px 0;word-break:break-word">${esc(x)}</li>`).join('') : '';
+      const scopeLine = typeof st.alcance === 'string' ? st.alcance : '';
+      const whatDetail = (scopeLine || noHace) ? `
+            <details style="margin-top:10px;font-size:11px;color:var(--text-secondary)">
+              <summary style="cursor:pointer;font-weight:600">${__t('nb_what_detail')}</summary>
+              ${scopeLine ? `<div style="margin-top:8px;word-break:break-word"><b>${__t('nb_scope')}</b><div style="margin-top:2px">${esc(scopeLine)}</div></div>` : ''}
+              ${noHace ? `<div style="margin-top:8px"><b>${__t('nb_no_hace')}</b><ul style="margin:4px 0 0 16px;padding:0">${noHace}</ul></div>` : ''}
+            </details>` : '';
+
+      const syncBtn = cfg
+        ? `<button class="btn btn-p btn-sm" onclick="nbSyncConfirm()">${NB_SVG_SYNC} ${__t('nb_sync')}</button>`
+        : `<button class="btn btn-p btn-sm" disabled style="opacity:.55;cursor:not-allowed" title="${escAttr(__t('nb_sync_disabled_hint'))}" aria-disabled="true">${NB_SVG_SYNC} ${__t('nb_sync')}</button>`;
+      // Sin configuración: mensaje literal del backend + variables a definir; el botón queda inactivo.
+      const cfgBanner = cfg ? '' : `<div role="status" style="background:var(--bg2);border:1px solid var(--border-s);border-left:3px solid var(--text-ter);border-radius:var(--radius);padding:12px 14px;margin-top:10px">
+            <b style="font-size:12px">${__t('nb_not_configured_title')}</b>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;word-break:break-word">${esc(st.mensaje || __t('nb_not_configured_title'))}</div>
+            <div style="font-size:11px;color:var(--text-ter);margin-top:6px">${__t('nb_not_configured_vars')}</div>
+          </div>`;
+
+      el.innerHTML = `
+        <div class="sc" style="margin-bottom:12px">
+          <div class="sl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> ${__t('nb_what_title')}</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;line-height:1.5">${__t('nb_what_text')}</div>
+          ${whatDetail}
+        </div>
+        <div class="sc" style="margin-bottom:12px">
+          <div class="sl">${__t('nb_checklist_title')}</div>
+          <div style="margin-top:6px">${checkRows}</div>
+          ${cfgBanner}
+        </div>
+        <div class="sc" style="margin-bottom:12px">
+          <div class="sl">${NB_SVG_SYNC} ${__t('nb_sync_title')}</div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:6px">${__t('nb_sync_desc')}</div>
+          <div style="margin-top:8px">${syncBtn}</div>
+          <div id="nb-panel" style="display:none;margin-top:12px;padding:14px;background:var(--panel);border:1px solid var(--accent);border-radius:var(--radius)"></div>
+          <div id="nb-result" style="margin-top:10px"></div>
+        </div>
+        <div class="sc" id="nb-sites">
+          <div class="sl">${__t('nb_sites_title')}</div>
+          <div id="nb-sites-body" style="font-size:11px;color:var(--text-ter);margin-top:6px">${__t('nb_sites_checking')}</div>
+        </div>`;
+
+      nbLoadSites();
+    }
+
+    // Lectura accesoria: GET /api/netbox/sites solo cuando NetBox responde; en otro caso, nota honesta con detail literal.
+    async function nbLoadSites() {
+      const bodyEl = document.getElementById('nb-sites-body'); if (!bodyEl || !t) return;
       let sites = null, note = '';
       try {
         const r = await fetch(`${A}/netbox/sites`, { headers: h(), signal: AbortSignal.timeout(20000) });
-        if (r.status === 503) note = __t('nb_unavailable');
-        else if (r.status === 403) note = __t('nb_admin_required');
-        else if (!r.ok) note = `${__t('np_unverified')} · HTTP ${r.status}`;
-        else sites = await r.json();
+        const b = (r.ok) ? await r.json() : await r.json().catch(() => null);
+        if (r.status === 403) note = __t('nb_admin_required');
+        else if (!r.ok) note = esc(_detText(b, `${__t('nb_unavailable')} · HTTP ${r.status}`));
+        else sites = b;
       } catch (e) { note = `${__t('nb_unavailable')} · ${esc(e.message)}`; }
       const sitesList = sites !== null ? (Array.isArray(sites) ? sites : []) : null;
       const statusLine = sitesList !== null
-        ? `<span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block"></span> ${__t('nb_online')}`
-        : `<span style="width:10px;height:10px;border-radius:50%;background:var(--text-ter);display:inline-block"></span> <span style="color:var(--text-ter)">${note || __t('np_unverified')}</span>`;
+        ? `<span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block;margin-right:4px;vertical-align:middle"></span> ${__t('nb_online')}`
+        : `<span style="width:10px;height:10px;border-radius:50%;background:var(--text-ter);display:inline-block;margin-right:4px;vertical-align:middle"></span> <span style="color:var(--text-ter)">${note || __t('np_unverified')}</span>`;
       const rows = (sitesList || []).map(s => `<tr>
         <td style="font-weight:500">${esc(s.name || '?')}</td>
         <td style="font-size:11px">${esc(s.status || '—')}</td>
         <td style="font-size:11px;color:var(--text-secondary)">${esc(s.region || '—')}</td>
         <td><span class="badge" style="background:var(--surface)">${Number(s.device_count ?? 0)}</span></td>
       </tr>`);
-      el.innerHTML = `
-        <div class="sc" style="margin-bottom:12px">
-          <div class="sl" style="display:flex;align-items:center;gap:10px">${statusLine}</div>
-          ${sitesList !== null ? (rows.length
+      bodyEl.innerHTML = `<div>${statusLine}</div>`
+        + (sitesList !== null
+          ? (rows.length
             ? `<div style="border:1px solid var(--border);border-radius:6px;margin-top:10px"><table><tr><th>${__t('nb_col_site')}</th><th>${__t('nb_col_status')}</th><th>${__t('nb_col_region')}</th><th>${__t('nb_col_devices')}</th></tr>${rows.join('')}</table></div>`
-            : `<div style="font-size:11px;color:var(--text-ter);margin-top:10px">${__t('nb_sites_empty')}</div>`) : ''}
-        </div>
-        <div class="sc">
-          <div class="sl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg> ${__t('nb_sync_title')}</div>
-          <div style="font-size:11px;color:var(--text-secondary);margin-top:6px">${__t('nb_sync_desc')}</div>
-          <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="nbSyncConfirm()"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg> ${__t('nb_sync')}</button>
-          <div id="nb-panel" style="display:none;margin-top:12px;padding:14px;background:var(--panel);border:1px solid var(--accent);border-radius:var(--radius)"></div>
-          <div id="nb-result" style="margin-top:10px"></div>
-        </div>`;
+            : `<div style="margin-top:10px">${__t('nb_sites_empty')}</div>`)
+          : '');
     }
+
     // Confirmación inline (mismo patrón que el panel de la bulk-bar), sin prompt() ciego.
     function nbSyncConfirm() {
       const p = document.getElementById('nb-panel'); if (!p) return;
       p.innerHTML = `
-        <div class="bt"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg> ${__t('nb_sync_confirm_title')}</div>
+        <div class="bt">${NB_SVG_SYNC} ${__t('nb_sync_confirm_title')}</div>
         <div style="font-size:11px;color:var(--text-secondary);margin-top:6px">${__t('nb_sync_desc')}</div>
         <div style="display:flex;gap:8px;margin-top:10px">
-          <button class="btn btn-p btn-sm" onclick="nbSyncRun()"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polygon points="6 4 20 12 6 20"/></svg> ${__t('nb_sync_run')}</button>
+          <button class="btn btn-p btn-sm" onclick="nbSyncRun()">${NB_SVG_SYNC} ${__t('nb_sync_run')}</button>
           <button class="btn btn-o btn-sm" onclick="nbSyncCancel()">${__t('nb_cancel')}</button>
         </div>`;
       p.style.display = 'block';
@@ -6295,21 +6429,81 @@
       const p = document.getElementById('nb-panel');
       if (p) { p.style.display = 'none'; p.innerHTML = ''; }
     }
+
+    function nbList(label, itemsHtml) {
+      return `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--text-secondary)">${label}</summary>
+        <ul style="margin:6px 0 0 16px;padding:0;font-size:11px;color:var(--text-secondary);word-break:break-word">${itemsHtml}</ul></details>`;
+    }
+
+    function nbRenderResult(d) {
+      const res = document.getElementById('nb-result'); if (!res) return;
+      // Campos del contrato nuevo; fallback a los heredados (created/updated/skipped) sin inventar datos.
+      const created = Array.isArray(d.creados) ? d.creados : null;
+      const updated = Array.isArray(d.actualizados) ? d.actualizados : null;
+      const skipped = Array.isArray(d.saltados) ? d.saltados : null;
+      const errores = Array.isArray(d.errores) ? d.errores : null;
+      const nCreados = created ? created.length : (Number(d.created) || 0);
+      const nAct = updated ? updated.length : (Number(d.updated) || 0);
+      const sinCamb = Number(d.sin_cambios) || 0;
+      const nSal = skipped ? skipped.length : (Number(d.skipped) || 0);
+      const nErr = errores ? errores.length : 0;
+      const partial = (d.status === 'partial') || (!d.status && (nSal + nErr) > 0);
+
+      const chip = (col, n, label) => `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--bg2);border:1px solid var(--border-s);font-size:11px;color:var(--text-secondary)"><b style="font-size:13px;color:${col}">${n}</b>${label}</span>`;
+      const chips = chip('var(--green)', nCreados, __t('nb_count_created'))
+        + chip('var(--accent)', nAct, __t('nb_count_updated'))
+        + chip('var(--text-secondary)', sinCamb, __t('nb_count_unchanged'))
+        + chip(nSal ? 'var(--orange)' : 'var(--text-ter)', nSal, __t('nb_count_skipped'))
+        + chip(nErr ? 'var(--red)' : 'var(--text-ter)', nErr, __t('nb_count_errors'));
+
+      const bits = [];
+      if (created && created.length) bits.push(nbList(__t('nb_list_created').replace('{n}', String(created.length)), created.map(id => `<li>${esc(id)}</li>`).join('')));
+      if (updated && updated.length) bits.push(nbList(__t('nb_list_updated').replace('{n}', String(updated.length)), updated.map(id => `<li>${esc(id)}</li>`).join('')));
+      if (skipped && skipped.length) bits.push(nbList(__t('nb_list_skipped').replace('{n}', String(skipped.length)), skipped.map(s => `<li><span style="font-family:var(--mono)">${esc(s.device_id || '—')}</span> — ${esc(s.motivo || '—')}</li>`).join('')));
+      if (errores && errores.length) bits.push(nbList(__t('nb_list_errors').replace('{n}', String(errores.length)), errores.map(s => `<li><span style="font-family:var(--mono)">${esc(s.device_id || '—')}</span> — ${esc(s.detalle || '—')}</li>`).join('')));
+
+      const head = partial
+        ? `<div style="background:rgba(245,158,11,.12);border:1px solid var(--border-s);border-left:3px solid var(--orange);border-radius:var(--radius);padding:12px 14px">
+            <b style="font-size:12px;color:var(--orange)">${__t('nb_res_partial').replace('{n}', String(nSal + nErr))}</b>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">${__t('nb_res_partial_hint')}</div>
+          </div>`
+        : `<div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--green)">${NB_SVG_OK} ${__t('nb_res_ok')}</div>`;
+      const totals = (d.inventario_total !== undefined && d.inventario_total !== null)
+        ? `<div style="font-size:11px;color:var(--text-ter);margin-top:8px">${__t('nb_totals').replace('{a}', String(Number(d.inventario_total) || 0)).replace('{b}', String(Number(d.netbox_total) || 0))}</div>`
+        : '';
+      res.innerHTML = `${head}<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${chips}</div>${bits.join('')}${totals}`;
+      return { partial };
+    }
+
+    function nbFailBanner(det) {
+      return `<div role="alert" style="background:var(--bg2);border:1px solid var(--border-s);border-left:3px solid var(--text-ter);border-radius:var(--radius);padding:12px 14px">
+        <b style="font-size:12px">${__t('nb_sync_fail')}</b>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;word-break:break-word">${esc(det || '')}</div>
+      </div>`;
+    }
+
     async function nbSyncRun() {
       nbSyncCancel();
       const res = document.getElementById('nb-result'); if (!res) return;
-      res.innerHTML = `<div class="bt"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg> ${__t('nb_sync_running')}</div>`;
+      res.innerHTML = `<div style="display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-secondary)"><span class="sp" style="width:14px;height:14px"></span>${__t('nb_sync_running')}</div>`;
       try {
         const r = await fetch(`${A}/netbox/sync`, { method: 'POST', headers: h(), signal: AbortSignal.timeout(120000) });
-        if (r.status === 403) { res.innerHTML = `<div class="bt" style="color:var(--text-ter)"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> ${__t('nb_admin_required')}</div>`; return; }
-        if (r.status === 503) { res.innerHTML = `<div class="bt" style="color:var(--text-ter)"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3" width="18" height="18" rx="2"/></svg> ${__t('nb_unavailable')}</div>`; return; }
-        if (!r.ok) { res.innerHTML = `<div class="bt" style="color:var(--text-ter)">${__t('np_unverified')} · HTTP ${r.status}</div>`; return; }
-        const d = await r.json();
-        // Resultado veraz: solo los contadores que el backend devuelve.
-        const line = `${Number(d.created) || 0} ${__t('nb_count_created')} · ${Number(d.updated) || 0} ${__t('nb_count_updated')} · ${Number(d.skipped) || 0} ${__t('nb_count_skipped')}`;
-        res.innerHTML = `<div class="bt"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> ${line}</div>`;
-        toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg> ${line}`, 's');
-      } catch (e) { res.innerHTML = `<div class="bt" style="color:var(--text-ter)">${__t('np_unverified')}: ${esc(e.message)}</div>`; }
+        const b = await r.json().catch(() => null);
+        if (r.status === 403) { res.innerHTML = npGray(`${NB_SVG_LOCK} ${__t('nb_admin_required')}`); return; }
+        if (!r.ok) {
+          // 503 (no configurado / NetBox caído), 500 inventario local, 401/403 de NetBox:
+          // detail literal, nada pintado como éxito.
+          res.innerHTML = nbFailBanner(_detText(b, `HTTP ${r.status}`));
+          return;
+        }
+        const out = nbRenderResult(b);
+        const plain = out.partial
+          ? __t('nb_res_partial').replace('{n}', String((Array.isArray(b.saltados) ? b.saltados.length : (Number(b.skipped) || 0)) + (Array.isArray(b.errores) ? b.errores.length : 0)))
+          : `${__t('nb_res_ok')}: ${Number(b.creados ? b.creados.length : (Number(b.created) || 0))} ${__t('nb_count_created')} · ${Number(b.actualizados ? b.actualizados.length : (Number(b.updated) || 0))} ${__t('nb_count_updated')}`;
+        toast(esc(plain), out.partial ? 'error' : 's');
+      } catch (e) {
+        res.innerHTML = nbFailBanner(`${__t('nb_unavailable')}: ${e.message}`);
+      }
     }
 
     // ── WEBHOOKS ──
@@ -8166,6 +8360,11 @@
         };
       }
       if (status === 502) {
+        // Kex/banner incompleto (contrato docs/handoffs/sftp-ui.md): NO es credenciales.
+        // Banner naranja con el detail literal; sin acción de reintento para no reintentar en bucle.
+        if (/^Negociación SSH incompleta/i.test(d)) {
+          return { tone: 'warn', title: __t('sftp_err_kex_title'), text: __t('sftp_err_kex_text'), detail: d };
+        }
         return { tone: 'gray', title: __t('sftp_err_502_title'), text: d, detail: '' };
       }
       if (status === 504) {
@@ -8764,7 +8963,8 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
           <b style="font-size:14px">${__t('dw_title')} · ${__t('dw_step_n').replace('{n}', String(dw.step))}/4</b>
           <button class="btn btn-o btn-sm" onclick="dwClose()">${__t('dw_close')}</button>
-        </div>${body}`;
+        </div>
+        <div style="font-size:11px;color:var(--text-ter);margin:-8px 0 12px">${__t('dw_help')}</div>${body}`;
     }
 
     function dwPanelError(msg) {
