@@ -129,3 +129,18 @@ Resultado real (job `bash-43`, recolectado, exit code 0):
 1. Ejecutar en navegador real login/dashboard/F5 con hash, logout y 401 forzado con mensaje y sin bucles. Es el bloqueo para afirmar sesión persistente end-to-end.
 2. Validar refresh automático y expiración real con un temporizador adecuado o una espera de 25 minutos; no ejecutado aquí.
 3. Observar el rechazo del JWT original después de su `exp` si se requiere evidencia temporal completa; aquí solo se comprobó su aceptación tras refresh.
+
+## Verificación en navegador real (orquestador, 2026-10-24, Chrome CDP)
+
+| Prueba | Resultado |
+|---|---|
+| Login → dashboard con np_token persistido | ✅ |
+| F5 en #sites: sesión persiste, sin login screen | ✅ |
+| F5: vista conservada por location.hash | ✅ |
+| 401 forzado en fetch (token corrupto): vuelve al login una vez, mensaje "Sesión expirada — vuelve a entrar." | ✅ |
+| F5 con np_token corrupto: login + mismo mensaje | ✅ |
+| logout: np_token eliminado y login visible | ✅ |
+
+Pendiente honesto: renovación automática a los 25 min no validada en vivo por
+tiempo de espera (intervalo fijo); el endpoint refresh sí está verificado por
+API y la lógica de temporizador por código. Sin afirmar E2E de expiración real.
