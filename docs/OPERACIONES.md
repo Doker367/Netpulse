@@ -242,6 +242,31 @@ Métricas por dispositivo que faltan (estándar NOC):
 
 ---
 
+## Smoke completo
+
+Con el laboratorio FRR/RouterOS levantado (SSH en 2222–2225), la API
+arrancada en un puerto libre y un usuario **admin** de prueba ya creado en
+`config/users.yaml`, ejecutar desde la raíz del proyecto:
+
+```bash
+export NETPULSE_URL=http://127.0.0.1:8099
+export NETPULSE_SMOKE_USER=demo9
+export NETPULSE_SMOKE_PASSWORD='contraseña-del-admin'
+# Opcional: export NETPULSE_COLLECTOR_API_KEY=np_...  # clave existente de tipo collector
+bash scripts/smoke_full.sh
+```
+
+Requiere `curl`, Python del entorno (`NETPULSE_PYTHON` si no se usa el venv
+predeterminado) con `websockets` y un inventario local que contenga los
+cuatro equipos del lab, con credenciales SSH válidas para cisco-core-01.
+Comprueba sesión, SFTP, terminal, sites, retención y vistas; omite solamente
+`whoami` si no hay clave de colector en el entorno. Cada resultado incluye
+URL/código y el resumen `N/M pruebas OK`; cualquier fallo devuelve código
+no cero. No muestra ni guarda el JWT o la contraseña. Tras la verificación,
+detener la API iniciada para la prueba y retirar el usuario temporal.
+
+---
+
 ## Custodia y rotación de la clave Fernet
 
 `config/.fernet_key` cifra todas las credenciales del inventario (`config/devices.yaml`). Quien la pierde, pierde el acceso a esas credenciales; quien la obtiene, puede descifrarlas. Trátala como el secreto más crítico del sistema.
