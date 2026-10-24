@@ -90,3 +90,16 @@ La primera corrida mostró que uvicorn registra la URL WS con `?token=...` inclu
 - Usuario temporal eliminado; configuración restaurada a su estado inicial ausente. No hubo modificación de código de app ni del repo principal.
 - Suite: **301 tests pasados**, exit 0, con `PYTHONPATH=. /Users/doker/netpulse-noc/.venv/bin/pytest tests/ -q`. La salida doble-quiet omite el resumen numérico: hay 301 puntos y ningún fallo/skip. Una advertencia de deprecación de Starlette/httpx; no afecta al resultado. [Salida completa](<docs/handoffs/terminal-verif-evidence/pytest.txt>).
 - **Pendientes explícitos:** resolver discrepancia 403/4401; verificar SSH exitoso y `connected.port` de MikroTik con configuración real autorizada; integrar UI 7C y validar banner de reconexión en navegador; aplicar redacción de JWT al logging real. El corte durante la negociación SSH, agotamiento por muchas sesiones y reconexiones repetidas no forman parte de esta evidencia.
+
+## Anexo — Validación de UI en navegador real (orquestador, Chrome CDP)
+
+Cubre el caso 7 que la verificación original dejó NO validado:
+
+| Prueba | Resultado |
+|---|---|
+| Terminal → cisco-core-01: banner "Conectado a cisco-core-01 (127.0.0.1:2222)", banner FRR 8.4_git y prompt `cisco-core-01#` reales | ✅ |
+| Tab «cisco-core-01» con × de cierre y scrollback | ✅ |
+| Caída de la API durante la sesión: banner ámbar "Reconectando… (intento 3/6)" + botón "Detener reintentos", sin spinner eterno ni consola congelada | ✅ |
+
+Pendiente: pestañas múltiples simultáneas y búsqueda en buffer no se ejercitaron en
+esta pasada (verificadas por código y tests); equipos reales fuera del lab, no.
