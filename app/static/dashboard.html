@@ -2916,6 +2916,9 @@
     let t = '', devices = [], sel = null, aTab = 'facts', cmdH = [], bSel = new Set(), bMode = false, currentUser = null;
     let alertSummary = null; // null significa fuente sin verificar, no cero alertas.
     let overviewState = null, inventoryError = false;
+    // Sesión persistente: el JWT vive en localStorage ('np_token') y se renueva en silencio.
+    let _refreshTimer = null; // renovación silenciosa (~25 min; exp por defecto 30 min)
+    let _np401Done = false;   // el aviso de sesión caducada solo se muestra UNA vez
     let currentLang = localStorage.getItem('np_lang') || 'es';
 
     // ── i18n SYSTEM ──
@@ -3055,8 +3058,8 @@
       topo_tr_clear: '<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Limpiar', topo_nodes_no_geo: 'Equipos sin geolocalización (IPs locales):',
       topo_tr_from: 'desde'
     });
-    Object.assign(I18N.en, { search_placeholder: 'Search devices or IPs (Ctrl+K)', ov_focus: 'Offline devices', ov_loading: 'Checking devices…', ov_loading_inventory: 'Loading inventory…', ov_hint: 'Select a device to inspect its details.', ov_topology: 'Open topology', ov_refresh: 'Refresh', ov_add: 'Add device', ov_offline: 'Offline', ov_online: 'Online', ov_devices: 'Devices', ov_availability: 'Online share', ov_alerts: 'Active alerts', ov_detail: 'View details', ov_unverified: 'Unverified', ov_disk: 'Disk', login_submit: 'Sign in', login_busy: 'Signing in…', login_err_401: 'Incorrect username or password. Check your credentials and try again.', login_err_429: 'Too many attempts. Wait a minute before signing in again.', login_err_generic: 'Could not sign in. Check that NetPulse is available and try again.', login_err_session: 'The session could not be validated. Please try again.', login_err_conn: 'Could not connect to NetPulse. Make sure the API is running and try again.' });
-    Object.assign(I18N.es, { search_placeholder: 'Buscar equipos o IP (Ctrl+K)', ov_focus: 'Equipos fuera de línea', ov_loading: 'Verificando equipos…', ov_loading_inventory: 'Consultando inventario…', ov_hint: 'Selecciona un equipo para ver su detalle.', ov_topology: 'Abrir topología', ov_refresh: 'Actualizar', ov_add: 'Agregar equipo', ov_offline: 'Fuera de línea', ov_online: 'En línea', ov_devices: 'Dispositivos', ov_availability: 'Porcentaje en línea', ov_alerts: 'Alertas activas', ov_detail: 'Ver detalle', ov_unverified: 'Sin verificar', ov_disk: 'Disco', login_submit: 'Ingresar', login_busy: 'Ingresando…', login_err_401: 'Usuario o contraseña incorrectos. Revisa los datos e inténtalo de nuevo.', login_err_429: 'Demasiados intentos. Espera un minuto antes de volver a ingresar.', login_err_generic: 'No se pudo iniciar sesión. Comprueba que NetPulse esté disponible e inténtalo de nuevo.', login_err_session: 'No se pudo validar la sesión. Vuelve a intentarlo.', login_err_conn: 'No se pudo conectar con NetPulse. Verifica que la API esté encendida e inténtalo de nuevo.' });
+    Object.assign(I18N.en, { search_placeholder: 'Search devices or IPs (Ctrl+K)', ov_focus: 'Offline devices', ov_loading: 'Checking devices…', ov_loading_inventory: 'Loading inventory…', ov_hint: 'Select a device to inspect its details.', ov_topology: 'Open topology', ov_refresh: 'Refresh', ov_add: 'Add device', ov_offline: 'Offline', ov_online: 'Online', ov_devices: 'Devices', ov_availability: 'Online share', ov_alerts: 'Active alerts', ov_detail: 'View details', ov_unverified: 'Unverified', ov_disk: 'Disk', login_submit: 'Sign in', login_busy: 'Signing in…', login_err_401: 'Incorrect username or password. Check your credentials and try again.', login_err_429: 'Too many attempts. Wait a minute before signing in again.', login_err_generic: 'Could not sign in. Check that NetPulse is available and try again.', login_err_session: 'The session could not be validated. Please try again.', login_err_conn: 'Could not connect to NetPulse. Make sure the API is running and try again.', sess_expired: 'Session expired — please sign in again.' });
+    Object.assign(I18N.es, { search_placeholder: 'Buscar equipos o IP (Ctrl+K)', ov_focus: 'Equipos fuera de línea', ov_loading: 'Verificando equipos…', ov_loading_inventory: 'Consultando inventario…', ov_hint: 'Selecciona un equipo para ver su detalle.', ov_topology: 'Abrir topología', ov_refresh: 'Actualizar', ov_add: 'Agregar equipo', ov_offline: 'Fuera de línea', ov_online: 'En línea', ov_devices: 'Dispositivos', ov_availability: 'Porcentaje en línea', ov_alerts: 'Alertas activas', ov_detail: 'Ver detalle', ov_unverified: 'Sin verificar', ov_disk: 'Disco', login_submit: 'Ingresar', login_busy: 'Ingresando…', login_err_401: 'Usuario o contraseña incorrectos. Revisa los datos e inténtalo de nuevo.', login_err_429: 'Demasiados intentos. Espera un minuto antes de volver a ingresar.', login_err_generic: 'No se pudo iniciar sesión. Comprueba que NetPulse esté disponible e inténtalo de nuevo.', login_err_session: 'No se pudo validar la sesión. Vuelve a intentarlo.', login_err_conn: 'No se pudo conectar con NetPulse. Verifica que la API esté encendida e inténtalo de nuevo.', sess_expired: 'Sesión expirada — vuelve a entrar.' });
 
     // Claves nuevas: Grupos (módulo dormido), NetBox (solo admin) y guard de Compliance.
     Object.assign(I18N.en, {
@@ -3318,6 +3321,64 @@
 
     function toast(m, ty = 'info', d = 3000) { const e = document.createElement('div'); e.className = `toast ${ty}`; setIconText(e, m); document.body.appendChild(e); setTimeout(() => e.remove(), d) }
     function h() { return t ? { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' } }
+
+    // ── INTERCEPTOR 401 GLOBAL ──
+    // Un solo punto de manejo: cualquier petición de la app con sesión activa que
+    // reciba 401 de la API devuelve al login UNA sola vez, conservando location.hash
+    // (init() restaura la vista del hash tras re-autenticar). No se reescribieron los
+    // fetch existentes: el wrapper pasa por todos los fetch de window.fetch.
+    const _npOrigFetch = window.fetch.bind(window);
+    window.fetch = async function (input, opts) {
+      const resp = await _npOrigFetch(input, opts);
+      try {
+        const url = typeof input === 'string' ? input : (input && input.url) || '';
+        if (resp && resp.status === 401 && t && !_np401Done && url.startsWith(A)
+          && !url.includes('/auth/login') && !url.includes('/auth/refresh') && !url.includes('/auth/me')) {
+          sessionExpired();
+        }
+      } catch (e) { }
+      return resp;
+    };
+
+    function sessionExpired(msg) {
+      if (_np401Done) return;
+      logout(); // limpia token/intervalos/currentUser sin tocar location.hash
+      _np401Done = true;
+      showLoginError(msg || __t('sess_expired'));
+    }
+
+    // Latidos periódicos de la app: solo hacen trabajo con sesión activa.
+    function _npTick(fn, ms) { return setInterval(() => { if (t) fn() }, ms) }
+
+    // ── RENOVACIÓN SILENCIOSA DE SESIÓN ──
+    // POST /api/auth/refresh con el JWT vigente a los ~25 min (exp por defecto 30 min,
+    // margen de 5 min como pide el contrato en docs/handoffs/auth-session.md).
+    // 200 → se reprograma con el token nuevo. 401 → sesión no renovable: login UNA vez.
+    // Fallo de red u otro error → NO desloguea: reintenta en el próximo ciclo.
+    const NP_REFRESH_MS = 25 * 60 * 1000;
+    function scheduleRefresh() {
+      if (_refreshTimer) { clearTimeout(_refreshTimer); _refreshTimer = null; }
+      if (!t || t.startsWith('np_')) return; // las API keys np_ no son sesiones: el refresh las rechaza
+      _refreshTimer = setTimeout(refreshSession, NP_REFRESH_MS);
+    }
+    function stopRefresh() {
+      if (_refreshTimer) { clearTimeout(_refreshTimer); _refreshTimer = null; }
+    }
+    async function refreshSession() {
+      if (!t || t.startsWith('np_')) return;
+      try {
+        const r = await _npOrigFetch(`${A}/auth/refresh`, { method: 'POST', headers: { Authorization: `Bearer ${t}` } });
+        if (r.ok) {
+          const d = await r.json();
+          t = d.access_token;
+          localStorage.setItem('np_token', t);
+          scheduleRefresh();
+        } else if (r.status === 401) {
+          sessionExpired();
+        }
+        // Semáforo honesto: un fallo transitorio no invalida la sesión vigente.
+      } catch (e) { /* sin red: reintento en el próximo ciclo, sin cerrar sesión */ }
+    }
     function esc(s) { return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }
     function escAttr(s) { return esc(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;') }
 
@@ -3501,6 +3562,28 @@
       error.textContent = message;
       error.style.display = 'block';
     }
+    function enterSession(me, fallbackName) {
+      // Punto común de entrada a la app: lo usan el login manual y la restauración
+      // de sesión desde localStorage tras cargar la página.
+      currentUser = me;
+      const role = me.role || 'viewer';
+      _np401Done = false; // nueva sesión: el aviso global de 401 vuelve a estar disponible
+      document.getElementById('pass').value = '';
+      document.getElementById('login-error').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'none'; document.getElementById('main').style.display = 'block';
+      const uname = me.username || fallbackName || 'user';
+      document.getElementById('user-avatar').textContent = uname.slice(0, 2).toUpperCase();
+      document.getElementById('user-name').textContent = uname;
+      document.getElementById('user-role').textContent = role;
+      document.getElementById('dd-name').textContent = uname;
+      document.getElementById('dd-role').textContent = 'Rol: ' + role;
+      document.getElementById('info-api').textContent = 'Conectada';
+      // Todos los grupos visibles para cualquier usuario autenticado.
+      // El RBAC del backend sigue validando cada acción.
+      document.querySelectorAll('.sidebar-s').forEach(el => { el.style.display = 'block'; });
+      scheduleRefresh();
+      init()
+    }
     async function login() {
       if (loginBusy) return;
       const u = document.getElementById('user').value.trim(), p = document.getElementById('pass').value;
@@ -3520,23 +3603,12 @@
           return;
         }
         const d = await r.json(); t = d.access_token;
+        localStorage.setItem('np_token', t); // F5 no desloguea: ver restoreSession()
         const mr = await fetch(`${A}/auth/me`, { headers: { Authorization: `Bearer ${t}` } });
-        if (!mr.ok) { t = ''; showLoginError(__t('login_err_session')); return; }
-        const me = await mr.json(); currentUser = me; const role = me.role || 'viewer';
-        document.getElementById('pass').value = '';
-        document.getElementById('login-screen').style.display = 'none'; document.getElementById('main').style.display = 'block';
-        const uname = me.username || u || 'user';
-        document.getElementById('user-avatar').textContent = uname.slice(0, 2).toUpperCase();
-        document.getElementById('user-name').textContent = uname;
-        document.getElementById('user-role').textContent = role;
-        document.getElementById('dd-name').textContent = uname;
-        document.getElementById('dd-role').textContent = 'Rol: ' + role;
-        document.getElementById('info-api').textContent = 'Conectada';
-        // Todos los grupos visibles para cualquier usuario autenticado.
-        // El RBAC del backend sigue validando cada acción.
-        document.querySelectorAll('.sidebar-s').forEach(el => { el.style.display = 'block'; });
-        init()
-      } catch (e) { t = ''; showLoginError(__t('login_err_conn')); }
+        if (!mr.ok) { t = ''; localStorage.removeItem('np_token'); showLoginError(__t('login_err_session')); return; }
+        const me = await mr.json();
+        enterSession(me, u);
+      } catch (e) { t = ''; localStorage.removeItem('np_token'); showLoginError(__t('login_err_conn')); }
       finally { loginBusy = false; button.disabled = false; button.textContent = __t('login_submit'); }
     }
     function toggleUserMenu(ev) {
@@ -3548,10 +3620,38 @@
       if (dd) dd.classList.remove('open');
     });
     function logout() {
-      t = ''; currentUser = null; document.getElementById('main').style.display = 'none'; document.getElementById('login-screen').style.display = 'flex';
+      stopRefresh();
+      t = ''; currentUser = null; localStorage.removeItem('np_token');
+      if (window._rInt) { clearInterval(window._rInt); window._rInt = null }
+      if (window._mInt) { clearInterval(window._mInt); window._mInt = null }
+      if (window.dLiveT) { clearInterval(window.dLiveT); window.dLiveT = null }
+      document.getElementById('main').style.display = 'none'; document.getElementById('login-screen').style.display = 'flex';
       const dd = document.getElementById('user-dd'); if (dd) dd.classList.remove('open');
       document.getElementById('login-error').style.display = 'none'
     }
+
+    // ── RESTAURAR SESIÓN AL CARGAR LA PÁGINA ──
+    // Con 'np_token' vigente se entra directo (mismo flujo que login(): currentUser,
+    // avatar, sidebar, init()); sin sesión válida se muestra el login con el aviso.
+    (async function restoreSession() {
+      const saved = localStorage.getItem('np_token');
+      if (!saved) return;
+      t = saved;
+      try {
+        const r = await fetch(`${A}/auth/me`, { headers: { Authorization: `Bearer ${t}` } });
+        if (r.ok) {
+          enterSession(await r.json());
+        } else {
+          // El token venció o fue invalidado con la pestaña cerrada: limpiar y pedir credenciales.
+          t = ''; currentUser = null; localStorage.removeItem('np_token');
+          showLoginError(__t('sess_expired'));
+        }
+      } catch (e) {
+        // Sin red al arrancar NO es sesión expirada: se conserva 'np_token' y la
+        // próxima recarga (o el login manual) la reutiliza.
+        t = '';
+      }
+    })();
     function togSide() {
       // En escritorio (>=1280px) el rail siempre es visible; el toggle solo tiene sentido en pantallas medias.
       if (window.innerWidth >= 1280) return;
@@ -4027,9 +4127,10 @@
       if (hv && document.getElementById(`v-${hv}`)) swView(hv);
       void refreshAlertSummary();
       await loadDev(); await loadBk();
-      setInterval(loadH, 10000); setInterval(loadBk, 60000);
-      setInterval(refreshAlertSummary, 45000);
-      setInterval(() => { loadDev(); }, 30000);
+      // Los latidos corren solo con sesión activa (_npTick): tras logout quedan en no-ops.
+      _npTick(loadH, 10000); _npTick(loadBk, 60000);
+      _npTick(refreshAlertSummary, 45000);
+      _npTick(loadDev, 30000);
       document.getElementById('info-dev').textContent = devices.length
       // Cargar recursos de hardware tras inicio
       setTimeout(() => loadDonuts(), 1500);
