@@ -85,9 +85,9 @@ def test_mikrotik_port_8728_is_api_not_ssh(api, headers):
     assert ssh.connect.call_args.kwargs["port"] == 22
     assert ssh.connect.call_args.kwargs["look_for_keys"] is False
     assert ssh.connect.call_args.kwargs["allow_agent"] is False
-    assert ssh.connect.call_args.kwargs["timeout"] == 10
-    assert ssh.connect.call_args.kwargs["banner_timeout"] == 15
-    assert ssh.connect.call_args.kwargs["auth_timeout"] == 15
+    assert ssh.connect.call_args.kwargs["timeout"] == 30
+    assert ssh.connect.call_args.kwargs["banner_timeout"] == 30
+    assert ssh.connect.call_args.kwargs["auth_timeout"] == 30
 
 
 def test_ros_api_ssl_port_8729_is_not_used(api, headers):
@@ -205,6 +205,102 @@ def test_dns_error_returns_502(api, headers):
 
     assert res.status_code == 502
     assert "host no resuelto" in res.json()["detail"]
+
+
+# ── Kex SSH incompleto (hallazgo 6D / RouterOS) ────────────
+
+
+def _expected_kex_detail(timeout="30", device="mock_switch", host="192.0.2.10", port=22):
+    return (
+        f"Negociación SSH incompleta con {device} ({host}:{port}): "
+        f"el equipo tardó más que el timeout ({timeout} s). "
+        f"Revisa el equipo o sube NETPULSE_SFTP_CONNECT_TIMEOUT_S."
+    )
+
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "No existing session",
+        "Unable to complete handshake with the server.",
+        "Error reading SSH protocol banner",
+    ],
+)
+def test_kex_incomplete_returns_honest_502(api, headers, message):
+    """El kex agotado NO es credenciales: 502 con detail de negociación."""
+    ssh = _ssh()
+    ssh.connect.side_effect = paramiko.SSHException(message)
+
+    res = _request(
+        api, headers, "GET",
+        "/api/sftp/mikrotik-edge-01/list?path=/",
+        _device(id="mikrotik-edge-01", driver="ros", cli_port=2225),
+        ssh,
+    )
+
+    assert res.status_code == 502
+    detail = res.json()["detail"]
+    assert detail == _expected_kex_detail(
+        timeout="30", device="mikrotik-edge-01", host="192.0.2.10", port=2225
+    )
+    # Ni el texto crudo de paramiko ni una acusación de credenciales.
+    assert "No existing session" not in detail
+    assert "credenciales" not in detail.lower()
+
+
+def test_connect_timeout_env_controls_kex_timeout(api, headers, monkeypatch):
+    monkeypatch.setenv("NETPULSE_SFTP_CONNECT_TIMEOUT_S", "45")
+    sftp = MagicMock()
+    sftp.listdir_attr.return_value = []
+    ssh = _ssh(sftp)
+
+    res = _request(api, headers, "GET", "/api/sftp/mock_switch/list?path=/", _device(), ssh)
+
+    assert res.status_code == 200
+    assert ssh.connect.call_args.kwargs["timeout"] == 45
+
+
+def test_kex_detail_reports_env_timeout(api, headers, monkeypatch):
+    monkeypatch.setenv("NETPULSE_SFTP_CONNECT_TIMEOUT_S", "12.5")
+    ssh = _ssh()
+    ssh.connect.side_effect = paramiko.SSHException("No existing session")
+
+    res = _request(
+        api, headers, "GET", "/api/sftp/mock_switch/list?path=/", _device(), ssh,
+    )
+
+    assert res.status_code == 502
+    assert "timeout (12.5 s)" in res.json()["detail"]
+
+
+@pytest.mark.parametrize("raw", ["", "abc", "0", "-7"])
+def test_invalid_connect_timeout_env_falls_back_to_30(
+    api, headers, monkeypatch, raw
+):
+    monkeypatch.setenv("NETPULSE_SFTP_CONNECT_TIMEOUT_S", raw)
+    sftp = MagicMock()
+    sftp.listdir_attr.return_value = []
+    ssh = _ssh(sftp)
+
+    res = _request(api, headers, "GET", "/api/sftp/mock_switch/list?path=/", _device(), ssh)
+
+    assert res.status_code == 200
+    assert ssh.connect.call_args.kwargs["timeout"] == 30
+
+
+def test_authentication_error_is_not_reported_as_kex(api, headers):
+    """Regresión: un auth real sigue siendo 401, no negociación."""
+    ssh = _ssh()
+    ssh.connect.side_effect = paramiko.AuthenticationException(
+        "Unable to complete handshake"  # texto tramposo, clase correcta manda
+    )
+
+    res = _request(api, headers, "GET", "/api/sftp/mock_switch/list?path=/", _device(), ssh)
+
+    assert res.status_code == 401
+    assert res.json()["detail"] == (
+        "Autenticación SSH fallida en mock_switch: revisa credenciales"
+    )
 
 
 @pytest.mark.parametrize(

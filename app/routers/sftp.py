@@ -11,6 +11,10 @@ Notas de conexión:
   los passwords Fernet del inventario. Aquí no se vuelve a descifrar.
 - Cada fallo se traduce a un ``detail`` literal en español para que la UI
   pueda explicar la causa; nunca se devuelve una lista vacía como éxito.
+- ``SSHClient.connect(timeout=...)`` no es solo el timeout TCP: también limita
+  el *kex* SSH. RouterOS del laboratorio tarda 8–26 s en negociarlo, así que
+  el default es 30 s (``NETPULSE_SFTP_CONNECT_TIMEOUT_S``). Un kex incompleto
+  se clasifica como negociación fallida, **nunca** como credenciales.
 """
 
 import errno
@@ -45,9 +49,14 @@ _API_PORTS_BY_DRIVER: dict[str, frozenset[int]] = {
 }
 
 _SSH_DEFAULT_PORT = 22
-_CONNECT_TIMEOUT = 10
-_BANNER_TIMEOUT = 15
-_AUTH_TIMEOUT = 15
+# ``timeout`` de ``SSHClient.connect`` = espera del kex SSH completo.
+# RouterOS emulado tarda 8–26 s en DH-GEX (mismo diagnóstico que la terminal,
+# ``docs/handoffs/terminal.md`` §9); con 10 s paramiko abortaba el kex y
+# devolvía el engañoso "No existing session". 30 s cubre el laboratorio.
+_CONNECT_TIMEOUT_S = 30.0
+_CONNECT_TIMEOUT_ENV = "NETPULSE_SFTP_CONNECT_TIMEOUT_S"
+_BANNER_TIMEOUT = 30
+_AUTH_TIMEOUT = 30
 
 _PERMISSION_MARKERS = (
     "permission denied",
@@ -56,6 +65,32 @@ _PERMISSION_MARKERS = (
     "eacces",
     "eperm",
 )
+
+# Mensajes con los que paramiko describe un kex/banner que no terminó. No
+# indican credenciales rechazadas: la sesión ni siquiera llegó a autenticar.
+_KEX_INCOMPLETE_MARKERS = (
+    "no existing session",
+    "unable to complete handshake",
+    "handshake failed",
+    "error reading ssh protocol banner",
+    "kex",
+    "key exchange",
+    "negotiation",
+)
+
+
+def _connect_timeout_s() -> float:
+    """Timeout de conexión/kex desde ``NETPULSE_SFTP_CONNECT_TIMEOUT_S``.
+
+    Default 30 s. Valores no numéricos o ``<= 0`` vuelven al default (mismo
+    criterio que ``app/routers/terminal.py``).
+    """
+    raw = os.getenv(_CONNECT_TIMEOUT_ENV, "")
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return _CONNECT_TIMEOUT_S
+    return value if value > 0 else _CONNECT_TIMEOUT_S
 
 
 # ── Resolución de puerto SSH ────────────────────────────────
@@ -159,6 +194,39 @@ def _short_cause(exc: BaseException) -> str:
     return first_line[:200]
 
 
+def _is_kex_incomplete(exc: BaseException) -> bool:
+    """True si paramiko no completó el kex/banner (no es un fallo de auth).
+
+    RouterOS del laboratorio devuelve ``No existing session`` cuando el kex
+    excede el timeout; también se cubre ``Unable to complete handshake`` y
+    errores de negociación/banner. Autenticación real llega como
+    ``AuthenticationException`` y se clasifica antes (401).
+    """
+    try:
+        import paramiko
+    except ImportError:
+        return False
+    if not isinstance(exc, paramiko.SSHException):
+        return False
+    message = str(exc).lower()
+    return any(marker in message for marker in _KEX_INCOMPLETE_MARKERS)
+
+
+def _kex_error(
+    *, device_id: str, host: str, port: int, note: str = ""
+) -> HTTPException:
+    """502 honesto cuando el kex SSH no termina dentro del timeout."""
+    return HTTPException(
+        status_code=502,
+        detail=(
+            f"Negociación SSH incompleta con {device_id} ({host}:{port}): "
+            f"el equipo tardó más que el timeout ({_connect_timeout_s():g} s). "
+            f"Revisa el equipo o sube {_CONNECT_TIMEOUT_ENV}."
+        )
+        + note,
+    )
+
+
 def _is_sftp_unsupported(exc: BaseException) -> bool:
     """True si paramiko falla al pedir el subsistema SFTP (equipo sin SFTP)."""
     try:
@@ -249,6 +317,13 @@ def _connection_error(
                 f"No se pudo conectar a {device_id} ({host}:{port}): "
                 f"host no resuelto"
             ) + note,
+        )
+
+    if _is_kex_incomplete(exc):
+        # "No existing session" / "Unable to complete handshake": el kex no
+        # terminó a tiempo. NO es credenciales rechazadas; decirlo claro.
+        return _kex_error(
+            device_id=device_id, host=host, port=port, note=note
         )
 
     if _is_sftp_unsupported(exc):
@@ -437,7 +512,7 @@ def _get_ssh_client_and_sftp(device_id: str):
             port=port,
             username=username,
             password=password,
-            timeout=_CONNECT_TIMEOUT,
+            timeout=_connect_timeout_s(),
             banner_timeout=_BANNER_TIMEOUT,
             auth_timeout=_AUTH_TIMEOUT,
             # El inventario solo guarda password: no buscamos llaves ni agente.

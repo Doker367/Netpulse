@@ -45,10 +45,38 @@ La UI debe mostrar el `detail` completo (o su texto en tooltip); no lo recorte.
 
 Las credenciales se leen de `napalm_svc._find_device()`, que ya descifra los
 passwords Fernet del inventario. El backend usa solo password:
-`look_for_keys=false`, `allow_agent=false`, `timeout=10`, `banner_timeout=15`,
-`auth_timeout=15`.
+`look_for_keys=false`, `allow_agent=false`, `timeout=30` (ver §«Timeout de
+conexión y kex»), `banner_timeout=30`, `auth_timeout=30`.
 
 ---
+
+## Timeout de conexión y kex SSH
+
+`SSHClient.connect(timeout=...)` de paramiko **no es solo el timeout TCP**:
+también es el tiempo máximo que se espera el *kex* (intercambio de claves)
+SSH. El default de SFTP es **30 s** y se puede cambiar con
+`NETPULSE_SFTP_CONNECT_TIMEOUT_S`. Valores no numéricos o `<= 0` vuelven al
+default de 30 s.
+
+Motivo (hallazgos 6D/6E): el RouterOS del laboratorio (`127.0.0.1:2225`)
+negocia el banner `SSH-2.0-ROSSSH` y tarda **8–26 s** en completar
+`diffie-hellman-group-exchange-sha256` porque paramiko no anuncia el
+`curve25519-sha256` que RouterOS espera. Con el timeout anterior de 10 s el kex
+se agotaba a mitad y paramiko devolvía el engañoso `No existing session`.
+Medición real con el default nuevo: **23.5 s** y listado `200` (ver
+«Verificación en vivo 6E»).
+
+Un kex/banner incompleto **no son credenciales rechazadas**. Se clasifica como
+`502` con un `detail` de negociación (tabla común). `401` se reserva para
+`paramiko.AuthenticationException` real. Marcadores reconocidos:
+`No existing session`, `Unable to complete handshake`, `Error reading SSH
+protocol banner`, `kex`, `key exchange`, `negotiation`.
+
+El mismo criterio que `app/routers/terminal.py` (`NETPULSE_TERM_CONNECT_TIMEOUT_S`,
+30 s), pero la variable de SFTP es independiente: subir una no cambia la otra.
+
+---
+
 
 ## 1) `GET /api/sftp/{device_id}/list?path=/`
 
@@ -166,10 +194,11 @@ operación).
 
 | Código | `detail` literal | Causa real |
 |---|---|---|
-| `401` | `Autenticación SSH fallida en <device>: revisa credenciales` | `paramiko.AuthenticationException` |
-| `501` | `SFTP no soportado por este equipo (<device>); usa Terminal/Comandos para CLI` | SSH acepta la sesión pero no hay subsistema SFTP (`Channel closed`, `subsystem request failed`, etc.). Es el caso de los FRR del laboratorio. |
-| `502` | `No se pudo conectar a <device> (<host>:<port>): <causa>` | DNS, conexión rechazada, red/host inalcanzable, SSHException no relacionada con SFTP |
-| `504` | `Tiempo de espera agotado conectando a <device> (<host>:<port>)` | timeout de TCP/banner/auth |
+| `401` | `Autenticación SSH fallida en <device>: revisa credenciales` | `paramiko.AuthenticationException` (rechazo real de usuario/contraseña). |
+| `501` | `SFTP no soportado por este equipo (<device>); usa Terminal/Comandos para CLI` | SSH acepta la sesión pero no hay subsistema SFTP (`Channel closed`, `subsystem request failed`, etc.). Medido: los FRR del laboratorio actual **sí** lo publican y devuelven `200`; el 501 aplica a equipos sin `Subsystem sftp`. |
+| `502` | `Negociación SSH incompleta con <device> (<host>:<port>): el equipo tardó más que el timeout (<n> s). Revisa el equipo o sube NETPULSE_SFTP_CONNECT_TIMEOUT_S.` | **Kex/banner incompleto** (`No existing session`, `Unable to complete handshake`, `Error reading SSH protocol banner`). No es credenciales. `<n>` es el timeout efectivo (env o 30). |
+| `502` | `No se pudo conectar a <device> (<host>:<port>): <causa>` | DNS, conexión rechazada, red/host inalcanzable, `SSHException` no relacionada con kex ni con el subsistema SFTP |
+| `504` | `Tiempo de espera agotado conectando a <device> (<host>:<port>)` | timeout de TCP/banner/auth reportado como `socket.timeout`/`TimeoutError` |
 | `500` | `Librería paramiko no disponible en el servidor: <causa>` | instalación incompleta |
 | `400` | `El dispositivo no tiene hostname ni IP configurado.` | inventario incompleto |
 | `404` | `Dispositivo '<device_id>' no encontrado.` | id inexistente |
@@ -189,6 +218,7 @@ panel SFTP con título, explicación y acción:
 |---|---|---|
 | `401` | **Credenciales SSH rechazadas** | «El equipo rechazó el usuario/contraseña del inventario.» Acción: revisar credenciales; no reintentar en bucle. |
 | `504` | **Sin respuesta SSH** | Mostrar `<host>:<port>` del `detail`. «El equipo no respondió; puede ser firewall, puerto incorrecto o equipo apagado.» Si el `detail` menciona «puerto API», mostrar además: «El inventario apunta a la API, no a SSH.» |
+| `502` (negociación) | **Negociación SSH incompleta** | Si el `detail` empieza por «Negociación SSH incompleta», mostrar el timeout y la acción: reintentar en unos segundos o subir `NETPULSE_SFTP_CONNECT_TIMEOUT_S` en el servidor. **No** pedir credenciales ni borrar el inventario. |
 | `502` | **No se pudo conectar** | Mostrar la causa del `detail`. Si es `host no resuelto`, revisar DNS/IP; si es `conexión rechazada`, revisar puerto/servicio SSH. |
 | `501` | **SFTP no soportado por este equipo** | «Este equipo ofrece CLI por SSH pero no subsistema SFTP (habitual en FRR).» Acción primaria: **Abrir Terminal/Comandos**. No ofrecer reintentar SFTP. |
 | `403` (upload) | **Permiso denegado al escribir** | Mostrar `<remote_path>`. «El usuario SSH no puede escribir en esa ruta.» Sugerir otra carpeta (p. ej. `/tmp` o la de configuración permitida). |
@@ -215,28 +245,63 @@ Buenas prácticas obligatorias:
 ```js
 if (!res.ok) {
   const { detail } = await res.json();
-  showSftpBanner({
-    401: { title: 'Credenciales SSH rechazadas', action: 'revisar-credenciales' },
-    501: { title: 'SFTP no soportado por este equipo', action: 'abrir-terminal' },
-    502: { title: 'No se pudo conectar' },
-    504: { title: 'Sin respuesta SSH' },
-    403: { title: 'Permiso denegado' },
-    404: { title: 'No encontrado' },
-  }[res.status] || { title: 'Error SFTP' }, detail);
+  const title = res.status === 502 && detail.startsWith('Negociación SSH incompleta')
+    ? 'Negociación SSH incompleta'
+    : {
+        401: 'Credenciales SSH rechazadas',
+        501: 'SFTP no soportado por este equipo',
+        502: 'No se pudo conectar',
+        504: 'Sin respuesta SSH',
+        403: 'Permiso denegado',
+        404: 'No encontrado',
+      }[res.status] || 'Error SFTP';
+  showSftpBanner({ title }, detail);
   return; // nunca pintar items
 }
 ```
 
 ---
 
+## Verificación en vivo 6E (lab real)
+
+Fecha: 2026-10-24. Uvicorn desde este worktree en `127.0.0.1:8102`, usuario
+temporal `demo6e` (admin) e inventario temporal local con
+`mikrotik-edge-01` (`port: 8728`, `cli_port: 2225`, `admin`/vacío) y
+`cisco-core-01` (`127.0.0.1:2222`, `admin`/`admin`). No se leyó el inventario
+del repositorio principal. Procesos, usuario e inventario temporales se
+retiraron al terminar; `lsof` confirmó el puerto 8102 libre y
+`config/users.yaml`/`config/devices.yaml` volvieron a no existir.
+
+| Caso | Esperado | Real |
+|---|---|---|
+| `GET /api/sftp/mikrotik-edge-01/list?path=/` con default 30 s | Intentar `2225`, esperar el kex; 200 o 502 de negociación | **PASA.** HTTP `200` en **23.46 s**; `success: true`, ruta `/`, 1 elemento real (`skins`). El kex RouterOS cabe en 30 s. |
+| Mismo caso con `NETPULSE_SFTP_CONNECT_TIMEOUT_S=5` (forzado para probar la clasificación) | 502 de negociación, nunca `No existing session` crudo | **PASA.** HTTP `502` en `5.10 s`; traceback interno de paramiko: `No existing session`; respuesta: `Negociación SSH incompleta con mikrotik-edge-01 (127.0.0.1:2225): el equipo tardó más que el timeout (5 s). Revisa el equipo o sube NETPULSE_SFTP_CONNECT_TIMEOUT_S.` |
+| `GET /api/sftp/cisco-core-01/list?path=/` | 200 con listado real (FRR sí tiene SFTP) | **PASA.** HTTP `200` en `0.23 s`, 18 entradas reales (`bin`, `dev`, `etc`, `home`, …). |
+
+Lectura: con 30 s el caso MikroTik ya **no** falla por kex. Si un equipo tarda
+más de 30 s, la UI recibe el 502 de negociación y puede sugerir subir la
+variable; no se presenta como credenciales. La variable se validó en vivo con
+`5`, no solo en tests mockeados.
+
+---
+
 ## Pendientes explícitos
 
-- **Verificación real con Docker/laboratorio → tarjeta 6D.** Estos tests usan
-  paramiko y sockets mockeados; no se abrió ninguna conexión SFTP real.
-- **MikroTik del laboratorio:** su SSH está en `2225` pero el inventario no lo
-  declara. Para probar en 6D, añadir `cli_port: 2225` o `ssh_port: 2225` en
-  `config/devices.yaml` (fuera de la zona de esta tarjeta).
-- **FRR (cisco/juniper/switch del laboratorio):** no ofrecen subsistema SFTP;
-  el backend devolverá `501` de forma honesta. La UI debe ofrecer Terminal.
+- **Verificación real:** hecha en 6D (comportamiento general) y 6E (timeout de
+  kex y error honesto) contra el laboratorio activo; ver §«Verificación en
+  vivo 6E». Los tests de `tests/test_sftp.py` siguen siendo mockeados salvo
+  esa verificación manual documentada.
+- **MikroTik del laboratorio:** su SSH está en `2225` pero el inventario del
+  repositorio principal no lo declara. Para que SFTP lo use, añadir
+  `cli_port: 2225` o `ssh_port: 2225` en `config/devices.yaml` (fuera de la
+  zona de esta tarjeta). En la verificación 6E se usó un inventario temporal.
+- **FRR (cisco/switch del laboratorio):** el laboratorio actual **sí** ofrece
+  `Subsystem sftp` y devuelve `200` con listado real; no se debe asumir `501`
+  por driver. El `501` se reserva a equipos que aceptan SSH pero no publican
+  el subsistema SFTP.
+- **Valor de timeout en producción:** el default de 30 s cubre el RouterOS
+  medido (8–26 s). Si el parque incluye equipos más lentos, ajustar
+  `NETPULSE_SFTP_CONNECT_TIMEOUT_S`; no hay validación en vivo por encima de
+  30 s.
 - El frontend sigue siendo de la ventana de UI: este documento es el contrato,
   no una implementación.
