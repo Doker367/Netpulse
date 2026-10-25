@@ -1,0 +1,32 @@
+# Dedicated Linux VM: no writable host mounts, no host Docker socket.
+vmType: vz
+cpus: 4
+memory: 8GiB
+disk: 40GiB
+user:
+  name: lima
+  home: /home/lima
+images:
+  - location: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-arm64.img
+    arch: aarch64
+  - location: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img
+    arch: x86_64
+mounts: []
+containerd:
+  system: false
+  user: false
+provision:
+  - mode: system
+    script: |
+      #!/bin/bash
+      set -euo pipefail
+      apt-get update
+      apt-get install -y docker.io docker-compose-v2 rsync python3
+      systemctl enable --now docker
+      usermod -aG docker lima
+portForwards:
+  - guestPort: 443
+    hostPort: 443
+    hostIP: 127.0.0.1
+  - guestPortRange: [1, 65535]
+    ignore: true
