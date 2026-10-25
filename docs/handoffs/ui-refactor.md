@@ -1342,3 +1342,222 @@ Tras este lote quedan **j** y **k**:
 | 13 terminal/sftp | **hecha (este lote)** |
 | 14 topology (j) | siguiente |
 | 15 router, 16 boot (k) | al final por diseño (cierre) |
+
+---
+
+# Lote J — Tarjeta 10D-J: topología
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-j` (worktree `/Users/doker/np-w10n`) ·
+Commit: `refactor(ui): extraer lote j (topology)`.
+
+Penúltimo lote. Mismo método que A–I: grep de exclusividad ANTES de mover;
+sin cambio de comportamiento, sin duplicar y conservando el orden relativo.
+`dashboard.html` pasó de **4.087 → 3.576 líneas** (−511 netas: −524/+13; las
+13 añadidas son 1 `<script src>` + 12 líneas de comentario-stub). El contenido
+del `<script>` inline residual baja de **1.053 a 540 líneas**.
+
+## Orden de carga en dashboard.html (tras core.js y las 26 vistas previas, antes del inline)
+
+```html
+  <script src="/static/js/views/sftp.js?v=1"></script>
+  <script src="/static/js/views/topology.js?v=1"></script>
+  <script> /* inline restante: router/login/theme/misc */ </script>
+```
+
+`views/topology.js` es un script clásico (sin `defer`/`async`) en la posición
+que fija la tarjeta (entre `sftp.js` y el inline). Su top-level es estado
+`let`, declaraciones `function` y **un** listener `resize` (el DOM ya está
+parseado porque el script va al final del body, como en el monolito). Ese
+listener reajusta el canvas y llama `_topoMap.invalidateSize()`; se registra
+una sola vez y no se lee ningún símbolo de otro script al evaluar. Antes se
+registraba unas líneas más tarde, dentro del inline; ningún evento `resize`
+puede dispararse durante la evaluación síncrona, así que no hay cambio
+observable. Es el único listener `resize` de todo el panel (grep).
+
+Leaflet **no se toca**: `/static/vendor/leaflet.js` sigue en el `<head>`
+(línea 1510) y `leaflet.css` en la 1507. `L` es el global del vendor; el mapa
+(`_topoMap`), sus capas (`_topoDevLayer`, `_topoTraceLayer`) y el último trace
+(`_topoTraceData`) viajan con su `let` a `topology.js`, no a `window.x`.
+
+## Qué fue a `views/topology.js` (byte a byte; rango 1-indexed del archivo pre-lote)
+
+Tramo contiguo **3497–4021** (525 líneas), en el mismo orden relativo:
+
+| Orden | Contenido |
+|---|---|
+| 1 | Comentario `── TOPOLOGY (grafo canvas + mapa Leaflet + tabla + traceroute) ──` |
+| 2 | Estado: `let _topoData`, `_topoTab`, `_topoGraph`, `_topoGraphRAF`, `_topoMap`, `_topoDevLayer`, `_topoTraceLayer`, `_topoTraceData` |
+| 3 | `_t(k)` — alias local de i18n (`I18N[currentLang] / I18N.en`, sin fallback extra) |
+| 4 | `topoTab(tv)` — pestañas graph/map/table + `requestAnimationFrame` |
+| 5 | `buildTraceOrigins()` — rellena y conserva `#topo-trace-origin` |
+| 6 | `loadTopology()` — `GET /topology/map`; stats, nodos, tabla de enlaces, `buildTraceOrigins`, `topoTab(_topoTab)` y `renderTraceResult(null)` si no hay trace |
+| 7 | `_topoScreen2World`, `_topoResolveEdges` |
+| 8 | `startTopoGraph()` + `step`/`draw`/`loop` anidadas (física O(n²), drag, zoom, hover, tooltip; los handlers del canvas son `cv.onmouse*`/`onwheel`/`ondblclick`) |
+| 9 | `ensureTopoMap()` — Leaflet lazy (`L.map`, tile OSM, layerGroups), guard `typeof L === 'undefined'` |
+| 10 | `updateTopoMapDevices()` — `L.circleMarker` + popups + leyenda |
+| 11 | `redrawTopoTrace()` — markers/polilínea del trace y `fitBounds` |
+| 12 | `runTopoTrace()` — `POST /topology/traceroute`, mensajes con `setIconText`/`_t`, salto a mapa |
+| 13 | `clearTopoTrace()`, `renderTraceResult(d)` |
+| 14 | Listener `window.addEventListener('resize', …)` (canvas + Leaflet) |
+| 15 | Bloque `── HEALTH SCORES ──` con `loadHealth()` (código muerto, ver abajo) |
+
+Los `function` top-level cuelgan de window: los handlers del markup de
+`#v-topology` (`topoTab('graph'|'map'|'table')`, `loadTopology()`,
+`runTopoTrace()`, y el `onkeydown` del destino que llama `runTopoTrace()`), el
+`onclick="clearTopoTrace()"` generado por `renderTraceResult`, el despacho
+`swView('topology') → loadTopology()` y el listener `resize` resuelven sin
+cambios. `_t` era global por ser `function` top-level en el inline; ahora es
+`function` top-level de un script clásico (misma resolución por window).
+
+## Grep de exclusividad (14 funciones + 8 `let`)
+
+- **Markup de `#v-topology`**: solo atributos `on*`; resuelven por window en el
+  click, como en todos los lotes.
+- **`swView` (inline, lote k)**: única referencia externa, `if (v === 'topology')
+  loadTopology();`. Es tiempo de llamada.
+- **`core.js` + las 25 vistas previas**: CERO referencias a `topoTab`,
+  `buildTraceOrigins`, `loadTopology`, `_topoScreen2World`, `_topoResolveEdges`,
+  `startTopoGraph`, `ensureTopoMap`, `updateTopoMapDevices`, `redrawTopoTrace`,
+  `runTopoTrace`, `clearTopoTrace`, `renderTraceResult`, `loadHealth`, `_t` ni
+  a las 8 variables `_topo*`.
+- **Atributos `on*`**: ninguno nombra `_t` ni el estado `_topo*`.
+
+Consecuencia (regla 4): el estado se queda como `let` interno de
+`topology.js` (script clásico = binding del entorno léxico global compartido;
+ningún `on*` ni otro archivo lo consulta), no como `window._topo*`.
+
+## Decisiones de las trampas de la tarjeta
+
+| Tema | Decisión |
+|---|---|
+| Leaflet vendorizado, objeto `map` y capas | `L` sigue siendo el global del vendor; `_topoMap`/`_topoDevLayer`/`_topoTraceLayer`/`_topoTraceData` viajan con su `let`. No se movió ningún `<script src>` del `<head>` ni `leaflet.css` |
+| `_t` | Viaja: tras el Lote H (que movió `renderCmd`, su otro consumidor muerto) el grep da **un único archivo** (topology.js). No se colapsó en `__t` (sería cambio de comportamiento en el fallback: `_t` no cae a `en` si falta en el idioma) |
+| `loadHealth` (muerta) | Viaja tal cual con el tramo contiguo, como pedía el plan del Lote I. **No se revivió**: su `#health-list` no existe en el markup y su única aparición es la declaración. Es código muerto del mapa §2.3, no se borra sin tarjeta aparte |
+| Listener `resize` | Viaja (depende de `_topoTab`/`_topoGraph`/`_topoMap`). El otro `Escape` que el plan del Lote I mencionaba **no** es de topología: cierra `#user-dd` y es misc global; se queda inline |
+| rAF sin cancelar al cambiar pestaña/vista (§7.12) | Conservado tal cual: `_topoGraphRAF` solo se reasigna y `loop` se autodetuvo con `if (_topoGraph !== g) return`; no se añadió cancelación "de higiene" |
+| `esc`, `icon`, `setIconText`, `A`, `h`, `t`, `__t`, `I18N`, `currentLang` | Compartidos/core: quedan donde estaban; topology.js los resuelve en tiempo de llamada |
+| Markup de `#v-topology`, `#topo-*`, modal `#dp` | **Intacto**: los cortes son solo del `<script>` |
+
+## Qué NO se movió (verificado por grep)
+
+- **`swView` + `hashchange`** — router, lote k. Incluye su despacho
+  `if (v === 'topology') loadTopology();` sin tocar una línea.
+- **Listener global de `Escape` de `#user-dd`** — misc del inline, no de la
+  vista (ver arriba).
+- **`populateCmdDevices`** — sigue inline (N=2: `loadBk` de backups.js y
+  `swView('commands')`), decisión de los Lotes G/H.
+- **Helpfulness compartidos**: `esc`/`escAttr`, `IC`/`icon`/`iconTextHTML`/
+  `setIconText`, tema/paleta, `npExport`, `togSide`, `login`,
+  `__isAdmin`/`npGray`, `_fmtBytes` (×2, trampa §7.1), `_fmtUptime`, `alDur`,
+  `_detText`, `_repTs` y el estado compartido (`devices`, `sel`, `aTab`,
+  `bSel`, `bMode`, `alertSummary`, `overviewState`, `inventoryError`) — todo
+  sigue inline/core, sin duplicados.
+- **Markup y modal `#dp`**: intactos.
+
+## Verificación del lote
+
+- `node --check`: `views/topology.js` (573 líneas: 48 de header + 525 movidas),
+  `core.js`, las 26 vistas y el inline restante extraído a temporal
+  (**540 líneas**) → OK los 28.
+- **Smoke de evaluación real (vm de Node, contexto único, como H/I)**: los 28
+  scripts en su orden de carga (core → 26 vistas → inline) evalúan sin
+  `SyntaxError` ni redeclaraciones. Llamadas posteriores desde el contexto:
+  `topoTab('table'|'map'|'graph')`, `buildTraceOrigins()`,
+  `renderTraceResult(null)`, `clearTopoTrace()`, `_t('topo_tr_run')`,
+  `ensureTopoMap()`, `updateTopoMapDevices()`, `redrawTopoTrace()`,
+  `loadTopology()`, `loadHealth()`, `swView('topology')` y lectura de
+  `_topoTab`/`_topoData` → sin `ReferenceError`.
+- **Auditoría de equivalencia**: las 525 líneas del tramo viajan contiguas y
+  **byte a byte** (`body == git show HEAD` → `True`). Multiset de líneas no
+  vacías del `<script>` completo: **0 líneas de código perdidas y 0
+  duplicadas**; las únicas "extra" son las 12 líneas del comentario-stub y la
+  repetición del comentario de sección dentro de él.
+- Grep de redeclaración: los 14 nombres movidos con EXACTAMENTE 1
+  `(async )?function <nombre>` en `core.js` + `views/*.js` + inline; cada
+  `_topo*` con una sola declaración `let`, solo en `topology.js`.
+- Handlers invocados desde atributos `on*` (markup + strings generados en
+  todos los `.js` e inline): **0 sin resolver** (único falso positivo `if`,
+  como en todos los lotes).
+- Conteos: 4.087 − 524 + 13 = **3.576 líneas** (git numstat 13/524); inline
+  1.053 − 525 + 12 = **540 líneas**.
+- `tests/`: **358 passed**, exit 0 (con el `.venv` del repo principal,
+  `PYTHONPATH=.`).
+- `<link>` CSS intactos (`style.css?v=4` L12, `overview.css?v=3` L1505,
+  vendor xterm/leaflet L1506–1507); el `.js` nuevo con `?v=1`. Sin
+  `console.log`/`confirm` nuevos (grep = 0 en el archivo nuevo).
+
+## Divergencias documentadas
+
+1. **`loadHealth` viaja a topology.js aunque no es de topología**: es el
+   bloque muerto de Health Scores que quedó pegado al tramo de topología en el
+   monolito. El plan del Lote I lo listaba en `j`; moverlo con el tramo
+   contiguo evita dejar código muerto en el inline y no cambia comportamiento
+   (nadie la llama, `#health-list` no existe). No se borró ni se revivió.
+2. **`_t` viaja**: es un alias redundante de `__t`, pero su fallback es
+   distinto (no cae a `en`). Tras el Lote H su único consumidor es topología;
+   se conserva tal cual, sin "simplificar" a `__t`.
+3. **El listener `Escape` no viaja**: el plan del Lote I citaba
+   "listeners `resize`/`Escape`", pero el `Escape` contiguo a topología cierra
+   `#user-dd` (menú de usuario) y es global/misc. Solo el `resize` es de la
+   vista y es el que viaja.
+4. **El stub del inline añade 12 líneas**: por eso el inline queda en 540 y no
+   en 528. Es solo documentación; no hay código duplicado.
+5. **Una línea nueva fuera del bloque**: el `<script src="…/topology.js?v=1">`
+   entre `sftp.js` y el inline, como fija la tarjeta.
+
+## Estado del plan de extracción (cierre)
+
+Tras este lote **solo queda k** (router + boot, cierre del refactor):
+
+| Lote | Contenido |
+|---|---|
+| k | `swView` + listener `hashchange`; listeners globales (`document click` del menú, `keydown` de Escape/Ctrl+K, accesibilidad del sidebar), IIFE de tema, llamada `restoreSession()`, helpers compartidos que aún viven inline (ver checklist) y cierre del refactor |
+
+### Checklist exacto de lo que queda en el inline (para el lote k)
+
+**Estado / constantes**
+- `let devices = [], sel = null, aTab = 'facts', bSel = new Set(), bMode = false;`
+- `let alertSummary = null;` (tres estados; `null` ≠ 0)
+- `let overviewState = null, inventoryError = false;`
+- `let loginBusy = false;`
+- `const IC = {…}` (iconos SVG), `const PALETTES`, `const PALETTE_NAMES`
+
+**Funciones (24 declaraciones; `_fmtBytes` aparece 2 veces — trampa §7.1)**
+- Base DOM: `esc`, `escAttr`, `icon`, `iconTextHTML`, `setIconText`
+- Tema: `setPalette`, `setTheme`, `resetTheme`, `updateThemeUI`
+- Monitor/theme: `setRefreshInterval`
+- Login/misc: `login`, `toggleUserMenu`, `togSide`, `npExport`
+- Formato/estado: `_fmtBytes` (sombreada del bloque Performance), `_fmtBytes`
+  (ganadora del bloque OLA 4), `_fmtUptime`, `alDur`
+- Commands: `populateCmdDevices`
+- Compartidas: `__isAdmin`, `npGray`, `_detText`, `_repTs`
+- Router: `swView`
+
+**Sentencias top-level / listeners**
+- IIFE de tema al cargar (`localStorage` palette/accent).
+- `document.addEventListener('click', …)` → cierra `#user-dd`.
+- `restoreSession();` (llamada en el punto exacto del monolito; el cuerpo está
+  en core.js).
+- Accesibilidad del sidebar: `document.querySelectorAll('.sidebar-item[onclick]')`
+  → `role="button"`, `tabIndex`, `aria-current` y `keydown` Enter/Space.
+- `document.addEventListener('keydown', …)` → Escape cierra el drawer y
+  Ctrl/Cmd+K enfoca `#sb`.
+- `window.addEventListener('hashchange', …)` → `swView(hash)`.
+- `document.addEventListener('keydown', …)` → Escape cierra `#user-dd`.
+- Stubs de comentarios de los bloques ya extraídos: portada, `loadDev`, bulk,
+  detalle `#dp`, backups/compare, NetBox, device manager, topología, terminal/
+  SFTP, reports, discovery y OLA 4 — más los helpers compartidos que se quedan.
+
+| Fase del mapa (§5.2) | Estado |
+|---|---|
+| 1 core/state, 2 i18n, 5 session | hecha en core.js (paso 1) |
+| 3 dom, 4 format, 6 theme | pendiente (inline conserva esc/escAttr/IC/icon/tema) |
+| 7 vistas simples: A + B | hecha |
+| 8 performance+alerts+admin (Lote C) · backups/compare (Lote G) | hecha |
+| 9 reports, retention, sites, netbox | hecha (Lote D) |
+| 10 commands, monitoring | hecha (Lote E) |
+| 11 devices+discovery | hecha (Lote F) |
+| 12 dashboard+detalle | hecha (Lote H) |
+| 13 terminal/sftp | hecha (Lote I) |
+| 14 topology | **hecha (este lote)** |
+| 15 router, 16 boot (k) | **único pendiente: cierre** |
