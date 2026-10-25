@@ -1170,3 +1170,175 @@ Tras este lote quedan:
 | 12 dashboard+detalle | **hecha (este lote)** |
 | 13 terminal/sftp (i), 14 topology (j) | siguiente |
 | 15 router, 16 boot (k) | al final por diseño |
+
+---
+
+# Lote I — Tarjeta 10D-I: terminal + SFTP (la zona más viva)
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-i` (worktree `/Users/doker/np-w10m`) ·
+Commit: `refactor(ui): extraer lote i (terminal, sftp)`.
+
+Mismo enfoque que los Lotes A–H: grep de exclusividad ANTES de mover;
+`dashboard.html` pasó de **5.244 → 4.087 líneas** (−1.157 netas: −1.167/+10;
+las 10 añadidas son 8 de stub + 2 `<script src>`), y el contenido del
+`<script>` inline residual baja de **2.212 a 1.053 líneas**. Dos archivos
+nuevos, porque el bloque del monolito ya venía partido en Terminal y SFTP y
+cada mitad es una unidad cerrada (los cruces son tiempo de llamada).
+
+## Orden de carga en dashboard.html (tras core.js y los 24 previos, antes del inline)
+
+```html
+  <script src="/static/js/views/dashboard.js?v=1"></script>
+  <script src="/static/js/views/terminal.js?v=1"></script>
+  <script src="/static/js/views/sftp.js?v=1"></script>
+  <script> /* inline restante: router/login/theme/topology/misc */ </script>
+```
+
+Ambos son scripts clásicos (sin `defer`/`async`), en la posición que fija la
+tarjeta (entre `dashboard.js` y el inline, orden terminal → sftp, el mismo del
+monolito). Top-level **sin lógica**: solo `const` (TERM_*, `_TERM_TONES`,
+`_SFTP_ICON_*`), `let` de estado y declaraciones `function`. Ningún símbolo
+movido se lee al evaluar los scripts; todas las dependencias resuelven en
+tiempo de llamada, así que el orden entre ambos archivos solo importa para las
+declaraciones de estado (ver abajo).
+
+## Qué fue a cada archivo (byte a byte; rangos 1-indexed del archivo pre-lote)
+
+| Archivo | Contenido movido (mismo orden relativo) |
+|---|---|
+| `views/terminal.js` | Tramo 4021–4717: comentario `── CONSOLA WEB (TERMINAL SSH JSON) & GESTOR SFTP ──` + contrato, constantes `TERM_TAB_MAX`/`TERM_RETRY_MAX`/`TERM_BACKOFF_MS`/`TERM_PING_MS`/`TERM_PONG_TIMEOUT_MS`/`TERM_BUF_MAX`, estado `_term`/`_fitAddon`/`_termWs`, `_termSessions`, `_termActiveId`, `_termSeq`, `_currentTermTab`, `_sftpCurrentPath`, `_sftpDeviceId`, `_sftpBlocked`, `_sftpBusy`, `_sftpLastGoodPath`, y 36 funciones: `_termActive`, `switchTermTab`, `termPopulateDevices`, `termDevChanged`, `_setTermStatus`, `_termRenderTabs`, `termActivateTab`, `termCloseTab`, `_termCreateSession`, `_termBuildXterm`, `termOpenConsoleFor`, `termConnect`, `_termManualRetry`, `_termOpenWs`, `_termSendResize`, `_termStartPing`, `_termKillPings`, `_termStartBackoff`, `_termGaveUp`, `_termHandleError`, `_termHandleClosed`, `_termBanner` (+ `_TERM_TONES`), `_termHideBanner`, `_termRefreshUI`, `termDisconnect`, `termClear`, `_termWatchResize`, `termToggleFullscreen`, `_termCopySel`, `_termCopyFallback`, `termSearchRun`, `termSearchClose`, `_termMarkLine`, `cmdOpenConsole` |
+| `views/sftp.js` | Tramo 4719–5187: comentario `── GESTOR SFTP (TRANSFERENCIA DE ARCHIVOS) ──`, `_formatBytes`, `_formatTime`, `_sftpNormPath`, `_sftpJoin`, `_sftpArg`, `_sftpSetSummary`, `_sftpProgress`, `_sftpProgressDone`, `sftpHideBanner`, `sftpShowBanner`, `sftpSetTransferEnabled`, `sftpRenderBreadcrumb`, `_sftpNotice`, `const _SFTP_ICON_WARN/_SFTP_ICON_FOLDER`, `_sftpClearList`, `_sftpErrorInfo`, `sftpApplyError`, `sftpLoadDir`, `sftpRefresh`, `sftpOpenDir`, `sftpNavUp`, `sftpUploadSelectedFile`, `sftpHandleDrop`, `_sftpFilenameFromCd`, `_sftpSaveBlob`, `sftpDownloadFile` |
+
+Todo lo de la tarjeta viaja **tal cual**: pestañas (hasta 4), scrollback/buffer
+por pestaña, búsqueda en buffer, copiar/pegar (`_termCopySel` +
+`_termCopyFallback`), WS dual (`?token=…&fmt=json`), 4401/4403, idle,
+heartbeat 25 s + margen 10 s y backoff visible 1-2-4-8-15-15 s (6 intentos)
+con `_termGaveUp`. No se renombró, "modernizó" ni reordenó una sola línea.
+
+Los `function` top-level cuelgan de window: los `onclick`/`onchange`/
+`onkeydown`/`ondrop` del markup de `#v-terminal` (`termConnect`,
+`termDisconnect`, `termDevChanged`, `termClear`, `termToggleFullscreen`,
+`termSearchRun`, `_termCopySel`, `switchTermTab('terminal'|'sftp')`,
+`sftpLoadDir`, `sftpRefresh`, `sftpNavUp`, `sftpUploadSelectedFile`,
+`sftpHandleDrop`, `sftpHideBanner`), los `onclick` generados por
+`_termRenderTabs` (`termActivateTab`, `termCloseTab`, `termSearchClose`), por
+`sftpRenderBreadcrumb`/`sftpLoadDir` (`sftpLoadDir`, `sftpOpenDir`,
+`sftpDownloadFile`), el botón de `#v-commands` y su `onclick` generado
+(`cmdOpenConsole`) y el despacho de `swView` (`termPopulateDevices`) siguen
+resolviendo sin cambios.
+
+## Grep de exclusividad (los 59 nombres movidos)
+
+Consumidores fuera del bloque, recalculados post-Lote H:
+
+- **Markup de `#v-terminal` / `#v-commands`**: solo en atributos `on*`. Se
+  resuelven por window en el click, como en todos los lotes.
+- **`swView` (inline, lote k)**: `termPopulateDevices` (líneas 3469–3470),
+  `_currentTermTab` y `_fitAddon` (3471–3472). Nada más.
+- **`app/static/js/**` (core + 22 vistas previas): CERO referencias** a
+  cualquiera de los 59 nombres. Los dos archivos son mutuamente exclusivos.
+
+## Estado movido (regla 4)
+
+- `_term` / `_fitAddon` / `_termWs` (alias de la pestaña activa),
+  `_termSessions`, `_termActiveId`, `_termSeq`, `_currentTermTab` → viajan con
+  su `let` a `terminal.js`. `swView` los lee en tiempo de llamada; un
+  `let`/`const` top-level de un script clásico vive en el entorno léxico
+  global compartido entre scripts, así que el inline (evaluado después) los
+  ve, igual que hoy. **No** se pasaron a `window.x` (nadie los invoca desde
+  un atributo `on*` ni desde otro archivo por nombre global).
+- `_sftpCurrentPath` / `_sftpDeviceId` / `_sftpBlocked` / `_sftpBusy` /
+  `_sftpLastGoodPath` → se quedan declaradas en `terminal.js`, exactamente
+  donde estaban (el bloque de estado del monolito), y `sftp.js` las
+  lee/escribe en tiempo de llamada. No se duplican ni se crea un tercer
+  archivo de estado: `switchTermTab`/`termDevChanged` (terminal.js) y
+  `sftpLoadDir`/`sftpUpload*` (sftp.js) las comparten igual que antes.
+- `_TERM_TONES`, `_SFTP_ICON_WARN`, `_SFTP_ICON_FOLDER`, `TERM_*` → `const`
+  exclusivos de su archivo (grep: solo sus propias funciones).
+- `window._termRO` sigue siendo `window._termRO` (lo escribe/lee
+  `_termWatchResize`/`_termCreateSession`); `logout` (core.js) sigue sin
+  cerrar WS ni el observer (§7.15): defecto preexistente, no se tocó.
+
+## Trampas de la tarjeta — decisiones
+
+| Tema | Decisión |
+|---|---|
+| `_termXterm`/`xterm`/`fitAddon` | No existen como globales de window: son `s.term`/`s.fit` por sesión y los alias `_term`/`_fitAddon`/`_termWs`. Viajan con su `let` en `terminal.js` (consumidor externo: `swView`). `Terminal` (vendor xterm.js en `<head>`) se usa como global tal cual, con los guards `typeof Terminal === 'undefined'` intactos |
+| `initDragDrop` de monitoring.js | **NO se toca ni se reutiliza.** El drag & drop de SFTP es `sftpHandleDrop(event)` (dropzone del markup) y `ondragover/ondragleave` inline; `views/monitoring.js` conserva `initDragDrop` + `dragSrc` para los charts. Cero doble declaración |
+| `_formatBytes`/`_formatTime` | Nombres distintos de `_fmtBytes` (§7.1): exclusivos de SFTP, viajan a `sftp.js` |
+| `sftpLoadDir` en el centro Terminal ↔ SFTP (§7.14) | Viaja a `sftp.js`; `switchTermTab`/`termDevChanged` (terminal.js, cargado antes) lo llaman en tiempo de llamada. El estado `_sftp*` queda en terminal.js (arriba) |
+| Código 4401/4403, banners por causa | Byte a byte (`_termHandleClosed`/`_termHandleError`/`_termGaveUp`; `_sftpErrorInfo`/`sftpApplyError`/`sftpShowBanner`) |
+| `esc`/`escAttr`/`setIconText`/`_detText`/`devices`/`A`/`h`/`t`/`toast`/`__t`/`swView`/`loadDev` | Compartidos: QUEDAN inline/core (tiempo de llamada) |
+| Markup de `#v-terminal`, `#v-commands`, modal `#dp` | **Intacto**: los cortes son solo del `<script>` |
+
+## Verificación del lote
+
+- `node --check`: `views/terminal.js` (756 líneas), `views/sftp.js` (515),
+  `core.js`, las 24 vistas previas y el inline restante extraído a temporal
+  (**1.053 líneas**) → OK los 27.
+- **Smoke de evaluación real (vm de Node, contexto único, como el lote H)**:
+  los 27 scripts en su orden de carga (core → 22 vistas → terminal → sftp →
+  inline) evalúan sin `SyntaxError` ni redeclaraciones. Llamadas posteriores
+  desde el contexto: `termConnect()`, `switchTermTab('sftp')` y
+  `switchTermTab('terminal')`, `_termRefreshUI()`, `_termRenderTabs()`,
+  `sftpRefresh()`, `sftpRenderBreadcrumb('/a/b')`, `sftpHideBanner()`,
+  `_formatTime(0)` y lecturas de `_currentTermTab`/`_fitAddon` desde el inline
+  → sin `ReferenceError`.
+- **Auditoría de equivalencia**: los 697 renglones del tramo Terminal y los
+  469 del tramo SFTP aparecen **byte a byte** en los `.js` nuevos, contiguos y
+  en el mismo orden (`diff` contra `git show HEAD` = 0). Multiset de líneas no
+  vacías del `<script>` completo: **0 perdidas, 0 duplicadas**; las 8 extra
+  son el comentario-stub del inline.
+- Grep de redeclaración: los 59 nombres movidos con EXACTAMENTE 1
+  `(async )?function <nombre>` en todo el árbol; estado (`_term*`, `_sftp*`,
+  `TERM_*`, `_TERM_TONES`, `_SFTP_ICON_*`) declarado una sola vez.
+- Handlers invocados desde atributos `on*` del markup (80) y desde strings
+  generados (73): **0 sin resolver** (único falso positivo `if`).
+- Conteos: 5.244 − 1.167 + 10 = **4.087 líneas** (git numstat 10/1167).
+- `tests/`: **358 passed** (con el `.venv` del repo principal, `PYTHONPATH=.`).
+- `<link>` CSS intactos (style.css?v=4 L12, overview.css?v=3 L1505, vendor
+  xterm/leaflet L1506–1507); los 2 `.js` nuevos con `?v=1`. Sin
+  `console.log`/`confirm` nuevos (grep = 0 en ambos archivos).
+
+## Divergencias documentadas
+
+1. **Dos archivos, no uno**: la tarjeta los nombra por separado y el bloque
+   del monolito ya venía partido. El estado `_sftp*` se queda en
+   `terminal.js` porque ahí estaba declarado y lo comparten ambas mitades
+   (terminal lo escribe al cambiar pestaña/dispositivo; sftp lo lee y
+   escribe). Alternativa descartada: `window._sftp*` explícito — no lo pide
+   ningún `on*` y añadiría superficie global nueva sin necesidad.
+2. **Superficie global nueva**: 59 nombres (incluidos `_termOpenWs`,
+   `_formatBytes`, `_sftp*`…) pasan a ser `function` de un script clásico y
+   por tanto propiedades de `window`. Era inevitable al extraer (misma regla
+   que lotes anteriores) y no colisiona: grep = 1 declaración por nombre en
+   core + vistas + inline.
+3. **`_sftpErrorInfo` llama `switchTermTab('terminal')`** (501 → abrir
+   consola): cruce entre los dos archivos nuevos, resuelto por window en
+   tiempo de llamada; `sftp.js` se evalúa después de `terminal.js`.
+4. **Números del inline**: el anexo H citaba 2.214 líneas (con las etiquetas
+   `<script>`); aquí se miden 2.212 → 1.053 con el mismo criterio que los
+   lotes previos (contenido entre etiquetas).
+
+## Estado del plan de extracción (siguiente ronda)
+
+Tras este lote quedan **j** y **k**:
+
+| Lote | Contenido |
+|---|---|
+| j | topology (`_topo*`, `topoTab`, `buildTraceOrigins`, `loadTopology`, `startTopoGraph` + `step`/`draw`/`loop`, `ensureTopoMap`, `updateTopoMapDevices`, `redrawTopoTrace`, `runTopoTrace`, `clearTopoTrace`, `renderTraceResult`, `loadHealth` muerta + listeners `resize`/`Escape`) |
+| k | router (`swView` + `hashchange`) y boot (listeners globales del `.sidebar-item[onclick]`, IIFE de tema y `restoreSession`, `init` si no viajó, cierre del refactor) |
+
+| Fase del mapa (§5.2) | Estado |
+|---|---|
+| 1 core/state, 2 i18n, 5 session | hecha en core.js (paso 1) |
+| 3 dom, 4 format, 6 theme | pendiente (inline conserva esc/escAttr/IC/icon/tema) |
+| 7 vistas simples: A + B | hecha |
+| 8 performance+alerts+admin (Lote C) · backups/compare (Lote G) | hecha |
+| 9 reports, retention, sites, netbox | hecha (Lote D) |
+| 10 commands, monitoring | hecha (Lote E) |
+| 11 devices+discovery | hecha (Lote F) |
+| 12 dashboard+detalle | hecha (Lote H) |
+| 13 terminal/sftp | **hecha (este lote)** |
+| 14 topology (j) | siguiente |
+| 15 router, 16 boot (k) | al final por diseño (cierre) |
