@@ -2,42 +2,42 @@ name: CI
 
 on:
   push:
-    branches: [master, main]
+    branches: [main]
   pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - name: Instalar dependencias
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements-dev.txt
-
-      - name: Ruff (lint)
-        run: ruff check app tests
-
-      - name: Tests
-        run: pytest tests
+        run: pip install -r requirements-dev.txt
+      - name: Ruff (incluido en requirements-dev.txt)
+        run: ruff check app tests scripts
+      - name: Tests y sintaxis JavaScript y Bash
+        run: make ci PY=python
 
   typecheck:
     runs-on: ubuntu-latest
-    continue-on-error: true  # informativo: la tipificación completa es incremental
+    continue-on-error: true # Informativo: la tipificación completa es incremental.
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Instalar dependencias
-        run: pip install -r requirements-dev.txt
-
-      - name: Pyright
-        run: pyright app
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: pip install -r requirements-dev.txt
+      - run: pyright app
