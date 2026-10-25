@@ -276,3 +276,108 @@ despachador.
 | 11 devices+discovery, 12 dashboard+device-detail, 13 terminal/sftp, 14 topology | pendiente (más riesgosas) |
 | 15 router (`swView`), 16 boot | al final por diseño |
 
+
+---
+
+# Lote C — Tarjeta 10D-C: tramo medio (performance, alerts, admin)
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-c` (worktree `/Users/doker/np-w10g`) ·
+Commit: `refactor(ui): extraer tramo medio c (performance, alerts, admin)`.
+
+Mismo enfoque que los Lotes A/B: función a función con verificación de
+solapamiento por grep; dashboard.html pasó de 8483 → 7900 líneas
+(−585 líneas netas, +3 `<script src>`).
+
+## Orden de carga en dashboard.html (tras core.js y los 8 previos, antes del inline)
+
+```html
+<script src="/static/js/views/logs.js?v=1"></script>
+<script src="/static/js/views/performance.js?v=1"></script>
+<script src="/static/js/views/alerts.js?v=1"></script>
+<script src="/static/js/views/admin.js?v=1"></script>
+<script> /* inline restante */ </script>
+```
+
+Los 3 son scripts clásicos (sin defer/async). Ninguno lee un símbolo del
+inline a la carga (top-level = declaraciones `function` + 3 `let`/`const` de
+estado de vista), así que no hay inversión de orden posible: todas las
+dependencias (`A`, `h`, `t`, `esc`, `escAttr`, `__t`, `toast`, `__isAdmin`,
+`devices`, `alDur`, `_fmtUptime`, `_detText`) resuelven en tiempo de llamada
+contra el entorno léxico global / window.
+
+## Qué fue a cada archivo
+
+| Archivo | Funciones movidas (mismo orden relativo) |
+|---|---|
+| `views/performance.js` | `loadPerformance` (única función: ver decisión sobre `_fmtBytes`/`_fmtUptime`/`_donut` abajo) |
+| `views/alerts.js` | `loadAlerts` (+ comentario de sección), comentario+estado `alSilData/alSilConfirmId/alRulesData` (`let`) y `alRulesOpen` (`const`), `alUnavail`, `loadAlertSilences`, `alSilChips`, `alRenderSilences`, `togSilForm`, `silAddMatcher`, `alSilFormMsg`, `alSubmitSilence`, `alSilCancel`, `loadAlertRules`, `alRenderRules`, `alToggleExpr` |
+| `views/admin.js` | comentario `── ADMIN USERS ──` + `loadUsers`, `createUser`, `delUser`; y `let _r4Groups` (con su comentario) + comentario `── SCOPES RBAC ──` + `userScopeBadge`, `userScopePanel`, `userScopeSave`, `userScopeClearConfirm`, `userScopePanelClose`, `userScopeClear`, `userScopeClearExec` |
+
+`refreshAlertSummary` (badge del sidebar del dashboard) NO se tocó: es otra
+cosa, sigue en el inline. El `confirm('Eliminar …')` de `delUser` es el
+preexistente del onclick generado por `loadUsers`; no se añadió ninguno nuevo.
+
+## Decisión `performance`: grep previo a mover nada
+
+| Helper | Usado por (grep post-Lotes A/B) | Decisión |
+|---|---|---|
+| `_fmtBytes` | `loadPerformance` **no** la llama; la ÚNICA llamada es `_fmtBytes(b.uso_bytes)` de `retPruneExec` (Retention, inline), que resuelve a la **segunda** declaración (la que gana por hoisting, bloque Sites). La primera (bloque Performance) está sombreada | NINGUNA se mueve; ambas quedan en el inline. Mover la ganadora rompería Retention; mover la sombreada no cambia nada y tocaría la trampa §7.1 del mapa sin motivo |
+| `_fmtUptime` | `loadPerformance` y `_repDur` (Reports, inline) | compartida → queda |
+| `_donut` | `repRender` (Reports, inline). `loadPerformance` NO la llama (pinta los donuts inline en su template) | queda |
+
+Resultado: `views/performance.js` contiene solo `loadPerformance` (~117
+líneas) y los tres helpers siguen en el inline bajo el comentario
+`── PERFORMANCE VIEW (Real Data) ──` que los documentaba.
+
+## Qué NO se movió (verificado por grep)
+
+- **`alDur`** — la usan `alRenderSilences` y `alRenderRules` de esta vista,
+  pero también `_ageHuman` (bloque Sites/Retention del inline):
+  compartida → queda en el inline; las renders movidas la resuelven en
+  tiempo de llamada.
+- **`refreshAlertSummary`** — dashboard: cada 45 s escribe el badge del
+  sidebar y llama `updStats`.
+- **`__isAdmin` / `npGray`** — bloque de Groups del inline; también los usan
+  Compliance, NetBox, Reports, Sites y Retention (decisión del Lote A que se respeta).
+- **`esc` / `escAttr` / `_detText`** — compartidos (inline; `_detText` en el
+  bloque Reports): `loadUsers` y los userScope* los usan en tiempo de llamada.
+- **`t`, `currentUser`, `h`, `A`, `toast`, `__t`, `currentLang`, `devices`** —
+  core.js o estado compartido del inline.
+- **`userScope*`** se movieron porque grep demostró exclusividad con la vista
+  Admin (los onclick que los invocan se generan en el propio `loadUsers` y
+  `userScopePanel`). Con ellos viaja `let _r4Groups`: su ÚNICO consumidor es
+  `userScopePanel` (estaba declarada en el bloque Sites, pero Sites nunca la
+  lee). Si la extracción futura de Sites esperaba encontrarla inline, ya sabe
+  dónde está (header de `admin.js`).
+
+## Verificación del lote
+
+- `node --check`: 3 archivos nuevos OK + inline restante extraído a temporal
+  (4881 líneas) OK.
+- Auditoría de equivalencia de líneas: los 551 renglones no-vacíos del tramo
+  movido (rangos 1-indexed del archivo pre-lote: 4218–4337, 4339–4449,
+  4451–4456, 4466–4673, 5112–5157, 8080, 8389–8478) aparecen en los .js en el
+  mismo orden, byte a byte (0 diffs contra `git show HEAD`).
+- Grep de redeclaración: los 24 nombres movidos con exactamente 1
+  `(async )?function <nombre>` en core.js + views/*.js + el inline;
+  `_fmtBytes` (×2), `_fmtUptime`, `_donut`, `alDur`, `__isAdmin`, `npGray` y
+  `refreshAlertSummary` siguen solo en el inline.
+- Handlers inline sin resolver: 0 (la lista del mapa §6.4 da vacío salvo
+  `if`, que no es función).
+- `tests/`: 358 passed (con el .venv del repo principal).
+- `<link>` CSS intactos (style.css?v=4, overview.css?v=3); los 3 .js nuevos
+  con `?v=1`. Sin console.log/confirm nuevos.
+
+## Estado del plan de extracción (siguiente ronda)
+
+| Fase del mapa (§5.2) | Estado |
+|---|---|
+| 1 core/state, 2 i18n, 5 session | hecha en core.js (paso 1) |
+| 3 dom, 4 format, 6 theme | pendiente (inline conserva esc/escAttr/IC/icon/tema) |
+| 7 vistas simples: connectivity, compliance, webhooks, groups | hecha (Lote A) |
+| 7 resto: maintenance, apikeys, tfa, logs | hecha (Lote B) |
+| 8 performance+alerts+admin | **hecha (este lote)** · NOTA: backups y compare del mismo "fase 8" del mapa quedan fuera: acopladas a `loadDev` (tarjeta especial aparte) |
+| 9 reports, retention, sites, netbox | después; usan `__isAdmin`/`npGray`/`_detText`/`_npState*`/`_fmtBytes` (la ganadora, hoy solo la llama Retention) |
+| 10 commands, monitoring (con reasignación de `refMon` en el mismo archivo) | después |
+| 11 devices+discovery, 12 dashboard+device-detail, 13 terminal/sftp, 14 topology | pendiente (más riesgosas) |
+| 15 router (`swView`), 16 boot | al final por diseño |
