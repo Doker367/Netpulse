@@ -19,6 +19,10 @@
  *      invPreloadGroup, addInventoryDevice (grupo del alta Ola 9: envía
  *      `group`, 403 literal del backend y aviso de equipo sin grupo —
  *      Tarjeta 9B, lógica intacta) y loadInventory.
+ *      Tarjeta 12E: loadInventory pinta el inventario PAGINADO en cliente
+ *      (INV_PAGE_SIZES 50/100, controles #inv-search / #inv-page-size /
+ *      #inv-pager inyectados en #inv-list) y filtra sobre el conjunto completo
+ *      (_invRows), no sobre la página visible. GET /api/devices no cambia.
  *
  * Lo que NO viajó (verificado por grep, regla 2):
  * - `selD` (modal #dp): consumidores inline residuales — listener del #grid
@@ -43,6 +47,37 @@
  * setTimeout que relanzan loadInventory/loadDev tras alta/borrado.
  * Script clásico sin defer/async.
  */
+
+    // ── i18n de la paginación del inventario (Tarjeta 12E) ──
+    // Se declara aquí, no en core.js: la tarjeta solo toca la vista. I18N es un
+    // const de top-level de core.js (entorno léxico global compartido) y este
+    // script se evalúa después, así que el Object.assign llega a tiempo.
+    Object.assign(I18N.en, {
+      inv_page_search: 'Filter by ID, host, driver, type or group…',
+      inv_page_size: 'per page',
+      inv_page_size_aria: 'Rows per page',
+      inv_page_word: 'Page',
+      inv_page_of: 'of',
+      inv_page_devices: 'devices',
+      inv_page_prev: 'Previous',
+      inv_page_next: 'Next',
+      inv_page_prev_aria: 'Previous page',
+      inv_page_next_aria: 'Next page',
+      inv_page_none: 'No device matches this filter.'
+    });
+    Object.assign(I18N.es, {
+      inv_page_search: 'Filtrar por ID, host, driver, tipo o grupo…',
+      inv_page_size: 'por página',
+      inv_page_size_aria: 'Filas por página',
+      inv_page_word: 'Página',
+      inv_page_of: 'de',
+      inv_page_devices: 'equipos',
+      inv_page_prev: 'Anterior',
+      inv_page_next: 'Siguiente',
+      inv_page_prev_aria: 'Página anterior',
+      inv_page_next_aria: 'Página siguiente',
+      inv_page_none: 'Ningún equipo coincide con este filtro.'
+    });
 
     async function loadDev() {
       try {
@@ -474,22 +509,79 @@
       }
     }
 
-    async function loadInventory() {
-      const el = document.getElementById('inv-list'); if (!el) return;
-      invRefreshGroups(); // <select> de Grupo del formulario "Nuevo Dispositivo" (falla → fallback)
-      el.innerHTML = '<div class="sp" style="margin:20px auto"></div>';
-      try {
-        const r = await fetch(`${A}/devices`, { headers: h() });
-        let list = [];
-        if (r.ok) list = await r.json();
-        if (!r.ok || !Array.isArray(list)) list = devices;
+    // ── PAGINACIÓN DEL INVENTARIO (Tarjeta 12E: escala a 500 equipos) ──
+    // Paginación client-side: el backend sigue devolviendo todo el inventario
+    // (GET /api/devices no cambia) y aquí se pinta solo una página. La búsqueda
+    // filtra SIEMPRE sobre el conjunto completo recibido (_invRows), nunca sobre
+    // la página visible. Con ≤50 equipos se ve igual que antes, más el pie.
+    const INV_PAGE_SIZES = [50, 100];
+    let _invRows = [];       // último inventario completo recibido
+    let _invPage = 1;
+    let _invPageSize = 50;
+    let _invQuery = '';
 
-        if (!list || !list.length) {
-          el.innerHTML = '<div class="empty"><span class="icon"><svg class="ic" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="opacity:0.4;color:var(--text-ter)"><path d="m12 3 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8M7.5 5.5l9 5"/></svg></span><br>El inventario está vacío. Agrega equipos a la izquierda.</div>';
-          return;
-        }
+    function _invMatches() {
+      const q = _invQuery.trim().toLowerCase();
+      if (!q) return _invRows;
+      return _invRows.filter(d => [d.id, d.host, d.ip, d.hostname, d.driver, d.type, d.group]
+        .filter(Boolean).join(' ').toLowerCase().includes(q));
+    }
+    function _invPages() {
+      return Math.max(1, Math.ceil(_invMatches().length / _invPageSize));
+    }
+    function invGoPage(p) {
+      const total = _invPages();
+      const n = Math.min(Math.max(1, Math.round(Number(p) || 1)), total);
+      if (n === _invPage) return;
+      _invPage = n;
+      _invRenderRows();
+    }
+    function invNextPage() { invGoPage(_invPage + 1); }
+    function invPrevPage() { invGoPage(_invPage - 1); }
+    function invSetPageSize(n) {
+      const size = INV_PAGE_SIZES.includes(Number(n)) ? Number(n) : 50;
+      if (size === _invPageSize) return;
+      _invPageSize = size;
+      _invPage = 1;
+      _invRenderRows();
+    }
+    function invSearch(v) {
+      const q = v || '';
+      if (q === _invQuery) return;
+      _invQuery = q;
+      _invPage = 1;
+      _invRenderRows();
+    }
 
-        el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;text-align:left">
+    function _invRowHtml(d) {
+      return `<tr style="border-bottom:1px solid var(--border-s);transition:background .15s" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='transparent'">
+        <td style="padding:12px 10px;font-weight:600;color:var(--text)">${d.id} <span style="display:inline-block;margin-left:4px;width:6px;height:6px;border-radius:50%;background:${d._online || d.status === 'active' ? 'var(--green)' : 'var(--red)'}"></span></td>
+        <td style="padding:12px 10px;font-family:var(--mono);color:var(--text-secondary)">${d.host || d.ip || d.hostname || '—'}</td>
+        <td style="padding:12px 10px;color:var(--text-ter)">${d.port || 22}</td>
+        <td style="padding:12px 10px;color:var(--text-secondary)"><span class="badge" style="background:#202124">${(d.driver || 'desconocido').toUpperCase()}</span></td>
+        <td style="padding:12px 10px;color:var(--text-ter)">${(d.type || '—')} / ${(d.group || '—')}</td>
+        <td style="padding:12px 10px;text-align:right">
+          <button class="btn btn-o btn-xs" style="padding:4px 8px;font-size:9px" onclick="selD('${d.id}')">Detalle</button>
+        </td>
+      </tr>`;
+    }
+
+    function _invRenderRows() {
+      const wrap = document.getElementById('inv-table-wrap');
+      if (!wrap) return;
+      const rows = _invMatches();
+      const pages = Math.max(1, Math.ceil(rows.length / _invPageSize));
+      if (_invPage > pages) _invPage = pages;
+      if (_invPage < 1) _invPage = 1;
+      const start = (_invPage - 1) * _invPageSize;
+      const pageRows = rows.slice(start, start + _invPageSize);
+
+      if (!rows.length) {
+        wrap.innerHTML = !_invRows.length
+          ? '<div class="empty"><span class="icon"><svg class="ic" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="opacity:0.4;color:var(--text-ter)"><path d="m12 3 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8M7.5 5.5l9 5"/></svg></span><br>El inventario está vacío. Agrega equipos a la izquierda.</div>'
+          : `<div class="empty" id="inv-empty">${esc(__t('inv_page_none'))}</div>`;
+      } else {
+        wrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;text-align:left">
           <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px">
             <th style="padding:12px 10px;font-weight:600">ID / Hostname</th>
             <th style="padding:12px 10px;font-weight:600">Host (IP)</th>
@@ -498,18 +590,75 @@
             <th style="padding:12px 10px;font-weight:600">Tipo / Grupo</th>
             <th style="padding:12px 10px;text-align:right">Acciones</th>
           </tr></thead>
-          <tbody>${list.map(d => `<tr style="border-bottom:1px solid var(--border-s);transition:background .15s" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='transparent'">
-            <td style="padding:12px 10px;font-weight:600;color:var(--text)">${d.id} <span style="display:inline-block;margin-left:4px;width:6px;height:6px;border-radius:50%;background:${d._online || d.status === 'active' ? 'var(--green)' : 'var(--red)'}"></span></td>
-            <td style="padding:12px 10px;font-family:var(--mono);color:var(--text-secondary)">${d.host || d.ip || d.hostname || '—'}</td>
-            <td style="padding:12px 10px;color:var(--text-ter)">${d.port || 22}</td>
-            <td style="padding:12px 10px;color:var(--text-secondary)"><span class="badge" style="background:#202124">${(d.driver || 'desconocido').toUpperCase()}</span></td>
-            <td style="padding:12px 10px;color:var(--text-ter)">${(d.type || '—')} / ${(d.group || '—')}</td>
-            <td style="padding:12px 10px;text-align:right">
-              <button class="btn btn-o btn-xs" style="padding:4px 8px;font-size:9px" onclick="selD('${d.id}')">Detalle</button>
-            </td>
-          </tr>`).join('')}</tbody>
+          <tbody>${pageRows.map(_invRowHtml).join('')}</tbody>
         </table>`;
+      }
+
+      const pager = document.getElementById('inv-pager');
+      if (pager) {
+        const btn = 'padding:4px 10px;font-size:10px';
+        // Pie encima de la tabla (no al final): #inv-list crece con la página y
+        // con 50 filas un pie al final quedaría a 2 600 px de scroll.
+        pager.innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border-s)">
+            <div style="font-size:11px;color:var(--text-ter)">
+              <span data-i18n="inv_page_word">${esc(__t('inv_page_word'))}</span>
+              <strong id="inv-page-cur" style="color:var(--text-secondary)">${_invPage}</strong>
+              <span data-i18n="inv_page_of">${esc(__t('inv_page_of'))}</span>
+              <strong id="inv-page-total" style="color:var(--text-secondary)">${pages}</strong>
+              · <strong id="inv-count" style="color:var(--text-secondary)">${pageRows.length}</strong>
+              <span data-i18n="inv_page_devices">${esc(__t('inv_page_devices'))}</span>
+              <span id="inv-count-all">(${rows.length}${_invQuery.trim() ? ' / ' + _invRows.length : ''})</span>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button type="button" class="btn btn-o" id="inv-prev" style="${btn}" onclick="invPrevPage()" ${_invPage <= 1 ? 'disabled' : ''}
+                data-i18n="inv_page_prev" data-i18n-aria="inv_page_prev_aria" aria-label="${escAttr(__t('inv_page_prev_aria'))}">${esc(__t('inv_page_prev'))}</button>
+              <button type="button" class="btn btn-o" id="inv-next" style="${btn}" onclick="invNextPage()" ${_invPage >= pages ? 'disabled' : ''}
+                data-i18n="inv_page_next" data-i18n-aria="inv_page_next_aria" aria-label="${escAttr(__t('inv_page_next_aria'))}">${esc(__t('inv_page_next'))}</button>
+            </div>
+          </div>`;
+      }
+    }
+
+    async function loadInventory() {
+      const el = document.getElementById('inv-list'); if (!el) return;
+      invRefreshGroups(); // <select> de Grupo del formulario "Nuevo Dispositivo" (falla → fallback)
+      // Barra de filtro + contenedor de tabla + pie de paginación: se crean una
+      // sola vez para no perder el foco ni el filtro al recargar el inventario.
+      if (!document.getElementById('inv-table-wrap')) {
+        el.innerHTML = `
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
+            <input id="inv-search" type="search" autocomplete="off" spellcheck="false"
+              placeholder="${escAttr(__t('inv_page_search'))}" title="${escAttr(__t('inv_page_search'))}"
+              data-i18n-title="inv_page_search" oninput="invSearch(this.value)"
+              style="flex:1 1 220px;min-width:200px;height:32px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0 10px;color:var(--text);font-size:12px">
+            <select id="inv-page-size" onchange="invSetPageSize(this.value)"
+              data-i18n-aria="inv_page_size_aria" aria-label="${escAttr(__t('inv_page_size_aria'))}"
+              style="flex:0 0 auto;width:88px;height:32px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:11px;padding:0 8px">
+              ${INV_PAGE_SIZES.map(n => `<option value="${n}">${n}</option>`).join('')}
+            </select>
+            <span style="font-size:10px;color:var(--text-ter)" data-i18n="inv_page_size">${esc(__t('inv_page_size'))}</span>
+          </div>
+          <div id="inv-pager"></div>
+          <div id="inv-table-wrap"></div>`;
+        const sizeSel = document.getElementById('inv-page-size');
+        if (sizeSel) sizeSel.value = String(_invPageSize);
+        const search = document.getElementById('inv-search');
+        if (search) search.value = _invQuery;
+      }
+      const wrap = document.getElementById('inv-table-wrap');
+      if (wrap) wrap.innerHTML = '<div class="sp" style="margin:20px auto"></div>';
+      try {
+        const r = await fetch(`${A}/devices`, { headers: h() });
+        let list = [];
+        if (r.ok) list = await r.json();
+        if (!r.ok || !Array.isArray(list)) list = devices;
+
+        _invRows = Array.isArray(list) ? list : [];
+        _invRenderRows();
       } catch (e) {
-        el.innerHTML = '<div class="empty"><span class="icon"><svg class="ic" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="opacity:0.4;color:var(--text-ter)"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span><br>Error cargando inventario: ' + esc(e.message) + '</div>';
+        if (wrap) wrap.innerHTML = '<div class="empty"><span class="icon"><svg class="ic" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="opacity:0.4;color:var(--text-ter)"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span><br>Error cargando inventario: ' + esc(e.message) + '</div>';
+        const pager = document.getElementById('inv-pager');
+        if (pager) pager.innerHTML = '';
       }
     }
