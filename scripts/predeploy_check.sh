@@ -227,6 +227,9 @@ PY
 fi
 
 # 2) TCP 443 y redirección HTTP→HTTPS
+if [ "$URL_SCHEME" = http ]; then
+  record 2 "Red y redirección" SKIP "URL http local: 443 y redirección HTTPS no aplican (valida con --url https://… en producción)"
+else
 c2_fail=0; c2_skip=0; c2_parts=()
 TCP_HOST=${DOMAIN:-$URL_HOST}
 if python3 - "$TCP_HOST" <<'PY'
@@ -267,6 +270,7 @@ case "$redirect_code" in
 esac
 c2_detail=$(join_details "${c2_parts[@]}")
 record 2 "Red y redirección" "$(aggregate_status "$c2_fail" "$c2_skip")" "$c2_detail"
+fi
 
 # 3) TLS
 if [ -z "$DOMAIN" ]; then
