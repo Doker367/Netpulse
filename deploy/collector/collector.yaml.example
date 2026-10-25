@@ -1,0 +1,73 @@
+# Ejemplo de configuración del colector remoto — despliegue Docker por site.
+#
+# Copiar a /etc/netpulse/collector.yaml en el nodo del site. Este archivo NO
+# contiene secretos: la API key va en /etc/netpulse/collector.env (o en
+# central.api_key_file montado aparte).
+#
+# En el contenedor, la ruta del buffer debe ser exactamente la del volumen
+# definido en docker-compose.yml (/var/lib/netpulse-collector). No la cambies
+# a /tmp: el buffer debe sobrevivir a reinicios y recreaciones del contenedor.
+#
+# Lo que hay que cambiar en producción (todo lo demás puede quedarse):
+#   - site_id / collector_id: EXACTAMENTE los de la API key kind=collector.
+#   - central.base_url: https:// del NetPulse central real del NOC.
+#   - central.verify_tls: true (nunca false en producción).
+#   - central.ca_file: ruta dentro del contenedor si el central usa CA privada
+#     (montarla en docker-compose.yml).
+#   - probe.interval_s / timeout_ms: según la criticidad del site.
+#   - devices: inventario real del site (IP/hostname, puerto y protocolo).
+#
+# El CLI valida este YAML de forma estricta: una clave desconocida o un typo
+# hace fallar `--check`/el arranque con exit 2, en vez de monitorizar de menos
+# en silencio.
+
+schema_version: 1
+
+site_id: site-lima                 # p. ej. site-cdmx, site-mty; debe coincidir con la key
+collector_id: collector-lima-01    # un único colector activo por site (fase 1)
+
+central:
+  base_url: https://noc.example.net   # sin barra final; HTTPS en producción
+  api_key_env: NETPULSE_COLLECTOR_API_KEY
+  # Alternativa más estricta que env_file: montar la key en solo-lectura y
+  # apuntar aquí. Requiere un volumen extra en docker-compose.yml.
+  api_key_file: null
+  verify_tls: true                  # false SOLO para pruebas HTTP en localhost
+  ca_file: null                     # p. ej. /etc/netpulse/ca.pem si es CA privada
+  timeout_s: 10
+
+probe:
+  interval_s: 60                    # cadencia por defecto; 10 es el mínimo
+  timeout_ms: 1500                  # timeout de TCP connect / ping
+  workers: 8                        # sondas en paralelo
+  icmp_count: 1                     # contrato actual: exactamente 1
+
+buffer:
+  # Volumen persistente del compose. No usar /tmp ni el rootfs (read_only).
+  path: /var/lib/netpulse-collector/buffer.sqlite3
+  max_rows: 500000                  # cota de filas (aprox. 72 h con ~20 devices)
+  max_age_hours: 72                 # lo no sincronizado más viejo se descarta
+  synced_retention_hours: 6         # margen para diagnosticar tras sincronizar
+  min_free_mb: 200                  # pausa la sonda si el volumen baja de esto
+
+sync:
+  interval_s: 30                    # intento de envío por lote
+  heartbeat_s: 60                   # late aunque no haya muestras nuevas
+  batch_max_samples: 200            # el central admite hasta 500 por POST
+  backoff_base_s: 5                 # backoff exponencial con jitter
+  backoff_max_s: 300
+
+# Inventario del site. `protocol: snmp` (o puerto 161) fuerza sonda ICMP con
+# el binario ping; ssh/telnet miden el handshake TCP contra host:port.
+# El `id` es el identificador estable que verá el central: no lo cambies sin
+# asumir que las series históricas quedan con otro nombre.
+devices:
+  - id: sw-access-01
+    hostname: 10.10.0.11
+    port: 22
+    protocol: ssh
+    driver: ios
+  - id: fw-edge-01
+    hostname: 10.10.0.1
+    port: 161
+    protocol: snmp
