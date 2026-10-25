@@ -665,3 +665,141 @@ Estados por fase del mapa (§5.2): fases 1/2/5 hechas (core), 3/4/6 pendientes
 (Lotes A-B), fase 8 parcial (Lote C; backups/compare → lote g), fase 9 hecha
 (Lote D), **fase 10 hecha (este lote)**, fases 11-16 pendientes en el orden
 f/g/h/i/j/k.
+
+---
+
+# Lote F — Tarjeta 10D-F: devices + discovery (con `loadDev` y bulk)
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-f` (worktree `/Users/doker/np-w10j`) ·
+Commit: `refactor(ui): extraer lote f (devices + discovery)`.
+
+Mismo enfoque que los Lotes A-E: función a función con verificación de
+solapamiento por grep; dashboard.html pasó de 6740 → 6004 líneas (−736 líneas
+netas, +2 `<script src>`).
+
+## Orden de carga en dashboard.html (tras core.js y los 19 previos, antes del inline)
+
+```html
+<script src="/static/js/views/monitoring.js?v=1"></script>
+<script src="/static/js/views/discovery.js?v=1"></script>
+<script src="/static/js/views/devices.js?v=1"></script>
+<script> /* inline restante */ </script>
+```
+
+Ambos son scripts clásicos (sin defer/async), en la posición que fija la
+tarjeta (entre monitoring.js y el inline; orden discovery → devices). Ambos
+son solo declaraciones `function` + `let`/`const` de estado propio (ninguna
+sentencia de nivel superior executable): ningún símbolo movido se lee a la
+evaluación, así que el orden entre ellos no es observable.
+
+## Qué fue a cada archivo (mismo orden relativo; rangos 1-indexed del archivo pre-lote)
+
+| Archivo | Contenido movido |
+|---|---|
+| `views/devices.js` | `loadDev` (3354–3429, **latido canónico 30 s**: viaja la función completa tal cual, trampa §7.6 intacta — pisa `#cmp-a`/`#cmp-b` con `selectedIndex=1` y llama `buildSchedForms` en cada pasada); comentario `── BULK OPERATIONS ──` + bulk de la grilla del overview: `tB`, `tB2`, `updB`, `bClear`, `bulkPanel`, `bulkClosePanel`, `bulkReset`, `bulkSummary`, `bCmd`, `bCmdRun`, `bPing`, `bFacts` (3469–3593); `delDev` (3940–3947); comentario `── DEVICE MANAGER (V-INVENTORY) ──` + `_invContainer`, `toggleInvAuth`, `toggleInvCli`, estado `let _invGroupsCache` + comentario/grupo Tarjeta 9B + `_invGroupEls`, `_invGroupSetManual`, `invGroupChanged`, `invRefreshGroups`, `invReadGroup`, `invPreloadGroup`, `addInventoryDevice`, `loadInventory` (4345–4601) |
+| `views/discovery.js` | Comentario de contrato (docs/handoffs/discovery.md) + estado `let dw` + `const DW_ESTADO` + `_dwEstadoText`, `_dwResList` y las 17 funciones del wizard: `dwOpen`, `dwClose`, `dwReset`, `dwRender`, `dwPanelError`, `dwStep1`, `dwToggleAllSources`, `dwScan`, `dwStep2`, `dwToStep3`, `dwStep3`, `dwSel`, `dwSelAll`, `dwToStep4`, `dwStep4`, `dwImport` (6405–6712) |
+
+Los `function` top-level cuelgan de window: botón Refresh de `#v-devices`,
+`onblur`/`onchange`/`oninput` del formulario de alta, botones del `#bulk-bar`
+de `#v-dashboard`, onclick="delDev(sel.id)" del modal `#dp`, onclick de las
+filas de inventario (`selD`), `onclick="dwOpen()"` y todo el onclick generado
+por dwRender/dwStep* — además de init/`_npTick(loadDev, 30000)`/`swView`
+('devices', 'terminal') y `loadReports`/`dwOpen`/`dwImport`/`addInventoryDevice`
+/`delDev` — siguen resolviendo sin cambios.
+
+## Las trampas de la tarjeta — decisiones
+
+| Símbolo | Consumidores (grep post-Lote E) | Decisión |
+|---|---|---|
+| `loadDev` | `init` (inline, 3343/3347), botón "Actualizar" del overview (markup), `delDev`/`addInventoryDevice` (movidas), `dwOpen`/`dwImport` (discovery.js), `loadReports` (reports.js), `swView('terminal')` (inline) | **VIAJA completa a devices.js** (la tarjeta lo instruye: "mueve la función completa tal cual"). NINGUNO de sus consumidores la lee a nivel de evaluación: todos resuelven contra window en tiempo de llamada. Los acoples del latido (renderD/loadDonuts/updStats/buildSchedForms + selects de Compare) quedan inline y se resuelven igual; tarjeta especial de backups/compare (lote g) pendiente |
+| `selD` | loadInventory emite `onclick="selD(...)"` (cada fila: window en el click OK) PERO el listener top-level del `#grid` y el del `#ops-focus-items` — INLINE RESIDUAL (3640, 3657) — la llaman, y el modal `#dp` la consume | **QUEDA inline** (la tarjeta: "consumidores inline residuales → QUEDA; no moverla por conveniencia") |
+| `delDev` | ÚNICO llamador: `onclick="delDev(sel.id)"` del modal `#dp` (markup, queda) — se resuelve por window en el click; nada la lee a la evaluación | **VIAJA a devices.js** (candidata de la tarjeta); el modal `#dp` no se tocó |
+| Bulk (`tB`…`bFacts`) | Botones del `#bulk-bar` (markup que queda) y checkbox que genera `renderD` (que queda) — window en el click | **VIAJAN a devices.js** (tarjeta: "pertenecen a devices"). `fDev` NO viaja: `renderD` la llama al final de cada render (inline residual) |
+| `bSel`/`bMode`/`devices`/`sel` | Movidas (bulk, loadDev) Y las que quedan (renderD 3598/3599, listener del `#grid` 3640) | **QUEDAN en el inline** (declaración `let` original 3021–3024, sin tocar): bindings del entorno léxico global compartido, tiempo de llamada |
+| `_invGroupsCache` | Solo las movidas de devices.js + `logout` (core.js la asigna a `null`, 826) | **VIAJA a devices.js** (`let`); logout la resuelve en tiempo de llamada (mismo patrón que `repState`, Lote D: el logout solo existe tras login, imposible antes de evaluar los 21 scripts) |
+| `dw`/`DW_ESTADO` | Solo el bloque wizard | **VIAJAN a discovery.js** (`let`/`const`); ningún atributo on* ni otro script los consulta |
+| `_detText` / `_repTs` | dwScan/dwStep2/dwStep3/dwImport (movidas) + sftp/admin/reports/etc (inline) | **QUEDAN inline** (compartidas, mapa §2.1) |
+| `populateCmdDevices`, `buildSchedForms`, `renderD`, `loadDonuts`, `updStats`, `refreshAlertSummary`, `loadH`, `init`, `swView` | acoples fuera de devices | **QUEDAN inline** (dashboard, lote h; backups/compare, lote g) |
+| `esc`/`escAttr`/`setIconText`/core (`A`,`h`,`t`,`toast`,`__t`,`_npTick`) | compartidos | QUEDAN (tiempo de llamada) |
+
+## Qué NO se tocó
+
+- Markup de TODAS las vistas y del modal `#dp` (ni qa*/rCmdBig/c-big/soporte):
+  los 5 cortes son del `<script>` inline, y el markup de `#v-devices`/`#dw-panel`
+  se queda tal cual (sus handlers resuelven por window).
+- Lógica Ola 9 de `addInventoryDevice` (envío de `group`, 403 literal del
+  backend, aviso de equipo sin grupo, upsert 409→PUT, `setTimeout` 1 s) y de
+  `loadInventory`: byte a byte.
+- El bloque de accesibilidad del sidebar (4603–4620 pre-lote) quedó EXACTO tras
+  el corte: es infraestructura (mapa §7.9, candidato a boot.js), no devices.
+
+## Verificación del lote
+
+- `node --check`: views/discovery.js, views/devices.js, core.js, los 17 .js
+  previos y el inline restante extraído a temporal (2978 líneas) → OK.
+- Auditoría de equivalencia: los 5 tramos movidos (3354–3429, 3469–3593,
+  3940–3947, 4345–4601 del archivo pre-lote; 6405–6712) aparecen BYTE A BYTE
+  en los .js nuevos (0 líneas perdidas; orden relativo preservado en cada
+  archivo: loadDev → bulk → delDev → DEVICE MANAGER; wizard completo en
+  discovery.js).
+- Grep de redeclaración: los 43 nombres de funciones movidos con EXACTAMENTE 1
+  `(async )?function <nombre>` en core.js + views/*.js + inline;
+  `_invGroupsCache` solo en devices.js, `dw`/`DW_ESTADO` solo en discovery.js.
+- Handlers invocados desde atributos `on*` (markup + strings generados en
+  todos los .js): 0 sin resolver.
+- Conteos: 6740 → 6004 (git numstat: −772/+36 = −736 netas; las 36 añadidas
+  son 34 líneas de stub + 2 `<script src>`).
+- `tests/`: **358 passed** (con el .venv del repo principal, `PYTHONPATH=.`).
+- `<link>` CSS intactos (style.css?v=4, overview.css?v=3); los 2 .js nuevos
+  con `?v=1`. Sin console.log/confirm nuevos (el único `confirm` en
+  devices.js es el preexistente de `delDev`).
+
+## Divergencias documentadas
+
+1. `loadDev` viaja (la tarjeta lo instruye, antes planificado para el lote h):
+   el grep demuestra 0 lecturas a nivel de evaluación de sus consumidores;
+   `renderD`/`buildSchedForms`/`updStats`/`loadDonuts` (inline) y los selects
+   de Compare siguen resuviéndose en tiempo de llamada. El lote g
+   (backups/compare) y el h (dashboard+detalle) conservan su plan.
+2. `selD` NO viaja a pesar de que loadInventory (movida) emite su onclick:
+   el listener del `#grid` y el del `#ops-focus-items` son consumidores
+   inline residuales (regla 2). Ambos onclick (generados y listener) la
+   resuelven por window sin cambio.
+3. `fDev` NO viaja con el resto de grilla-filtering: no es bulk y su
+   llamador (`renderD`) queda inline. El stub lo documenta.
+4. `delDev` viaja aunque su único llamador es el markup del modal `#dp`
+   (que queda): resolución por window en el click (mismo caso que los
+   onclick que la tarjeta declara válidos). Modal intacto.
+5. `bSel`/`bMode` NO viajan aunque la mayoría de sus consumidores sí:
+   renderD y el listener del `#grid` (que quedan para el lote h) los leen —
+   evitar `window.x` explícito innecesario (regla 4); seguimiento en el
+   bloque de estado del inline.
+
+## Estado del plan de extracción (siguiente ronda)
+
+Tras este lote quedan:
+| Lote | Contenido |
+|---|---|
+| g | backups/compare (tarjeta especial acoplada a `loadDev` ahora en views/devices.js: al extraer, re-evaluar `populateCmdDevices`) |
+| h | dashboard+detalle (init/renderD/updStats/updateDashboardHero/loadDonuts/refreshAlertSummary/loadH/buildSchedForms + modal `#dp`: selD/closeD/setDTab/qa*/dlC/rCmdBig + listener del grid/ops-focus) |
+| i | terminal+sftp (`_term*`, `term*`, `cmdOpenConsole`, `_sftp*`, `sftp*` + `_formatBytes`/`_formatTime`) |
+| j | topology (`_topo*`, `topoTab`, `buildTraceOrigins`, …) |
+| k | router (swView+hashchange) y boot (init+listeners+IIFE de tema/restoreSession) — cierre |
+
+Estados por fase del mapa (§5.2): fases 1/2/5 hechas (core), 3/4/6 pendientes,
+fases 7 y 9 hechas, fase 10 hecha (Lote E), **fase 11 hecha (este lote)**,
+fases 12–16 pendientes en el orden g/h/i/j/k.
+
+## Resumen por fase del mapa (§5.2) tras este lote
+
+| Fase del mapa (§5.2) | Estado |
+|---|---|
+| 1 core/state, 2 i18n, 5 session | hecha en core.js (paso 1) |
+| 3 dom, 4 format, 6 theme | pendiente (inline conserva esc/escAttr/IC/icon/tema) |
+| 7 vistas simples: A + B | hecha |
+| 8 performance+alerts+admin (Lote C) · backups/compare → lote g | hecha / pendiente |
+| 9 reports, retention, sites, netbox | hecha (Lote D) |
+| 10 commands, monitoring | hecha (Lote E) |
+| 11 devices+discovery | **hecha (este lote)** |
+| 12 dashboard+detalle (lote h), 13 terminal/sftp (i), 14 topology (j) | después |
+| 15 router, 16 boot (k) | al final por diseño |
