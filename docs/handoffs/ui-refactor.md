@@ -525,3 +525,143 @@ de core.js (intacto).
 | 13 terminal+sftp, 14 topology | después |
 | router (`swView`) | después |
 | boot | al final por diseño |
+
+---
+
+# Lote E — Tarjeta 10D-E: commands, monitoring
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-e` (worktree `/Users/doker/np-w10i`) ·
+Commit: `refactor(ui): extraer lote e (commands, monitoring)`.
+
+Mismo enfoque que los Lotes A-D: función a función con verificación de
+solapamiento por grep; dashboard.html pasó de 7158 → 6740 líneas (−418 líneas
+movidas netas, +2 `<script src>`).
+
+## Orden de carga en dashboard.html (tras core.js y los 15 previos, antes del inline)
+
+```html
+<script src="/static/js/views/netbox.js?v=1"></script>
+<script src="/static/js/views/commands.js?v=1"></script>
+<script src="/static/js/views/monitoring.js?v=1"></script>
+<script> /* inline restante */ </script>
+```
+
+Ambos son scripts clásicos (sin defer/async). El único top-level ejecutable de
+los dos es, intencionadamente, el de monitoring.js: `let dragSrc = null` y la
+reasignación `refMon` (§7.2 del mapa, ver abajo). Ningún símbolo de la vista
+se lee a la evaluación en orden inverso: `views/commands.js` es todo
+declaraciones `function`.
+
+## Qué fue a cada archivo
+
+| Archivo | Contenido movido (mismo orden relativo; rangos 1-indexed del archivo pre-lote) |
+|---|---|
+| `views/commands.js` | `execGlobalCmd` (4236–4257; sus helpers de output/status eran locales de la función, viajan dentro) y `runQuickCmd` (4258–4261) |
+| `views/monitoring.js` | Tramo 1 (3270–3582, block-stack completo): comentario `── MONITOREO (Prometheus nativo) ──`, `queryProm`, `queryPromRange`, `_avgByTs`, `_countByTs`, `_nativeChart`, `renderNativeMon`, `refMon` (+ `drawLine`/`drawMulti`/`drawBars` anidadas), comentario `── DRAG AND DROP for monitoring charts ──`, `let dragSrc`, `initDragDrop`, `saveChartOrder`, `loadChartOrder`, comentario "Run drag-drop init..." y la reasignación `const _origRefMon = refMon; refMon = async function () { await _origRefMon(); initDragDrop() }`. Tramo 2 (5022–5100, métricas de plataforma): comentario `── MONITOREO (secciones stack + plataforma) ──`, `monNum`, `renderMonSpark`, `loadMonitoring` |
+
+Los `function` top-level cuelgan de window: los onclick/onchange del markup
+(`refMon()` del select `#mon-range` y del botón Refresh, `loadMonitoring()` del
+botón Actualizar, `execGlobalCmd()` del textarea/botón, `runQuickCmd('…')` en
+los 8 atajos), el intervalo `window._mInt` de 15 s y `setRefreshInterval`
+(inline) que ejecutan `loadMonitoring`+`refMon`, y el `swView('commands')`
+despachando `populateCmdDevices` (inline) siguen resolviendo sin cambios.
+
+## La trampa `refMon` (mapa §7.2) — decisión
+
+`refMon` (declaración `async function`, pre-lote L3387) se REASIGNA a sí misma
+en la misma pasada de evaluación (pre-lote L3581–3582): `const _origRefMon =
+refMon; refMon = async function () { await _origRefMon(); initDragDrop() }`.
+
+Decisión: **viajó a monitoring.js junto con la declaración, en el mismo
+orden** (declaración L52–364, reasignación L363–364 del archivo nuevo). En un
+script clásico las declaraciones `function` top-level se izan ANTES de las
+sentencias del script, así que `const _origRefMon` captura la versión real —
+exactamente como en el monolito. Tras evaluar monitoring.js, `refMon` es el
+wrapper con `initDragDrop`; los consumidores (`setRefreshInterval` y
+`swView('monitoring')`, ambos inline; onclick del markup) lo resuelven en
+tiempo de llamada contra window, y NINGUNO se ejecuta durante la evaluación
+de otro script: no hay riesgo de capturar una versión ya envuelta.
+Grep de exclusividad de `_origRefMon`: solo monitoring.js.
+
+## Qué NO se movió (grep de exclusividad, regla 2)
+
+| Símbolo | Consumidores (grep post-Lote D) | Decisión |
+|---|---|---|
+| `populateCmdDevices` | `loadBk` (pre-lote L4576; Backups, inline residual: latido 60 s + tras cada backup) y `swView('commands')` | **QUEDA en el inline** (regla anti-compartidas, como `__isAdmin`/`npGray` en el Lote A); el comentario de sección `── GLOBAL COMMAND CENTER ──` se queda con ella |
+| `setRefreshInterval` | onchange de `#refresh-interval` (Theme) y `#mon-interval` (Monitoring); opera `window._rInt` | QUEDA (bloque Theme del inline; llama `refMon`/`loadMonitoring` en tiempo de llamada) |
+| `loadDonuts` (latido 120 s) | `init` (`setTimeout` 1.5 s + `setInterval` 120 s con guard de `#v-devices`) y `loadDev` — NINGUNA función de monitoring la llama | QUEDA: es del DASHBOARD (inline) |
+| `refreshAlertSummary` | badge del sidebar; `loadMonitoring` la llama (tiempo de llamada) si hay alertas | QUEDA (dashboard, inline) |
+| Lógica de `window._mInt` | `swView('monitoring')` (inline) | QUEDA: la GESTIONA swView; monitoring.js solo trae los workers (`loadMonitoring`, `refMon`) |
+| `devices`, `A`, `h`, `t`, `toast`, `esc`, `icon`, `__t`, `currentLang` | core.js o estado compartido del inline | QUEDAN (resolución en tiempo de llamada) |
+| `c-big`/`t-big`/`rCmdBig`, `dCmp`, `qa*`, `dlC` | modal `#dp` del dashboard/detalle | NO SE TOCARON (la tarjeta lo prohíbe); ninguna función movida los usa |
+| `localStorage['np-chart-order']`, `window._chartRO` | solo `initDragDrop`/`saveChartOrder`/`loadChartOrder` | viajan con ellas (sin cambio de clave ni de versión) |
+
+## Estado movido
+
+- `dragSrc` → views/monitoring.js (`let` top-level). Su ÚNICO consumidor es
+  `initDragDrop` y sus closures (mismo archivo). La regla 4 pide `window.x`
+  para no-funciones, pero grep demostró que ningún atributo `on*` del markup
+  lo referencia; se mantiene el patrón de estado de módulo de los Lotes C/D
+  (`alSilData`, `_r4Groups`, `repState`).
+- `_origRefMon` → views/monitoring.js (`const` top-level; solo lo lee el
+  wrapper del propio archivo).
+- La reevaluación de `refMon` al cargar la página mantiene el MISMO efecto
+  global que antes (wrapper instalado una vez, `_origRefMon` → función real).
+
+## Verificación del lote
+
+- `node --check`: views/monitoring.js, views/commands.js, core.js y el inline
+  restante extraído a temporal (3714 líneas) → OK los 4.
+- Auditoría de equivalencia: los 3 tramos movidos (4236–4261, 3270–3582,
+  5022–5100 del archivo pre-lote) aparecen BYTE A BYTE en los .js nuevos
+  (diff = 0), en el mismo orden relativo (líneas 52–364 y 366–444 de
+  monitoring.js; único separador añadido: la línea en blanco que separa los
+  dos tramos).
+- Grep de redeclaración: los 17 nombres de funciones tocados
+  (`execGlobalCmd`, `runQuickCmd`, `queryProm`, `queryPromRange`, `_avgByTs`,
+  `_countByTs`, `_nativeChart`, `renderNativeMon`, `refMon`, `initDragDrop`,
+  `saveChartOrder`, `loadChartOrder`, `monNum`, `renderMonSpark`,
+  `loadMonitoring`, `populateCmdDevices` — la última sigue inline) con
+  EXACTAMENTE 1 `function <nombre>` en todo el árbol (core.js + views/*.js +
+  inline); `dragSrc`/`_origRefMon` solo en monitoring.js.
+- Handlers invocados desde atributos `on*` (markup + strings generados):
+  0 sin resolver (script del §6.4 del mapa; solo falso positivo `if`, como en
+  Lotes C/D).
+- Conteos: 7158 − 418 movidos + 2 `<script src>` = 6740 líneas.
+- `tests/`: **358 passed** (con el .venv del repo principal, `PYTHONPATH=.`).
+- `<link>` CSS intactos (style.css?v=4, overview.css?v=3); los 2 .js nuevos
+  con `?v=1`. Sin console.log/confirm nuevos (grep = 0 en los archivos nuevos).
+
+## Divergencias documentadas
+
+1. `populateCmdDevices` NO viaja aunque 2 de 3 consumidores son de esta vista
+   (swView y el markup de commands): `loadBk` (Backups, inline residual) la
+   llama en CADA latido de 60 s y tras cada backup — regla anti-compartidas,
+   como pactó el Lote A. Cuando la tarjeta de Backups/Compare (g) extraiga
+   `loadBk` se re-evaluará la exclusividad.
+2. `loadDonuts` NO viaja a monitoring: su intervalo de 120 s lo registran
+   `init` y `loadDev` (dashboard), y el grep da cero usos desde monitoring.
+3. `dragSrc` viaja como `let` (no `window.dragSrc`): regla 4 en su lectura
+   estricta pediría `window.x`, pero su único consumidor es `initDragDrop`
+   (mismo archivo) y ningún atributo `on*` lo consulta.
+4. El comentario de sección de commands se quedó inline en vez de viajar:
+   sigue documentando el código que permaneció (`populateCmdDevices`); los
+   headers de los .js llevan el contrato completo.
+
+## Estado del plan de extracción (siguiente ronda)
+
+Tras este lote quedan (sugerencia de próximos lotes de la tarjeta):
+| Lote | Contenido |
+|---|---|
+| f | devices+discovery (`loadInventory`, `addInventoryDevice`, bloques `_inv*`/`dw*` con `_invGroupsCache`, `dw`, `DW_ESTADO`) |
+| g | backups/compare (`loadBk`, `loadJobs`, `doBackupMulti`, `scheduleBackup`, `scheduleRecurring`, `cancelJob`, `dlBackup`, `offsiteExport`, `dCmp`, `bd*`, `buildSchedForms` — tarjeta especial acoplada a `loadDev`: al extraer, re-evaluar `populateCmdDevices`) |
+| h | dashboard+detalle (el monolito central: init/loadDev/renderD/bulk/updStats/updateDashboardHero/loadDonuts/refreshAlertSummary/loadH + modal `#dp`: selD/closeD/setDTab/qa*/dlC/rCmdBig) |
+| i | terminal+sftp (`_term*`, `term*`, `cmdOpenConsole`, `_sftp*`, `sftp*` + `_formatBytes`/`_formatTime`) |
+| j | topology (`_topo*`, `topoTab`, `buildTraceOrigins`, …) |
+| k | router (swView+hashchange) y boot (init+listeners+IIFE de tema/restoreSession) — cierre |
+
+Estados por fase del mapa (§5.2): fases 1/2/5 hechas (core), 3/4/6 pendientes
+(esc/escAttr/IC/icon/tema, `_fmt*`/`_detText`/`alDur`…), fase 7 hecha
+(Lotes A-B), fase 8 parcial (Lote C; backups/compare → lote g), fase 9 hecha
+(Lote D), **fase 10 hecha (este lote)**, fases 11-16 pendientes en el orden
+f/g/h/i/j/k.
