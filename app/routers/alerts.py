@@ -45,15 +45,49 @@ async def alertmanager_auth(
     return {"sub": "admin", "role": "admin"}
 
 
+def _watchdog_alerts() -> list[dict]:
+    """Alertas de site del watchdog interno (nunca deben romper la respuesta)."""
+    try:
+        from app.services.remote import watchdog_svc
+
+        return watchdog_svc.active_alerts()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("[alerts] watchdog de sites no disponible: %s", e)
+        return []
+
+
 @router.get("/active", dependencies=[Depends(JWTBearer())])
 def active_alerts():
-    """Lista las alertas activas desde Prometheus /api/v1/alerts."""
+    """Lista las alertas activas: Prometheus + watchdog de sites remotos.
+
+    Las de Prometheus se leen de ``/api/v1/alerts``. Las de site las produce
+    ``watchdog_svc`` y se incluyen con ``source="watchdog"``. Si Prometheus no
+    responde pero hay alertas de site, se devuelve ``status="success"`` con
+    ``prometheus_available=false``: el operador ve lo que sí se sabe, sin
+    ocultar una alerta crítica porque el stack de métricas esté caído.
+    """
+    internal = _watchdog_alerts()
     try:
         with urllib.request.urlopen("http://localhost:9090/api/v1/alerts", timeout=8) as resp:
             data = json.loads(resp.read().decode())
     except Exception as e:
         logger.warning("[alerts] Prometheus no disponible: %s", e)
-        return {"status": "error", "detail": f"Prometheus: {e}", "alerts": []}
+        if internal:
+            return {
+                "status": "success",
+                "total": len(internal),
+                "firing": len(internal),
+                "alerts": internal,
+                "prometheus_available": False,
+                "prometheus_error": f"Prometheus: {e}",
+                "sources": ["watchdog"],
+            }
+        return {
+            "status": "error",
+            "detail": f"Prometheus: {e}",
+            "alerts": [],
+            "prometheus_available": False,
+        }
 
     alerts = []
     for a in data.get("data", {}).get("alerts", []):
@@ -67,14 +101,19 @@ def active_alerts():
             "summary": annotations.get("summary", ""),
             "description": annotations.get("description", ""),
             "active_at": a.get("activeAt", ""),
+            "source": "prometheus",
         })
 
+    alerts.extend(internal)
     firing = [a for a in alerts if a["state"] == "firing"]
+    sources = ["prometheus"] + (["watchdog"] if internal else [])
     return {
         "status": "success",
         "total": len(alerts),
         "firing": len(firing),
         "alerts": alerts,
+        "prometheus_available": True,
+        "sources": sources,
     }
 
 

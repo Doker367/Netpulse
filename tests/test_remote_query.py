@@ -179,3 +179,132 @@ def test_empty_sites_when_no_db():
     response = CLIENT.get("/api/remote/sites", headers=auth(viewer()))
     assert response.status_code == 200
     assert response.json()["sites"] == []
+
+
+# ── Sites provisionados sin heartbeat (Tarjeta 12D) ───────────
+
+
+NEVER_SITE = "site-nuevo"
+NEVER_COLLECTOR = "collector-nuevo-01"
+
+
+def _never_key(monkeypatch=None):
+    return api_keys_svc.create_api_key(
+        "colector-nuevo",
+        kind="collector",
+        site_id=NEVER_SITE,
+        collector_id=NEVER_COLLECTOR,
+    )
+
+
+def _sites():
+    response = CLIENT.get("/api/remote/sites", headers=auth(viewer()))
+    assert response.status_code == 200, response.text
+    return {site["site_id"]: site for site in response.json()["sites"]}
+
+
+def test_site_without_heartbeat_is_listed_as_never():
+    """Una clave de colector sin ninguna muestra aparece, pero nunca como verde."""
+    ingest([sample()])  # el central ya tiene datos: la DB existe
+    _never_key()
+
+    sites = _sites()
+    assert set(sites) == {SITE, NEVER_SITE}
+    never = sites[NEVER_SITE]
+    assert never["contact"] == "never"
+    assert never["contact"] != "fresh"
+    assert never["last_seen_at"] is None
+    assert never["last_contact_age_s"] is None
+    assert never["devices"] == {
+        "total": 0,
+        "reachable": 0,
+        "unreachable": 0,
+        "unverifiable": 0,
+        "unmatched": 0,
+    }
+    collector = never["collectors"][0]
+    assert collector["collector_id"] == NEVER_COLLECTOR
+    assert collector["contact"] == "never"
+    # Nada medido todavía: null, nunca 0 inventado.
+    assert collector["version"] is None
+    assert collector["probe_interval_s"] is None
+    assert collector["last_seen_at"] is None
+    assert collector["buffer"]["pending"] is None
+    assert collector["last_batch"]["accepted"] is None
+    assert collector["sync"]["auth_state"] is None
+
+
+def test_site_without_heartbeat_detail_and_devices_are_honest():
+    ingest([sample()])
+    _never_key()
+
+    detail = CLIENT.get(f"/api/remote/sites/{NEVER_SITE}", headers=auth(viewer()))
+    assert detail.status_code == 200, detail.text
+    body = detail.json()
+    assert body["contact"] == "never"
+    assert body["last_seen_at"] is None
+    assert body["oldest_sample_ts"] is None
+    assert body["buffer_epoch_changed_at"] is None
+    assert body["retention_days"] == 30
+
+    devices = CLIENT.get(
+        f"/api/remote/sites/{NEVER_SITE}/devices", headers=auth(viewer())
+    )
+    assert devices.status_code == 200, devices.text
+    payload = devices.json()
+    assert payload["contact"] == "never"
+    assert payload["last_seen_at"] is None
+    assert payload["stale_after_s"] is None
+    assert payload["devices"] == []
+
+
+def test_site_without_heartbeat_stops_being_never_after_first_batch():
+    ingest([sample()])
+    never_token = _never_key()["key"]
+    payload = {
+        "schema_version": 1,
+        "collector_version": "0.1.0",
+        "probe_interval_s": 60,
+        "sync_batch_id": "nuevo-1",
+        "sent_at": iso_now(),
+        "buffer": {
+            "buffer_epoch": "e",
+            "pending": 0,
+            "oldest_pending_ts": None,
+            "dropped_total": 0,
+            "gap_since": None,
+            "paused_reason": None,
+        },
+        "samples": [sample()],
+    }
+    response = CLIENT.post("/api/remote/ingest", headers=auth(never_token), json=payload)
+    assert response.status_code == 200, response.text
+
+    sites = _sites()
+    assert set(sites) == {SITE, NEVER_SITE}
+    assert sites[NEVER_SITE]["contact"] == "fresh"
+    assert sites[NEVER_SITE]["last_seen_at"] is not None
+
+
+def test_revoked_collector_key_is_not_a_site():
+    ingest([sample()])
+    created = _never_key()
+    assert api_keys_svc.revoke_api_key(created["id"]) is True
+
+    assert set(_sites()) == {SITE}
+
+
+def test_injected_clock_read_keeps_watchdog_grace():
+    """La lectura con reloj inyectado (watchdog) solo ve sites observados.
+
+    El watchdog decide el silencio y la gracia de despliegue de las claves
+    nuevas con su propia regla; no debe recibir sites ``never`` derivados de
+    claves que todavía no han tenido oportunidad de reportar.
+    """
+    from datetime import datetime, timezone
+
+    ingest([sample()])
+    _never_key()
+
+    snapshot = query_svc.list_sites(now=datetime.now(timezone.utc))
+    assert [site["site_id"] for site in snapshot["sites"]] == [SITE]

@@ -1663,8 +1663,8 @@ un mock que respete este documento.
 - **No** hace config push ni recibe órdenes del centro. El flujo es
   site → centro, nunca centro → site.
 - **No** genera alertas en el site ni habla con Alertmanager. Solo latencia y
-  disponibilidad. Las alertas (p. ej. «site sin contacto») son una ola
-  posterior y deben usar estos datos, no inventarlos.
+  disponibilidad. Las alertas de «site sin contacto» se implementaron después
+  en el central (ola 12C, sección 15 de este documento) usando estos datos.
 - **No** recolecta CPU/RAM/disco, syslog, tráfico, interfaces ni vecinos LLDP.
 - **No** tiene HA ni varios colectores por site validados. Un site, un
   colector activo.
@@ -1779,3 +1779,170 @@ anteriores.
 - La frescura de `GET .../devices` se calcula con `last_received_at` (reloj
   del servidor), no con el `ts` del colector; el histórico usa `ts`. Es la
   separación diseñada para que un reloj desviado no oculte un site activo.
+
+---
+
+## 15. Ola 12C — watchdog de site enmudecido
+
+Estado: implementado. Zona: `app/services/remote/watchdog_svc.py`,
+`app/main.py`, `app/routers/remote.py`, `app/routers/alerts.py`,
+`app/core/settings.py`, tests y documentación.
+
+### 15.1 Problema
+
+`query_svc` ya calculaba `contact = "stale"` y la UI lo pintaba, pero nadie
+recibía un aviso si un colector dejaba de reportar. En un NOC eso es un fallo
+silencioso: el enlace o el host del site pueden llevar horas caídos y solo se
+descubre mirando la pantalla.
+
+### 15.2 Vía elegida: watchdog interno (opción A)
+
+Se implementó la **opción A** porque el producto ya tiene un pipeline de aviso
+real que no depende del perfil opcional `monitoring`:
+
+- `notifications_svc.notify_event()` → webhooks registrados, Telegram, Slack y
+  email.
+- `GET /api/alerts/active` → vista de alertas activas que ya consume el panel.
+
+El watchdog reutiliza ambos; lo único nuevo es el estado del episodio
+(deduplicación). La opción B (gauge Prometheus + regla en
+`config/prometheus-rules.yml`) se documenta como mejora en 15.7: daría aviso
+también si el central muere, pero **exige** Prometheus/Alertmanager, que en
+producción son un perfil opcional (`--profile monitoring`). Se descartó como
+vía principal para no dejar sin alerta un despliegue sin ese perfil. Tampoco se
+añadió la regla para evitar un doble aviso (watchdog + Alertmanager) cuando sí
+está desplegado.
+
+### 15.3 Cómo funciona
+
+`watchdog_svc` es una `asyncio.Task` que arranca en el `lifespan` de
+`app/main.py` y se detiene de forma limpia en el shutdown (`stop()` espera a
+la tarea; no quedan tareas huérfanas). Cada `NETPULSE_SITE_WATCHDOG_INTERVAL_S`
+segundos:
+
+1. Lee los sites con `query_svc.list_sites()` (misma fuente que la UI) dentro
+   de `asyncio.to_thread`, para no bloquear el event loop con SQLite ni con los
+   webhooks.
+2. Un site está **fresh** si al menos un colector cumple
+   `edad <= max(NETPULSE_SITE_STALE_AFTER_S, stale_after_s de la UI)`. Es la
+   misma regla de «algún colector en contacto» que pinta `query_svc`.
+3. Si el site está en silencio y **no hay alerta activa para ese site** en
+   `runtime/site_watchdog.json`, crea el episodio, lo notifica con
+   `site_stale` y persiste el estado. En ciclos posteriores no vuelve a
+   notificar: **una alerta por episodio**, sobrevive reinicios de la API.
+4. Si un site con alerta vuelve a estar fresh, elimina el episodio y notifica
+   `site_recovered`. La alerta desaparece de `/api/alerts/active`.
+5. Si el almacén remoto no se puede leer, registra el error y **no resuelve
+   nada**: no se inventa una recuperación.
+
+Un site provisionado con una clave de colector activa pero **sin ninguna fila**
+en `remote_collector` no se considera verde: se alerta con motivo
+`"sin heartbeat"`. Hay una ventana de gracia desde `created_at` de la clave
+(igual al umbral) para no alertar mientras se despliega el colector.
+
+### 15.4 Variables de entorno
+
+| Variable | Default | Efecto |
+|---|---|---|
+| `NETPULSE_SITE_WATCHDOG_ENABLED` | `true` | `false` desactiva el bucle y la evaluación; no borra el estado persistido |
+| `NETPULSE_SITE_WATCHDOG_INTERVAL_S` | `60` | Segundos entre ciclos (mínimo 5) |
+| `NETPULSE_SITE_STALE_AFTER_S` | `300` | Segundos de silencio para alertar (mínimo 30). Es un suelo: manda el mayor entre este valor y `3 × probe_interval_s` |
+| `NETPULSE_SITE_WATCHDOG_STATE` | `runtime/site_watchdog.json` | Ruta del estado de deduplicación |
+
+Sin sites, sin DB remota o con la feature desactivada, el watchdog no hace
+nada y no rompe el arranque. Los valores se releen en cada ciclo; un cambio de
+entorno no exige reiniciar (salvo el arranque/parada del bucle, que sí).
+
+### 15.5 Qué ve el operador
+
+En `GET /api/alerts/active` (JWT) aparece una alerta más con
+`source: "watchdog"`, `state: "firing"` y `severity: "critical"`:
+
+```json
+{
+  "name": "SiteSilent",
+  "state": "firing",
+  "severity": "critical",
+  "device_id": "site-lima",
+  "site_id": "site-lima",
+  "collector_id": "collector-lima-01",
+  "minutes_without_contact": 47,
+  "reason": "sin contacto",
+  "last_seen_at": "2026-10-25T10:13:00.000000+00:00",
+  "last_error": "connection refused",
+  "last_error_at": "2026-10-25T10:12:58.000000+00:00",
+  "summary": "Site site-lima sin contacto hace 47 min",
+  "description": "... Último error conocido: connection refused ...",
+  "active_at": "2026-10-25T11:00:00.000000+00:00",
+  "source": "watchdog"
+}
+```
+
+`device_id` se mantiene igual al `site_id` por compatibilidad con la vista de
+alertas actual (usa `device_id` para el título). Si Prometheus no responde
+pero hay alertas de site, el endpoint devuelve `status: "success"` con
+`prometheus_available: false`: no se oculta una alerta crítica porque el stack
+de métricas esté caído.
+
+`GET /api/remote/watchdog` (rol `viewer` o superior) expone el estado
+operativo: `enabled`, `running`, `interval_s`, `stale_after_s`, `last_run`,
+`last_error`, `cycles`, `active_count` y las alertas activas.
+
+Notificaciones: se emiten por los canales ya existentes de
+`notifications_svc`. Los webhooks deben suscribirse a los eventos nuevos
+`site_stale` (disparo) y `site_recovered` (recuperación). Telegram, Slack y
+email se envían si están configurados, sin suscripción por evento.
+
+### 15.6 Límites honestos
+
+- **Si el central entero cae, este watchdog no corre y no alerta de su propia
+  caída.** Eso lo cubre el monitoreo externo del proceso/API (Prometheus,
+  systemd, el orquestador o un chequeo remoto) — no se finge que el central se
+  vigila a sí mismo.
+- Asume **un proceso uvicorn** (igual que `store.py`). Con varios workers cada
+  uno evaluaría y podría duplicar la notificación; el estado en fichero reduce
+  pero no elimina esa carrera.
+- Desactivar el watchdog no cierra los episodios abiertos: el estado queda
+  como último conocido y las alertas siguen visibles hasta que se reactive y
+  el site recupere, o hasta que el operador limpie el fichero de estado.
+- Un site sin heartbeat **no aparece** en `/api/remote/sites` en fase 1 (esa
+  lista solo muestra sites que contactaron alguna vez). El watchdog sí lo
+  alerta; unificarlo en la lista es trabajo de UI posterior.
+- El `last_error` es el último que reportó el propio colector en su heartbeat
+  de sincronización; si el host murió de golpe, puede no haber error o estar
+  desactualizado. No se inventa una causa.
+
+### 15.7 Mejora documentada (opción B, no implementada)
+
+Exponer en `/api/metrics`:
+
+- `netpulse_site_last_seen_seconds{site_id,collector_id}`
+- `netpulse_site_stale{site_id,collector_id}` (1 si supera el umbral)
+
+y una regla en `config/prometheus-rules.yml` con `for: 5m`, `severity:
+critical` y anotaciones con `site_id`/`collector_id`, enrutada por Alertmanager
+al webhook existente `/api/alerts/webhook`. Ventaja: si el central muere,
+Prometheus (externo) sigue evaluando y puede alertar. Requisito: desplegar el
+perfil `monitoring`; si se implanta, hay que **retirar** el aviso duplicado del
+watchdog o aceptar el doble canal a propósito.
+
+### 15.8 Pruebas
+
+`tests/test_remote_watchdog.py` cubre, con reloj inyectado (sin sleeps):
+
+- site fresh → sin alerta;
+- site viejo → una alerta, no duplicada en el siguiente ciclo;
+- recuperación → `site_recovered` una vez y alerta resuelta;
+- dos sites independientes (uno cae mientras el otro se recupera);
+- watchdog desactivado → no evalúa, no notifica, no escribe estado;
+- site fresh durante varios ciclos → sigue silencioso;
+- site sin heartbeat (clave de colector sin fila) → alerta con motivo
+  `"sin heartbeat"` y minutos desde la creación de la clave;
+- ventana de gracia de una clave recién creada;
+- fallo del almacén → `status: "error"` sin resolver alertas existentes;
+- fallo de notificación → el episodio se persiste igualmente y no se duplica;
+- arranque/parada de la tarea sin huérfanas;
+- `/api/alerts/active` con Prometheus caído y alerta de site visible;
+- `GET /api/remote/watchdog`;
+- `lifespan` de la app con `TestClient`: arranca, responde `/api/health` y
+  detiene la tarea al salir.

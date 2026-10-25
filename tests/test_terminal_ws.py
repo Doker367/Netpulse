@@ -458,3 +458,60 @@ def test_scope_autorizado_abre_shell(client):
             ws.send_json({"type": "close"})
             assert ws.receive_json()["code"] == "operator"
     assert fake.closed is True
+
+
+# ── Revocación de sesión (token_version) en el WS ───────────
+
+
+def test_token_revocado_avisa_json_y_cierra_4401_sin_abrir_ssh(client, monkeypatch):
+    token = create_access_token({"sub": "bob", "role": "operator", "tv": 0})
+    monkeypatch.setattr(
+        "app.routers.auth._get_users",
+        lambda: {"bob": {"username": "bob", "token_version": 1}},
+    )
+
+    with patch("app.services.napalm_svc._find_device") as find_device, \
+         patch("paramiko.SSHClient") as ssh_client:
+        with pytest.raises(WebSocketDisconnect) as exc:
+            with _connect(client, token, fmt="json") as ws:
+                assert ws.receive_json() == {"type": "error", "error": "revoked"}
+                ws.receive_json()  # cierre 4401
+
+    assert exc.value.code == 4401
+    find_device.assert_not_called()
+    ssh_client.assert_not_called()
+
+
+def test_token_con_tv_vigente_abre_sesion(client, monkeypatch):
+    token = create_access_token({"sub": "bob", "role": "operator", "tv": 2})
+    monkeypatch.setattr(
+        "app.routers.auth._get_users",
+        lambda: {"bob": {"username": "bob", "token_version": 2}},
+    )
+    fake = FakeSSHClient()
+    with patch("app.services.napalm_svc._find_device", return_value=_device()), \
+         patch("paramiko.SSHClient", return_value=fake):
+        with _connect(client, token) as ws:
+            assert ws.receive_text().startswith("Conectando a")
+    assert fake.connect_kwargs["port"] == 22
+
+
+def test_token_sin_tv_contra_usuario_versionado_es_revocado(client, monkeypatch):
+    """Tokens legado sin ``tv`` valen 0: una revocación posterior los invalida."""
+    token = create_access_token({"sub": "bob", "role": "operator"})
+    monkeypatch.setattr(
+        "app.routers.auth._get_users",
+        lambda: {"bob": {"username": "bob", "token_version": 3}},
+    )
+
+    with patch("app.services.napalm_svc._find_device") as find_device, \
+         patch("paramiko.SSHClient") as ssh_client:
+        with pytest.raises(WebSocketDisconnect) as exc:
+            with _connect(client, token) as ws:
+                # El aviso viaja también en modo legacy y el cierre sigue siendo 4401.
+                assert "revoked" in ws.receive_text()
+                ws.receive_text()
+
+    assert exc.value.code == 4401
+    find_device.assert_not_called()
+    ssh_client.assert_not_called()

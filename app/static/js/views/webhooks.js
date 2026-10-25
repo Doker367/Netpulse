@@ -5,7 +5,7 @@
  * lote 1) sin cambio de comportamiento: loadWebhooks, addWebhook,
  * deleteWebhook, mismas líneas en el mismo orden relativo.
  *
- * Depende (en tiempo de llamada, no de carga): core.js (A, h, toast) e
+ * Depende (en tiempo de llamada, no de carga): core.js (A, h, toast, __t) e
  * inline de dashboard.html (esc, currentLang). Handlers que las resuelven
  * por window: swView('webhooks') → loadWebhooks(); onclick generados por
  * loadWebhooks() → addWebhook(), deleteWebhook(). Scripts clásicos sin
@@ -27,7 +27,9 @@
           <option value="device_down">Device Down</option>
           <option value="device_up">Device Up</option>
           <option value="backup_complete">Backup Complete</option>
-          <option value="all">Todos los eventos</option>
+          <option value="site_stale">${__t('wh_ev_site_stale')}</option>
+          <option value="site_recovered">${__t('wh_ev_site_recovered')}</option>
+          <option value="all">${__t('wh_ev_all')}</option>
         </select>
         <button class="btn btn-p btn-sm" onclick="addWebhook()"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg> Agregar</button>
       </div>
@@ -41,7 +43,7 @@
     async function addWebhook() {
       const url = document.getElementById('wh-url')?.value; const event = document.getElementById('wh-event')?.value;
       if (!url) return;
-      try { await fetch(`${A}/notifications/webhooks`, { method: 'POST', headers: h(), body: JSON.stringify({ url, events: event === 'all' ? ['device_down', 'device_up', 'backup_complete'] : [event] }) }); toast('<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Webhook agregado', 's'); loadWebhooks() }
+      try { await fetch(`${A}/notifications/webhooks`, { method: 'POST', headers: h(), body: JSON.stringify({ url, events: event === 'all' ? ['device_down', 'device_up', 'backup_complete', 'site_stale', 'site_recovered'] : [event] }) }); toast('<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Webhook agregado', 's'); loadWebhooks() }
       catch (e) { toast('Error al agregar webhook', 'error') }
     }
     async function deleteWebhook(id) { try { await fetch(`${A}/notifications/webhooks/${id}`, { method: 'DELETE', headers: h() }); toast('<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Webhook eliminado', 'info'); loadWebhooks() } catch (e) { } }
