@@ -1,0 +1,79 @@
+# ============================================================
+# Contexto de build de la API NetPulse — mínimo y sin secretos.
+# ============================================================
+
+# Control de versiones / entornos virtuales / cachés
+.git
+.gitignore
+.github
+.venv
+venv
+__pycache__
+**/__pycache__
+*.py[cod]
+*.egg-info
+
+# Pruebas y documentación (no se usan en runtime)
+tests
+docs
+*.md
+!requirements.txt
+
+# Estado persistente y bases de datos (NUNCA en la imagen)
+audit
+backups
+runtime
+reports
+*.db
+*.db-wal
+*.db-shm
+*.log
+logs
+config/metrics_history.json
+config/scheduler_jobs.json
+config/maintenance_windows.json
+config/api_keys.json
+config/baselines
+config/drift_history
+docker/volumes
+
+# Secretos y datos de despliegue (NUNCA en la imagen)
+.env
+.env.*
+!.env.example
+config/users.yaml
+config/devices.yaml
+config/.fernet_key
+config/.fernet_key.*
+config/.netbox_token
+config/.netbox_token.*
+config/.initial_credentials
+config/.env.secrets
+config/alertmanager.yml
+config/*.pem
+config/*.key
+secrets
+
+# Artefactos de laboratorio y otros stacks
+docker
+*.iso
+*.img
+*.qcow2
+*.vdi
+netbox-media
+netbox-reports
+netbox-scripts
+netbox-db-data
+netbox-redis-data
+loki_data
+prometheus_data
+grafana_data
+
+# Ruido del sistema
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+*.pem
+*.key
+.impeccable

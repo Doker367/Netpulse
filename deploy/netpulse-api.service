@@ -1,0 +1,65 @@
+# ============================================================
+# NetPulse NOC API — alternativa SIN Docker (opción B)
+# ============================================================
+# Instalación:
+#   useradd --system --home /opt/netpulse --shell /usr/sbin/nologin netpulse
+#   rsync -a --exclude .venv ./ /opt/netpulse/
+#   python3.12 -m venv /opt/netpulse/.venv
+#   /opt/netpulse/.venv/bin/pip install -r /opt/netpulse/requirements.txt
+#   install -d -o netpulse -g netpulse /opt/netpulse/{config,runtime,audit,backups,reports}
+#   install -m 0640 -o root -g netpulse .env /etc/netpulse/netpulse.env
+#   cp deploy/netpulse-api.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now netpulse-api
+#
+# Solo escucha en 0.0.0.0:8082; del TLS se encarga Caddy/nginx delante.
+# Si el reverse proxy es local, cambie --host 0.0.0.0 por 127.0.0.1.
+# ============================================================
+
+[Unit]
+Description=NetPulse NOC API
+Documentation=file:///opt/netpulse/docs/DOCKER.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=netpulse
+Group=netpulse
+WorkingDirectory=/opt/netpulse
+# Secretos y configuración de entorno (NO versionado, modo 0640 root:netpulse).
+# Debe incluir NETPULSE_ENV=production y NETPULSE_JWT_SECRET.
+EnvironmentFile=/etc/netpulse/netpulse.env
+
+# workers=1 deliberado: SQLite (audit/remote) y el poller son de un solo
+# proceso. --forwarded-allow-ips=127.0.0.1 confía solo en el proxy local.
+ExecStart=/opt/netpulse/.venv/bin/python -m uvicorn app.main:app \
+    --host 0.0.0.0 \
+    --port 8082 \
+    --workers 1 \
+    --proxy-headers \
+    --forwarded-allow-ips=127.0.0.1
+
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+
+# ── Hardening ────────────────────────────────────────────────
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# Estado que la app escribe (config incluye users/devices/metrics_history).
+ReadWritePaths=/opt/netpulse/config /opt/netpulse/runtime /opt/netpulse/audit /opt/netpulse/backups /opt/netpulse/reports
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

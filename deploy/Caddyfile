@@ -1,0 +1,62 @@
+# ============================================================
+# Caddy — TLS + reverse proxy para NetPulse (producción)
+# ============================================================
+# El dominio se toma de NETPULSE_DOMAIN (por defecto localhost).
+#   NETPULSE_DOMAIN=noc.example.com  → certificado Let's Encrypt automático
+#   NETPULSE_DOMAIN=localhost        → CA interna de Caddy (pruebas)
+#
+# DECISIÓN DE LOGGING: los tokens JWT del terminal viajan en la query
+# string (?token=...) de /ws/terminal/... Si se registrara la URI de acceso
+# se filtrarían credenciales al disco. Por eso el access log (nivel INFO)
+# queda desactivado bajando el nivel a ERROR: se conservan los errores del
+# proxy y del TLS, pero no se escribe ninguna URI de petición. No se usa
+# `output discard` para no perder también los errores.
+# ============================================================
+{
+	# Sin API de administración: no se necesita y reduce superficie.
+	admin off
+}
+
+{$NETPULSE_DOMAIN:localhost} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# No revelar la versión del servidor.
+		-Server
+	}
+
+	# WebSocket de terminal y de eventos: conexiones de larga duración.
+	# Caddy negocia el upgrade automáticamente en reverse_proxy.
+	@ws path /ws/*
+	handle @ws {
+		reverse_proxy api:8082 {
+			transport http {
+				dial_timeout 10s
+				read_timeout 24h
+				write_timeout 24h
+			}
+		}
+	}
+
+	# Resto de la API, dashboard y estáticos.
+	handle {
+		reverse_proxy api:8082 {
+			transport http {
+				dial_timeout 10s
+				response_header_timeout 120s
+				read_timeout 300s
+				write_timeout 300s
+			}
+		}
+	}
+
+	log {
+		output stderr
+		# INFO incluiría el access log con la URI completa (token en query).
+		level ERROR
+		format json
+	}
+}
