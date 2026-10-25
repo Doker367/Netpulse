@@ -1,0 +1,223 @@
+# ============================================================
+# NetPulse NOC — stack de PRODUCCIÓN (API + Caddy)
+# ============================================================
+#   cp .env.example .env      # completar secretos
+#   docker compose -f deploy/docker-compose.prod.yml up -d --build
+#
+# Solo Caddy publica puertos (80/443). La API no tiene puertos al host:
+# vive en la red interna y Caddy hace reverse_proxy api:8082.
+#
+# Estado persistente: bind mounts al repo (config/runtime/audit/backups)
+# + volumen nombrado para los reportes generados.
+# ============================================================
+
+name: netpulse-prod
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    # Tag estable y explícito (nunca :latest).
+    image: netpulse-api:1.0.0
+    container_name: netpulse-api
+    env_file:
+      # El fichero es obligatorio para arrancar (JWT secret, credenciales),
+      # pero `required: false` permite validar la config en un clon limpio
+      # donde aún no se ha copiado .env.example → .env.
+      - path: ../.env
+        required: false
+    environment:
+      # Overrides de contenedor: dentro siempre escucha en todas las ifaces.
+      NETPULSE_HOST: 0.0.0.0
+      NETPULSE_PORT: "8082"
+      # Falla al arrancar si NETPULSE_JWT_SECRET no está definido.
+      NETPULSE_ENV: production
+      HOME: /tmp
+    # Raíz de solo lectura: el código y los estáticos no se mutan.
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    volumes:
+      # Estado persistente del repo. El usuario del contenedor es uid 10001:
+      # los directorios del host deben permitir su escritura (ver docs/DOCKER.md).
+      - ../config:/app/config
+      - ../runtime:/app/runtime
+      - ../audit:/app/audit
+      - ../backups:/app/backups
+      # Reportes PDF/CSV generados por la app (no están en el repo).
+      - reports_data:/app/reports
+      # metrics_history.json: la app lo escribe en config/
+      # (app/services/metrics_history_svc.py → CONFIG_DIR), por lo que ya
+      # queda persistido por el bind ../config. No se hace un bind de archivo
+      # porque Docker crearía un DIRECTORIO si el fichero no existiera, ni un
+      # volumen dedicado porque no puede montarse sobre un subpath de un bind.
+    # El healthcheck viene de la imagen (python + urllib, sin curl).
+    # depends_on de caddy usa service_healthy, que lo consume.
+    init: true
+    restart: unless-stopped
+    networks:
+      netpulse:
+        # config/prometheus.yml (perfil monitoring) scrapea
+        # host.docker.internal:8082 y la API no publica puertos. Este alias
+        # resuelve ese nombre al contenedor api dentro de la red, sin editar
+        # el YAML existente.
+        aliases:
+          - host.docker.internal
+    extra_hosts:
+      # Permite alcanzar servicios del host (p. ej. el colector o el lab)
+      # sin publicar puertos de la API.
+      - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1g
+        reservations:
+          memory: 128m
+    logging: *default-logging
+
+  caddy:
+    # Tag fijo; no :latest.
+    image: caddy:2.11.7-alpine
+    container_name: netpulse-caddy
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 (opcional)
+    environment:
+      # Dominio público; si no se define, Caddy usa su CA interna para localhost.
+      NETPULSE_DOMAIN: ${NETPULSE_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    init: true
+    restart: unless-stopped
+    networks:
+      - netpulse
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256m
+    logging: *default-logging
+
+  # ==========================================================
+  # Perfil opcional: monitoring
+  #   docker compose -f deploy/docker-compose.prod.yml \
+  #     --profile monitoring up -d
+  # Reutiliza los YAML de config/ en solo lectura y volúmenes nombrados.
+  # Versiones FIJADAS (no :latest) equivalentes al stack de
+  # docker-compose.monitoring.yml. Alertmanager necesita
+  # config/alertmanager.yml real (cp desde alertmanager.yml.template).
+  # ==========================================================
+  prometheus:
+    image: prom/prometheus:v3.15.1
+    container_name: netpulse-prometheus
+    profiles: [monitoring]
+    volumes:
+      - ../config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../config/prometheus-rules.yml:/etc/prometheus/rules/rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+      - "--web.listen-address=0.0.0.0:9090"
+      - "--storage.tsdb.retention.time=90d"
+    networks:
+      - netpulse
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1g
+    logging: *default-logging
+
+  alertmanager:
+    image: prom/alertmanager:v0.34.1
+    container_name: netpulse-alertmanager
+    profiles: [monitoring]
+    volumes:
+      - ../config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+      - "--web.listen-address=0.0.0.0:9093"
+    networks:
+      - netpulse
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256m
+    logging: *default-logging
+
+  loki:
+    image: grafana/loki:3.7.9
+    container_name: netpulse-loki
+    profiles: [monitoring]
+    volumes:
+      - ../config/loki-config.yml:/etc/loki/loki-config.yml:ro
+      - loki_data:/loki
+    command:
+      - "-config.file=/etc/loki/loki-config.yml"
+    networks:
+      - netpulse
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1g
+    logging: *default-logging
+
+  promtail:
+    image: grafana/promtail:3.6.11
+    container_name: netpulse-promtail
+    profiles: [monitoring]
+    volumes:
+      - ../config/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log:/var/log:ro
+    command:
+      - "-config.file=/etc/promtail/config.yml"
+    networks:
+      - netpulse
+    restart: unless-stopped
+    depends_on:
+      - loki
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256m
+    logging: *default-logging
+
+networks:
+  netpulse:
+    driver: bridge
+
+volumes:
+  reports_data:
+  caddy_data:
+  caddy_config:
+  prometheus_data:
+  alertmanager_data:
+  loki_data:
