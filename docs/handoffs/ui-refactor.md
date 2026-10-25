@@ -195,3 +195,84 @@ en `#v-webhooks`) y los generados en strings siguen resolviendo sin cambios.
 | 11 devices+discovery, 12 dashboard+device-detail, 13 terminal/sftp, 14 topology | pendiente (más riesgosas) |
 | 15 router (`swView`), 16 boot | al final por diseño |
 
+---
+
+# Lote B — Tarjeta 10D-B: vistas simples, lote 2 (maintenance, apikeys, tfa, logs)
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-b` (worktree `/Users/doker/np-w10f`) ·
+Commit: `refactor(ui): extraer vistas simples b (maintenance, apikeys, tfa, logs)`.
+
+Mismo enfoque que el Lote A: función a función con verificación de overlap por
+grep; dashboard.html pasó de 8745 → 8483 líneas (−266 movidas, +4 `<script src>`).
+
+## Orden de carga en dashboard.html (tras core.js, antes del inline)
+
+```html
+<script src="/static/js/core.js?v=1"></script>
+<script src="/static/js/views/connectivity.js?v=1"></script>
+<script src="/static/js/views/compliance.js?v=1"></script>
+<script src="/static/js/views/webhooks.js?v=1"></script>
+<script src="/static/js/views/groups.js?v=1"></script>
+<script src="/static/js/views/maintenance.js?v=1"></script>
+<script src="/static/js/views/apikeys.js?v=1"></script>
+<script src="/static/js/views/tfa.js?v=1"></script>
+<script src="/static/js/views/logs.js?v=1"></script>
+<script> /* inline restante */ </script>
+```
+
+## Qué fue a cada archivo
+
+| Archivo | Funciones movidas (mismo orden relativo) |
+|---|---|
+| `views/maintenance.js` | `loadMaint`, `showMaintForm`, `createMaint`, `delMaint` (+ comentario de sección) |
+| `views/apikeys.js` | `showKeyForm`, `loadKeys`, `createKey`, `revokeKey` (+ comentario de sección) |
+| `views/tfa.js` | `setup2FA`, `verify2FA` (+ comentario de sección) |
+| `views/logs.js` | `switchLogSource`, `loadLokiLabels`, `loadLokiLogs`, `loadLogs` (+ 2 comentarios de sección del bloque LOGS VIEW) |
+
+Los `function` top-level cuelgan de window: los `onclick` del markup de
+`#v-maintenance/#v-apikeys/#v-2fa/#v-logs`, los `onchange` de los controles
+Loki/audit y los onclick generados (`delMaint(...)`, `revokeKey(...)`)
+siguen resolviendo sin cambios. `swView` (inline) despachaba `loadMaint`,
+`loadKeys` y `loadLogs`: se resuelve en tiempo de llamada, sin tocar el
+despachador.
+
+## Qué NO se movió (verificado por grep)
+
+- **`__isAdmin` / `npGray` / `esc` / `escAttr`** — ninguna de las 14 funciones
+  movidas los declara; las 4 vistas los usan solo en tiempo de llamada
+  (`esc` en renders, `__isAdmin`/`npGray` en otras vistas). Siguen donde
+  estaban (inline/core según el Lote A): sin duplicación, 0 redeclaraciones
+  (grep = 1 por nombre en todo el árbol).
+- **`devices`** — `loadMaint` lee el array compartido del inventario para
+  rellenar `#maint-dev`; sigue declarado en el inline (estado del dashboard).
+- **`A`, `h`, `toast`, `__t`** — core.js.
+- **DOM exclusivo verificado:** `log-*`, `loki-*` (solo `#v-logs`),
+  `maint-*` (solo `#v-maintenance`), `key-*` (solo `#v-apikeys`),
+  `2fa-*` (solo `#v-2fa`). Tras la extracción, cada id aparece solo en el
+  markup de su vista; `log-filter-action` es un control con handler
+  de `#v-logs`, no se comparte con otra vista.
+
+## Verificación del lote
+
+- `node --check`: 4 archivos nuevos OK + inline restante extraído a temporal
+  (5467 líneas) OK.
+- Grep de redeclaración: los 14 nombres con exactamente 1 `function` en
+  dashboard.html + core.js + views/*.js.
+- `tests/`: 355 passed (con .venv del repo principal).
+- `<link>` CSS intactos (style.css?v=4, overview.css?v=3); cada `.js` nuevo
+  con su `?v=1`. Sin console.log/confirm nuevos.
+
+## Estado del plan de extracción (siguiente ronda)
+
+| Fase del mapa (§5.2) | Estado |
+|---|---|
+| 1 core/state, 2 i18n, 5 session | hecha en core.js (paso 1) |
+| 3 dom, 4 format, 6 theme | pendiente (inline conserva esc/escAttr/IC/icon/tema) |
+| 7 vistas simples: connectivity, compliance, webhooks, groups | hecha (Lote A) |
+| 7 resto: maintenance, apikeys, tfa, logs | **hecha (este lote)** |
+| 8 backups+compare+performance+alerts+admin(userScope+`_r4Groups`) | pendiente (siguiente ronda); acoplamientos: `loadBk→populateCmdDevices`, performance/compare leen `devices` de dashboard |
+| 9 reports, retention, sites, netbox | después; usan `__isAdmin`/`npGray`/`_detText`/`_npState*` |
+| 10 commands, monitoring (con reasignación de `refMon` en el mismo archivo) | después |
+| 11 devices+discovery, 12 dashboard+device-detail, 13 terminal/sftp, 14 topology | pendiente (más riesgosas) |
+| 15 router (`swView`), 16 boot | al final por diseño |
+
