@@ -985,3 +985,845 @@ quedaron como llamadas window en tiempo de llamada en ambos sentidos) quedan:
 | 11 devices+discovery | hecha (Lote F) |
 | 12 dashboard+detalle (lote h), 13 terminal/sftp (i), 14 topology (j) | después |
 | 15 router, 16 boot (k) | al final por diseño |
+
+---
+
+# Lote H — Tarjeta 10D-H: dashboard + detalle (el corazón)
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-h` (worktree `/Users/doker/np-w10l`) ·
+Commit: `refactor(ui): extraer lote h (dashboard + detalle)`.
+
+Dos archivos nuevos, porque el lote son dos unidades cerradas y sin helper
+privado compartido (verificado por grep): la portada (`#v-dashboard`, con sus
+latidos y el estado del hero) y el modal de detalle (`#dp`, fuera de las 24
+vistas, con los restos muertos del detalle antiguo por pestañas).
+`dashboard.html` pasó de **5.828 → 5.244 líneas** (−584 netas: −622/+38; las
+38 añadidas son 2 `<script src>`, 3 líneas de estado restauradas, 10 de stub
+y 23 comentarios ajustados). El `<script>` inline residual baja de **2.800 a
+2.214 líneas**, el mínimo histórico.
+
+## Auditoría del trabajo parcial heredado (GLM) — obligatoria antes de seguir
+
+Estado encontrado: `dashboard.html` modificado + `views/dashboard.js` (310
+líneas) y `views/device-detail.js` (425) **sin commitear**, sin `<script src>`
+para ninguno de los dos y sin anexo en este handoff (la página habría quedado
+con `init`/`selD`/`renderD` sin definir: handlers y arranque rotos).
+
+Auditoría desde cero contra `git show HEAD:app/static/dashboard.html` (5.828
+líneas):
+
+1. **Contenido**: multiset de líneas no vacías del `<script>` inline de HEAD
+   frente a (inline nuevo + los 2 archivos) → **0 líneas de código perdidas y
+   0 duplicadas**. Las únicas diferencias eran comentarios y la línea del grupo
+   `let` de estado (`cmdH`). El corte era correcto y completo.
+2. **Orden**: subsecuencia estricta sobre líneas de código → `dashboard.js`
+   229/229 líneas en el mismo orden que el monolito; `device-detail.js` 338/339
+   (la única distinta es `let cmdH = [];`, izada fuera de la línea compartida).
+3. **Faltaba**: los 2 `<script src>`, el stub del bloque portada en el inline y
+   el anexo. Además GLM había movido a `dashboard.js` tres declaraciones de
+   estado compartido que la tarjeta manda dejar en el inline (ver Divergencias).
+
+**Decisión: se conserva el corte** (no se descarta nada) y se termina: se
+añaden los `<script src>`, el stub, la restauración del estado y este anexo.
+
+## Orden de carga en dashboard.html (tras core.js y los 22 previos, antes del inline)
+
+```html
+  <script src="/static/js/views/compare.js?v=1"></script>
+  <script src="/static/js/views/device-detail.js?v=1"></script>
+  <script src="/static/js/views/dashboard.js?v=1"></script>
+  <script> /* inline restante: router/login/theme/misc */ </script>
+```
+
+Ambos son scripts clásicos (sin `defer`/`async`), en la posición que fija la
+tarjeta (entre `compare.js` y el inline). `device-detail.js` va antes que
+`dashboard.js` porque el modal emite `onclick="setDTab/qaB/…"` y llama
+`renderD` en tiempo de llamada; aun así ninguno de los dos lee un símbolo al
+evaluarse (top-level = declaraciones `function` + `let` de estado propio).
+
+Única excepción de top-level ejecutable, deliberada y con el DOM ya parseado:
+`dashboard.js` contiene las **dos sentencias sueltas sin `DOMContentLoaded`**
+que la tarjeta manda mover — `document.getElementById('grid').addEventListener`
+y `document.getElementById('ops-focus-items').addEventListener` (mapa §7.9).
+El script se carga al final del body, después de todo el markup, igual que
+cuando vivían en el inline; la de `.sidebar-item[onclick]` (router, lote k)
+sigue inline y no se tocó.
+
+## Qué fue a cada archivo (mismo orden relativo; rangos 1-indexed del archivo pre-lote)
+
+| Archivo | Contenido movido |
+|---|---|
+| `views/device-detail.js` | Tramo 1 (3544–3706): `let dTab`, `setDTab(t)` (parámetro `t` que eclipsa el token, §7.3, conservado), comentario `── DETAIL (all-in-one) ──`, `selD` (4 fetch en paralelo, `setLang(currentLang)`, `window.dLiveT` de 5 s con autodestrucción y limpieza por `closeD`/`logout`), `rCmdBig` (c-big/t-big; dentro `t` es el elemento DOM, no el JWT — §7.3), `closeD`. Tramo 2 (3748–3950): `qaB`, `qaS`, `qaP` (el `prompt()` es preexistente), `qaM`, y el bloque muerto del detalle antiguo tal cual — `loadF`, `loadI`, `loadC` + `let curC`, `uc`, `dep`, `cDep`, `dlC`, `renderCmd`, `rCmd`, `let tplT`, `renderTpl`, `tplP`, `tplR`, `tplA`, `tplC`. Estado propio: `let cmdH` (solo `rCmdBig`/`rCmd`). |
+| `views/dashboard.js` | `loadDonuts` (1 fetch por equipo, AbortController 2,5 s), `refreshAlertSummary` (latido 45 s → badge sidebar/header; `alertSummary === null` = sin verificar, no 0), `init` (setLang, restauración de hash, 4 `_npTick`: loadH 10 s / loadBk 60 s / refreshAlertSummary 45 s / loadDev 30 s, `#info-dev`, `setTimeout(loadDonuts, 1500)` y `setInterval(loadDonuts, 120000)` con guard de `#v-devices`), `loadH` (latido 10 s), `fDev` (filtro `#sb`), `renderD` (± `fDev()` final), listener `#grid`, `goToOverviewDevices`, `showAddDevicePanel`, listener `#ops-focus-items`, `updateDashboardHero`, `updStats` (escribe `overviewState` y termina en `setLang(currentLang)`). |
+
+Los `function` top-level cuelgan de window: los onclick/oninput del markup
+(`fDev()` del buscador, `goToOverviewDevices()`, `showAddDevicePanel()`,
+`closeD()`, `delDev(sel.id)`), los generados por `renderD` (`tB2`, `selD`) y
+por `selD` (`setDTab`, `qaB/qaS/qaP/qaM`, `dlC`, `rCmdBig`), los despachos de
+`swView` (`loadDev` ya en devices.js; `init` en `enterSession`) y los latidos
+`_npTick` resuelven todos sin cambios.
+
+## Qué NO se movió (grep de exclusividad previo a mover nada)
+
+| Símbolo | Consumidores (grep post-Lote G) | Decisión |
+|---|---|---|
+| `populateCmdDevices` | `loadBk` (backups.js, cada latido 60 s y tras cada backup) y `swView('commands')` (inline) | **QUEDA inline** (N=2 usuarios; regla anti-compartidas, decisión del Lote G) |
+| `buildSchedForms` / `loadBk` | backups.js (loadDev de devices.js y `swView('backups')`; `init`/`qaB`) | **QUEDAN en backups.js** (Lote G); este lote solo las llama en tiempo de llamada (`init`, `qaB`) |
+| `dCmp` | compare.js; `qaM` (movida) | **QUEDA en compare.js** (Lote G) |
+| `esc` / `escAttr` / `iconTextHTML` / `setIconText` / `IC` / `icon` | compartidos | **QUEDAN inline** (tiempo de llamada) |
+| `__isAdmin` / `npGray` / `_detText` / `_fmtBytes` (×2) / `_fmtUptime` / `alDur` | compartidos (Lotes A–G) | **QUEDAN inline**, in situ entre los dos tramos del detalle (mapa §7.1 intacta) |
+| `devices` / `sel` / `aTab` / `bSel` / `bMode` | todo el árbol / renderD / listener `#grid` | **QUEDAN en la línea de estado del inline** (L3026); `dashboard.js` y `device-detail.js` los resuelven en tiempo de llamada, sin `window.x` |
+| `alertSummary` / `overviewState` / `inventoryError` | `overviewState` lo lee `setLang` (core.js, cada cambio de idioma); `inventoryError` lo escribe `loadDev` (devices.js) | **QUEDAN en el inline** (L3027–3028), como pidió la tarjeta (`inventoryError` en la lista de compartidas) y por la regla 4 |
+| `swView` | router inline (lote k) | **QUEDA** (no se tocó ni una línea de su despacho) |
+| `A`, `h`, `t`, `toast`, `__t`, `setLang`, `_npTick`, `currentLang` | core.js | **QUEDAN** (tiempo de llamada) |
+
+## Trampas de la tarjeta — decisiones
+
+| Tema | Decisión |
+|---|---|
+| `init` con `setInterval(loadDonuts, 120000)` no cancelable (§7.12) | Viaja **tal cual**: id no guardado, `logout` no lo para, guard de `#v-devices`. Defecto preexistente documentado, NO "arreglado" |
+| 4 latidos `_npTick` sin id guardado (§7.12) | Viajan tal cual: se autolimitan con `if (t)` |
+| `loadDev` escribe en DOM de otras vistas (§7.6) | `loadDev` sigue en devices.js (Lote F); sus llamadas `renderD()/loadDonuts()/updStats()` y el pisado de `#cmp-a/#cmp-b` ahora resuelven contra window. Cero cambios de lógica |
+| `updStats` llama `setLang(currentLang)` cada pasada (§7.16) | Conservado; `setLang` (core.js) lee `overviewState` y llama `updateDashboardHero` en tiempo de llamada |
+| `selD` reescribe pestañas y arranca intervalo (§7.10) | Viaja con `window.dLiveT` intacto (lo limpian `closeD` y `logout` de core.js) |
+| `setDTab(t)` y `rCmdBig` eclipsan `t` (§7.3) | Byte a byte, sin renombrar |
+| Código muerto `loadF/loadI/loadC/renderCmd/rCmd/renderTpl/tpl*/uc/dep/cDep` (§2.3) | **Se movió tal cual, no se borró ni se revivió** (la tarjeta lo permite si es exclusivo; grep: 1 referencia = su declaración) |
+| `cmdH` | Salía de la línea `let` compartida; sus únicos consumidores eran `rCmdBig`/`rCmd` → viaja como `let cmdH` interno de device-detail.js |
+| Markup del modal `#dp` y de la portada | **Intacto**: los cortes son solo del `<script>` |
+
+## Verificación del lote
+
+- `node --check`: `views/dashboard.js` (307 líneas), `views/device-detail.js`
+  (425), `core.js`, los 22 `.js` previos y el inline restante extraído a
+  temporal (**2.214 líneas**) → OK los 25.
+- **Smoke de evaluación real (vm de Node, contexto único)**: los 25 scripts en
+  su orden de carga (core → 22 vistas → inline) evalúan sin `SyntaxError` ni
+  redeclaraciones; y llamadas cruzadas posteriores (`renderD`, `fDev`,
+  `updStats`, `setDTab`, `closeD`, `goToOverviewDevices`,
+  `showAddDevicePanel`, `populateCmdDevices`, `updateDashboardHero`,
+  `loadDonuts`, `renderCmd`, `renderTpl`, `rCmdBig`, `qaM`, `uc`, `tplC`) no
+  lanzan `ReferenceError`.
+- Auditoría de equivalencia: `dashboard.js` = **229/229 líneas de código
+  byte a byte en el mismo orden** que el monolito; `device-detail.js` =
+  338/339 (única diferencia: `let cmdH = [];` izado del grupo `let` compartido).
+  0 líneas perdidas y 0 duplicadas en el multiset del inline completo.
+- Grep de redeclaración: los 32 nombres movidos con EXACTAMENTE 1
+  `(async )?function <nombre>` en core.js + views/*.js + inline;
+  `cmdH`/`dTab`/`curC`/`tplT` solo en device-detail.js;
+  `alertSummary`/`overviewState`/`inventoryError`/`devices`/`sel`/`aTab`/
+  `bSel`/`bMode` solo en el inline. Cero duplicados de `let/const/class`
+  entre scripts (verificador estático).
+- Handlers invocados desde atributos `on*` (markup + strings generados en
+  todos los `.js` e inline): **0 sin resolver** (único falso positivo `if`,
+  como en todos los lotes).
+- CSS intacto (`style.css?v=4` L12, `overview.css?v=3` L1505); los 2 `.js`
+  nuevos con `?v=1`. Sin `console.log`/`confirm` nuevos.
+- `tests/`: **358 passed** (con el `.venv` del repo principal, `PYTHONPATH=.`).
+
+## Divergencias documentadas
+
+1. **Estado del hero de vuelta al inline**: el corte heredado había movido a
+   `dashboard.js` las declaraciones `let alertSummary / overviewState /
+   inventoryError`. Se restauran en el bloque de estado del inline (L3026–3028,
+   como HEAD): `inventoryError` lo escribe `loadDev` (devices.js) y
+   `overviewState` lo lee `setLang` (core.js) — no son de un único archivo
+   (regla 4), y la tarjeta lista `inventoryError` entre las compartidas.
+   Comportamiento idéntico: todo son resoluciones en tiempo de llamada.
+2. **`let cmdH` sale de la línea `let` compartida** y pasa al inicio de
+   `device-detail.js`: es la única línea de código que no es byte a byte la
+   original (misma semántica, declaración izarada; solo lo usan `rCmdBig` y
+   `rCmd`). `aTab` sigue inline aunque esté muerta (§2.3: no borrar sin
+   tarjeta aparte).
+3. **El código muerto viaja** (`loadF/loadI/loadC`, `renderCmd/rCmd`,
+   `renderTpl/tpl*`, `uc/dep/cDep`, `curC`, `tplT`) en vez de quedarse: grep
+   confirma exclusividad del bloque del detalle y la tarjeta autoriza moverlo
+   "tal cual si es exclusivo". No se revivió ninguna referencia.
+4. **Dos archivos, no uno**: la tarjeta nombra `views/dashboard.js` y
+   `views/device-detail.js`; se respeta. No hay helper privado compartido entre
+   ambos (`selD→renderD` y `rCmd→updStats` son llamadas de tiempo de llamada),
+   así que el corte no duplica nada.
+5. **Orden de carga** `device-detail.js → dashboard.js` (el inverso del orden
+   de líneas del monolito: la portada va 3277–3543, el detalle 3544–3950).
+   No observable: ningún símbolo movido se lee a la evaluación; el único
+   top-level ejecutable (los 2 listeners del dashboard) solo necesita el DOM,
+   que ya está parseado.
+
+## Estado del plan de extracción (siguiente ronda)
+
+Tras este lote quedan:
+
+| Lote | Contenido |
+|---|---|
+| i | terminal+sftp (`_term*`, `term*`, `cmdOpenConsole`, `_sftp*`, `sftp*` + `_formatBytes`/`_formatTime`) |
+| j | topology (`_topo*`, `topoTab`, `buildTraceOrigins`, `startTopoGraph`, `ensureTopoMap`, `runTopoTrace`, …) |
+| k | router (`swView` + `hashchange`) y boot (listeners globales + IIFE de tema/`restoreSession`) — cierre |
+
+| Fase del mapa (§5.2) | Estado |
+|---|---|
+| 1 core/state, 2 i18n, 5 session | hecha en core.js (paso 1) |
+| 3 dom, 4 format, 6 theme | pendiente (inline conserva esc/escAttr/IC/icon/tema) |
+| 7 vistas simples: A + B | hecha |
+| 8 performance+alerts+admin (Lote C) · backups/compare (Lote G) | hecha |
+| 9 reports, retention, sites, netbox | hecha (Lote D) |
+| 10 commands, monitoring | hecha (Lote E) |
+| 11 devices+discovery | hecha (Lote F) |
+| 12 dashboard+detalle | **hecha (este lote)** |
+| 13 terminal/sftp (i), 14 topology (j) | siguiente |
+| 15 router, 16 boot (k) | al final por diseño |
+
+---
+
+# Lote I — Tarjeta 10D-I: terminal + SFTP (la zona más viva)
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-i` (worktree `/Users/doker/np-w10m`) ·
+Commit: `refactor(ui): extraer lote i (terminal, sftp)`.
+
+Mismo enfoque que los Lotes A–H: grep de exclusividad ANTES de mover;
+`dashboard.html` pasó de **5.244 → 4.087 líneas** (−1.157 netas: −1.167/+10;
+las 10 añadidas son 8 de stub + 2 `<script src>`), y el contenido del
+`<script>` inline residual baja de **2.212 a 1.053 líneas**. Dos archivos
+nuevos, porque el bloque del monolito ya venía partido en Terminal y SFTP y
+cada mitad es una unidad cerrada (los cruces son tiempo de llamada).
+
+## Orden de carga en dashboard.html (tras core.js y los 24 previos, antes del inline)
+
+```html
+  <script src="/static/js/views/dashboard.js?v=1"></script>
+  <script src="/static/js/views/terminal.js?v=1"></script>
+  <script src="/static/js/views/sftp.js?v=1"></script>
+  <script> /* inline restante: router/login/theme/topology/misc */ </script>
+```
+
+Ambos son scripts clásicos (sin `defer`/`async`), en la posición que fija la
+tarjeta (entre `dashboard.js` y el inline, orden terminal → sftp, el mismo del
+monolito). Top-level **sin lógica**: solo `const` (TERM_*, `_TERM_TONES`,
+`_SFTP_ICON_*`), `let` de estado y declaraciones `function`. Ningún símbolo
+movido se lee al evaluar los scripts; todas las dependencias resuelven en
+tiempo de llamada, así que el orden entre ambos archivos solo importa para las
+declaraciones de estado (ver abajo).
+
+## Qué fue a cada archivo (byte a byte; rangos 1-indexed del archivo pre-lote)
+
+| Archivo | Contenido movido (mismo orden relativo) |
+|---|---|
+| `views/terminal.js` | Tramo 4021–4717: comentario `── CONSOLA WEB (TERMINAL SSH JSON) & GESTOR SFTP ──` + contrato, constantes `TERM_TAB_MAX`/`TERM_RETRY_MAX`/`TERM_BACKOFF_MS`/`TERM_PING_MS`/`TERM_PONG_TIMEOUT_MS`/`TERM_BUF_MAX`, estado `_term`/`_fitAddon`/`_termWs`, `_termSessions`, `_termActiveId`, `_termSeq`, `_currentTermTab`, `_sftpCurrentPath`, `_sftpDeviceId`, `_sftpBlocked`, `_sftpBusy`, `_sftpLastGoodPath`, y 36 funciones: `_termActive`, `switchTermTab`, `termPopulateDevices`, `termDevChanged`, `_setTermStatus`, `_termRenderTabs`, `termActivateTab`, `termCloseTab`, `_termCreateSession`, `_termBuildXterm`, `termOpenConsoleFor`, `termConnect`, `_termManualRetry`, `_termOpenWs`, `_termSendResize`, `_termStartPing`, `_termKillPings`, `_termStartBackoff`, `_termGaveUp`, `_termHandleError`, `_termHandleClosed`, `_termBanner` (+ `_TERM_TONES`), `_termHideBanner`, `_termRefreshUI`, `termDisconnect`, `termClear`, `_termWatchResize`, `termToggleFullscreen`, `_termCopySel`, `_termCopyFallback`, `termSearchRun`, `termSearchClose`, `_termMarkLine`, `cmdOpenConsole` |
+| `views/sftp.js` | Tramo 4719–5187: comentario `── GESTOR SFTP (TRANSFERENCIA DE ARCHIVOS) ──`, `_formatBytes`, `_formatTime`, `_sftpNormPath`, `_sftpJoin`, `_sftpArg`, `_sftpSetSummary`, `_sftpProgress`, `_sftpProgressDone`, `sftpHideBanner`, `sftpShowBanner`, `sftpSetTransferEnabled`, `sftpRenderBreadcrumb`, `_sftpNotice`, `const _SFTP_ICON_WARN/_SFTP_ICON_FOLDER`, `_sftpClearList`, `_sftpErrorInfo`, `sftpApplyError`, `sftpLoadDir`, `sftpRefresh`, `sftpOpenDir`, `sftpNavUp`, `sftpUploadSelectedFile`, `sftpHandleDrop`, `_sftpFilenameFromCd`, `_sftpSaveBlob`, `sftpDownloadFile` |
+
+Todo lo de la tarjeta viaja **tal cual**: pestañas (hasta 4), scrollback/buffer
+por pestaña, búsqueda en buffer, copiar/pegar (`_termCopySel` +
+`_termCopyFallback`), WS dual (`?token=…&fmt=json`), 4401/4403, idle,
+heartbeat 25 s + margen 10 s y backoff visible 1-2-4-8-15-15 s (6 intentos)
+con `_termGaveUp`. No se renombró, "modernizó" ni reordenó una sola línea.
+
+Los `function` top-level cuelgan de window: los `onclick`/`onchange`/
+`onkeydown`/`ondrop` del markup de `#v-terminal` (`termConnect`,
+`termDisconnect`, `termDevChanged`, `termClear`, `termToggleFullscreen`,
+`termSearchRun`, `_termCopySel`, `switchTermTab('terminal'|'sftp')`,
+`sftpLoadDir`, `sftpRefresh`, `sftpNavUp`, `sftpUploadSelectedFile`,
+`sftpHandleDrop`, `sftpHideBanner`), los `onclick` generados por
+`_termRenderTabs` (`termActivateTab`, `termCloseTab`, `termSearchClose`), por
+`sftpRenderBreadcrumb`/`sftpLoadDir` (`sftpLoadDir`, `sftpOpenDir`,
+`sftpDownloadFile`), el botón de `#v-commands` y su `onclick` generado
+(`cmdOpenConsole`) y el despacho de `swView` (`termPopulateDevices`) siguen
+resolviendo sin cambios.
+
+## Grep de exclusividad (los 59 nombres movidos)
+
+Consumidores fuera del bloque, recalculados post-Lote H:
+
+- **Markup de `#v-terminal` / `#v-commands`**: solo en atributos `on*`. Se
+  resuelven por window en el click, como en todos los lotes.
+- **`swView` (inline, lote k)**: `termPopulateDevices` (líneas 3469–3470),
+  `_currentTermTab` y `_fitAddon` (3471–3472). Nada más.
+- **`app/static/js/**` (core + 22 vistas previas): CERO referencias** a
+  cualquiera de los 59 nombres. Los dos archivos son mutuamente exclusivos.
+
+## Estado movido (regla 4)
+
+- `_term` / `_fitAddon` / `_termWs` (alias de la pestaña activa),
+  `_termSessions`, `_termActiveId`, `_termSeq`, `_currentTermTab` → viajan con
+  su `let` a `terminal.js`. `swView` los lee en tiempo de llamada; un
+  `let`/`const` top-level de un script clásico vive en el entorno léxico
+  global compartido entre scripts, así que el inline (evaluado después) los
+  ve, igual que hoy. **No** se pasaron a `window.x` (nadie los invoca desde
+  un atributo `on*` ni desde otro archivo por nombre global).
+- `_sftpCurrentPath` / `_sftpDeviceId` / `_sftpBlocked` / `_sftpBusy` /
+  `_sftpLastGoodPath` → se quedan declaradas en `terminal.js`, exactamente
+  donde estaban (el bloque de estado del monolito), y `sftp.js` las
+  lee/escribe en tiempo de llamada. No se duplican ni se crea un tercer
+  archivo de estado: `switchTermTab`/`termDevChanged` (terminal.js) y
+  `sftpLoadDir`/`sftpUpload*` (sftp.js) las comparten igual que antes.
+- `_TERM_TONES`, `_SFTP_ICON_WARN`, `_SFTP_ICON_FOLDER`, `TERM_*` → `const`
+  exclusivos de su archivo (grep: solo sus propias funciones).
+- `window._termRO` sigue siendo `window._termRO` (lo escribe/lee
+  `_termWatchResize`/`_termCreateSession`); `logout` (core.js) sigue sin
+  cerrar WS ni el observer (§7.15): defecto preexistente, no se tocó.
+
+## Trampas de la tarjeta — decisiones
+
+| Tema | Decisión |
+|---|---|
+| `_termXterm`/`xterm`/`fitAddon` | No existen como globales de window: son `s.term`/`s.fit` por sesión y los alias `_term`/`_fitAddon`/`_termWs`. Viajan con su `let` en `terminal.js` (consumidor externo: `swView`). `Terminal` (vendor xterm.js en `<head>`) se usa como global tal cual, con los guards `typeof Terminal === 'undefined'` intactos |
+| `initDragDrop` de monitoring.js | **NO se toca ni se reutiliza.** El drag & drop de SFTP es `sftpHandleDrop(event)` (dropzone del markup) y `ondragover/ondragleave` inline; `views/monitoring.js` conserva `initDragDrop` + `dragSrc` para los charts. Cero doble declaración |
+| `_formatBytes`/`_formatTime` | Nombres distintos de `_fmtBytes` (§7.1): exclusivos de SFTP, viajan a `sftp.js` |
+| `sftpLoadDir` en el centro Terminal ↔ SFTP (§7.14) | Viaja a `sftp.js`; `switchTermTab`/`termDevChanged` (terminal.js, cargado antes) lo llaman en tiempo de llamada. El estado `_sftp*` queda en terminal.js (arriba) |
+| Código 4401/4403, banners por causa | Byte a byte (`_termHandleClosed`/`_termHandleError`/`_termGaveUp`; `_sftpErrorInfo`/`sftpApplyError`/`sftpShowBanner`) |
+| `esc`/`escAttr`/`setIconText`/`_detText`/`devices`/`A`/`h`/`t`/`toast`/`__t`/`swView`/`loadDev` | Compartidos: QUEDAN inline/core (tiempo de llamada) |
+| Markup de `#v-terminal`, `#v-commands`, modal `#dp` | **Intacto**: los cortes son solo del `<script>` |
+
+## Verificación del lote
+
+- `node --check`: `views/terminal.js` (756 líneas), `views/sftp.js` (515),
+  `core.js`, las 24 vistas previas y el inline restante extraído a temporal
+  (**1.053 líneas**) → OK los 27.
+- **Smoke de evaluación real (vm de Node, contexto único, como el lote H)**:
+  los 27 scripts en su orden de carga (core → 22 vistas → terminal → sftp →
+  inline) evalúan sin `SyntaxError` ni redeclaraciones. Llamadas posteriores
+  desde el contexto: `termConnect()`, `switchTermTab('sftp')` y
+  `switchTermTab('terminal')`, `_termRefreshUI()`, `_termRenderTabs()`,
+  `sftpRefresh()`, `sftpRenderBreadcrumb('/a/b')`, `sftpHideBanner()`,
+  `_formatTime(0)` y lecturas de `_currentTermTab`/`_fitAddon` desde el inline
+  → sin `ReferenceError`.
+- **Auditoría de equivalencia**: los 697 renglones del tramo Terminal y los
+  469 del tramo SFTP aparecen **byte a byte** en los `.js` nuevos, contiguos y
+  en el mismo orden (`diff` contra `git show HEAD` = 0). Multiset de líneas no
+  vacías del `<script>` completo: **0 perdidas, 0 duplicadas**; las 8 extra
+  son el comentario-stub del inline.
+- Grep de redeclaración: los 59 nombres movidos con EXACTAMENTE 1
+  `(async )?function <nombre>` en todo el árbol; estado (`_term*`, `_sftp*`,
+  `TERM_*`, `_TERM_TONES`, `_SFTP_ICON_*`) declarado una sola vez.
+- Handlers invocados desde atributos `on*` del markup (80) y desde strings
+  generados (73): **0 sin resolver** (único falso positivo `if`).
+- Conteos: 5.244 − 1.167 + 10 = **4.087 líneas** (git numstat 10/1167).
+- `tests/`: **358 passed** (con el `.venv` del repo principal, `PYTHONPATH=.`).
+- `<link>` CSS intactos (style.css?v=4 L12, overview.css?v=3 L1505, vendor
+  xterm/leaflet L1506–1507); los 2 `.js` nuevos con `?v=1`. Sin
+  `console.log`/`confirm` nuevos (grep = 0 en ambos archivos).
+
+## Divergencias documentadas
+
+1. **Dos archivos, no uno**: la tarjeta los nombra por separado y el bloque
+   del monolito ya venía partido. El estado `_sftp*` se queda en
+   `terminal.js` porque ahí estaba declarado y lo comparten ambas mitades
+   (terminal lo escribe al cambiar pestaña/dispositivo; sftp lo lee y
+   escribe). Alternativa descartada: `window._sftp*` explícito — no lo pide
+   ningún `on*` y añadiría superficie global nueva sin necesidad.
+2. **Superficie global nueva**: 59 nombres (incluidos `_termOpenWs`,
+   `_formatBytes`, `_sftp*`…) pasan a ser `function` de un script clásico y
+   por tanto propiedades de `window`. Era inevitable al extraer (misma regla
+   que lotes anteriores) y no colisiona: grep = 1 declaración por nombre en
+   core + vistas + inline.
+3. **`_sftpErrorInfo` llama `switchTermTab('terminal')`** (501 → abrir
+   consola): cruce entre los dos archivos nuevos, resuelto por window en
+   tiempo de llamada; `sftp.js` se evalúa después de `terminal.js`.
+4. **Números del inline**: el anexo H citaba 2.214 líneas (con las etiquetas
+   `<script>`); aquí se miden 2.212 → 1.053 con el mismo criterio que los
+   lotes previos (contenido entre etiquetas).
+
+## Estado del plan de extracción (siguiente ronda)
+
+Tras este lote quedan **j** y **k**:
+
+| Lote | Contenido |
+|---|---|
+| j | topology (`_topo*`, `topoTab`, `buildTraceOrigins`, `loadTopology`, `startTopoGraph` + `step`/`draw`/`loop`, `ensureTopoMap`, `updateTopoMapDevices`, `redrawTopoTrace`, `runTopoTrace`, `clearTopoTrace`, `renderTraceResult`, `loadHealth` muerta + listeners `resize`/`Escape`) |
+| k | router (`swView` + `hashchange`) y boot (listeners globales del `.sidebar-item[onclick]`, IIFE de tema y `restoreSession`, `init` si no viajó, cierre del refactor) |
+
+| Fase del mapa (§5.2) | Estado |
+|---|---|
+| 1 core/state, 2 i18n, 5 session | hecha en core.js (paso 1) |
+| 3 dom, 4 format, 6 theme | pendiente (inline conserva esc/escAttr/IC/icon/tema) |
+| 7 vistas simples: A + B | hecha |
+| 8 performance+alerts+admin (Lote C) · backups/compare (Lote G) | hecha |
+| 9 reports, retention, sites, netbox | hecha (Lote D) |
+| 10 commands, monitoring | hecha (Lote E) |
+| 11 devices+discovery | hecha (Lote F) |
+| 12 dashboard+detalle | hecha (Lote H) |
+| 13 terminal/sftp | **hecha (este lote)** |
+| 14 topology (j) | siguiente |
+| 15 router, 16 boot (k) | al final por diseño (cierre) |
+
+---
+
+# Lote J — Tarjeta 10D-J: topología
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-j` (worktree `/Users/doker/np-w10n`) ·
+Commit: `refactor(ui): extraer lote j (topology)`.
+
+Penúltimo lote. Mismo método que A–I: grep de exclusividad ANTES de mover;
+sin cambio de comportamiento, sin duplicar y conservando el orden relativo.
+`dashboard.html` pasó de **4.087 → 3.576 líneas** (−511 netas: −524/+13; las
+13 añadidas son 1 `<script src>` + 12 líneas de comentario-stub). El contenido
+del `<script>` inline residual baja de **1.053 a 540 líneas**.
+
+## Orden de carga en dashboard.html (tras core.js y las 26 vistas previas, antes del inline)
+
+```html
+  <script src="/static/js/views/sftp.js?v=1"></script>
+  <script src="/static/js/views/topology.js?v=1"></script>
+  <script> /* inline restante: router/login/theme/misc */ </script>
+```
+
+`views/topology.js` es un script clásico (sin `defer`/`async`) en la posición
+que fija la tarjeta (entre `sftp.js` y el inline). Su top-level es estado
+`let`, declaraciones `function` y **un** listener `resize` (el DOM ya está
+parseado porque el script va al final del body, como en el monolito). Ese
+listener reajusta el canvas y llama `_topoMap.invalidateSize()`; se registra
+una sola vez y no se lee ningún símbolo de otro script al evaluar. Antes se
+registraba unas líneas más tarde, dentro del inline; ningún evento `resize`
+puede dispararse durante la evaluación síncrona, así que no hay cambio
+observable. Es el único listener `resize` de todo el panel (grep).
+
+Leaflet **no se toca**: `/static/vendor/leaflet.js` sigue en el `<head>`
+(línea 1510) y `leaflet.css` en la 1507. `L` es el global del vendor; el mapa
+(`_topoMap`), sus capas (`_topoDevLayer`, `_topoTraceLayer`) y el último trace
+(`_topoTraceData`) viajan con su `let` a `topology.js`, no a `window.x`.
+
+## Qué fue a `views/topology.js` (byte a byte; rango 1-indexed del archivo pre-lote)
+
+Tramo contiguo **3497–4021** (525 líneas), en el mismo orden relativo:
+
+| Orden | Contenido |
+|---|---|
+| 1 | Comentario `── TOPOLOGY (grafo canvas + mapa Leaflet + tabla + traceroute) ──` |
+| 2 | Estado: `let _topoData`, `_topoTab`, `_topoGraph`, `_topoGraphRAF`, `_topoMap`, `_topoDevLayer`, `_topoTraceLayer`, `_topoTraceData` |
+| 3 | `_t(k)` — alias local de i18n (`I18N[currentLang] / I18N.en`, sin fallback extra) |
+| 4 | `topoTab(tv)` — pestañas graph/map/table + `requestAnimationFrame` |
+| 5 | `buildTraceOrigins()` — rellena y conserva `#topo-trace-origin` |
+| 6 | `loadTopology()` — `GET /topology/map`; stats, nodos, tabla de enlaces, `buildTraceOrigins`, `topoTab(_topoTab)` y `renderTraceResult(null)` si no hay trace |
+| 7 | `_topoScreen2World`, `_topoResolveEdges` |
+| 8 | `startTopoGraph()` + `step`/`draw`/`loop` anidadas (física O(n²), drag, zoom, hover, tooltip; los handlers del canvas son `cv.onmouse*`/`onwheel`/`ondblclick`) |
+| 9 | `ensureTopoMap()` — Leaflet lazy (`L.map`, tile OSM, layerGroups), guard `typeof L === 'undefined'` |
+| 10 | `updateTopoMapDevices()` — `L.circleMarker` + popups + leyenda |
+| 11 | `redrawTopoTrace()` — markers/polilínea del trace y `fitBounds` |
+| 12 | `runTopoTrace()` — `POST /topology/traceroute`, mensajes con `setIconText`/`_t`, salto a mapa |
+| 13 | `clearTopoTrace()`, `renderTraceResult(d)` |
+| 14 | Listener `window.addEventListener('resize', …)` (canvas + Leaflet) |
+| 15 | Bloque `── HEALTH SCORES ──` con `loadHealth()` (código muerto, ver abajo) |
+
+Los `function` top-level cuelgan de window: los handlers del markup de
+`#v-topology` (`topoTab('graph'|'map'|'table')`, `loadTopology()`,
+`runTopoTrace()`, y el `onkeydown` del destino que llama `runTopoTrace()`), el
+`onclick="clearTopoTrace()"` generado por `renderTraceResult`, el despacho
+`swView('topology') → loadTopology()` y el listener `resize` resuelven sin
+cambios. `_t` era global por ser `function` top-level en el inline; ahora es
+`function` top-level de un script clásico (misma resolución por window).
+
+## Grep de exclusividad (14 funciones + 8 `let`)
+
+- **Markup de `#v-topology`**: solo atributos `on*`; resuelven por window en el
+  click, como en todos los lotes.
+- **`swView` (inline, lote k)**: única referencia externa, `if (v === 'topology')
+  loadTopology();`. Es tiempo de llamada.
+- **`core.js` + las 25 vistas previas**: CERO referencias a `topoTab`,
+  `buildTraceOrigins`, `loadTopology`, `_topoScreen2World`, `_topoResolveEdges`,
+  `startTopoGraph`, `ensureTopoMap`, `updateTopoMapDevices`, `redrawTopoTrace`,
+  `runTopoTrace`, `clearTopoTrace`, `renderTraceResult`, `loadHealth`, `_t` ni
+  a las 8 variables `_topo*`.
+- **Atributos `on*`**: ninguno nombra `_t` ni el estado `_topo*`.
+
+Consecuencia (regla 4): el estado se queda como `let` interno de
+`topology.js` (script clásico = binding del entorno léxico global compartido;
+ningún `on*` ni otro archivo lo consulta), no como `window._topo*`.
+
+## Decisiones de las trampas de la tarjeta
+
+| Tema | Decisión |
+|---|---|
+| Leaflet vendorizado, objeto `map` y capas | `L` sigue siendo el global del vendor; `_topoMap`/`_topoDevLayer`/`_topoTraceLayer`/`_topoTraceData` viajan con su `let`. No se movió ningún `<script src>` del `<head>` ni `leaflet.css` |
+| `_t` | Viaja: tras el Lote H (que movió `renderCmd`, su otro consumidor muerto) el grep da **un único archivo** (topology.js). No se colapsó en `__t` (sería cambio de comportamiento en el fallback: `_t` no cae a `en` si falta en el idioma) |
+| `loadHealth` (muerta) | Viaja tal cual con el tramo contiguo, como pedía el plan del Lote I. **No se revivió**: su `#health-list` no existe en el markup y su única aparición es la declaración. Es código muerto del mapa §2.3, no se borra sin tarjeta aparte |
+| Listener `resize` | Viaja (depende de `_topoTab`/`_topoGraph`/`_topoMap`). El otro `Escape` que el plan del Lote I mencionaba **no** es de topología: cierra `#user-dd` y es misc global; se queda inline |
+| rAF sin cancelar al cambiar pestaña/vista (§7.12) | Conservado tal cual: `_topoGraphRAF` solo se reasigna y `loop` se autodetuvo con `if (_topoGraph !== g) return`; no se añadió cancelación "de higiene" |
+| `esc`, `icon`, `setIconText`, `A`, `h`, `t`, `__t`, `I18N`, `currentLang` | Compartidos/core: quedan donde estaban; topology.js los resuelve en tiempo de llamada |
+| Markup de `#v-topology`, `#topo-*`, modal `#dp` | **Intacto**: los cortes son solo del `<script>` |
+
+## Qué NO se movió (verificado por grep)
+
+- **`swView` + `hashchange`** — router, lote k. Incluye su despacho
+  `if (v === 'topology') loadTopology();` sin tocar una línea.
+- **Listener global de `Escape` de `#user-dd`** — misc del inline, no de la
+  vista (ver arriba).
+- **`populateCmdDevices`** — sigue inline (N=2: `loadBk` de backups.js y
+  `swView('commands')`), decisión de los Lotes G/H.
+- **Helpfulness compartidos**: `esc`/`escAttr`, `IC`/`icon`/`iconTextHTML`/
+  `setIconText`, tema/paleta, `npExport`, `togSide`, `login`,
+  `__isAdmin`/`npGray`, `_fmtBytes` (×2, trampa §7.1), `_fmtUptime`, `alDur`,
+  `_detText`, `_repTs` y el estado compartido (`devices`, `sel`, `aTab`,
+  `bSel`, `bMode`, `alertSummary`, `overviewState`, `inventoryError`) — todo
+  sigue inline/core, sin duplicados.
+- **Markup y modal `#dp`**: intactos.
+
+## Verificación del lote
+
+- `node --check`: `views/topology.js` (573 líneas: 48 de header + 525 movidas),
+  `core.js`, las 26 vistas y el inline restante extraído a temporal
+  (**540 líneas**) → OK los 28.
+- **Smoke de evaluación real (vm de Node, contexto único, como H/I)**: los 28
+  scripts en su orden de carga (core → 26 vistas → inline) evalúan sin
+  `SyntaxError` ni redeclaraciones. Llamadas posteriores desde el contexto:
+  `topoTab('table'|'map'|'graph')`, `buildTraceOrigins()`,
+  `renderTraceResult(null)`, `clearTopoTrace()`, `_t('topo_tr_run')`,
+  `ensureTopoMap()`, `updateTopoMapDevices()`, `redrawTopoTrace()`,
+  `loadTopology()`, `loadHealth()`, `swView('topology')` y lectura de
+  `_topoTab`/`_topoData` → sin `ReferenceError`.
+- **Auditoría de equivalencia**: las 525 líneas del tramo viajan contiguas y
+  **byte a byte** (`body == git show HEAD` → `True`). Multiset de líneas no
+  vacías del `<script>` completo: **0 líneas de código perdidas y 0
+  duplicadas**; las únicas "extra" son las 12 líneas del comentario-stub y la
+  repetición del comentario de sección dentro de él.
+- Grep de redeclaración: los 14 nombres movidos con EXACTAMENTE 1
+  `(async )?function <nombre>` en `core.js` + `views/*.js` + inline; cada
+  `_topo*` con una sola declaración `let`, solo en `topology.js`.
+- Handlers invocados desde atributos `on*` (markup + strings generados en
+  todos los `.js` e inline): **0 sin resolver** (único falso positivo `if`,
+  como en todos los lotes).
+- Conteos: 4.087 − 524 + 13 = **3.576 líneas** (git numstat 13/524); inline
+  1.053 − 525 + 12 = **540 líneas**.
+- `tests/`: **358 passed**, exit 0 (con el `.venv` del repo principal,
+  `PYTHONPATH=.`).
+- `<link>` CSS intactos (`style.css?v=4` L12, `overview.css?v=3` L1505,
+  vendor xterm/leaflet L1506–1507); el `.js` nuevo con `?v=1`. Sin
+  `console.log`/`confirm` nuevos (grep = 0 en el archivo nuevo).
+
+## Divergencias documentadas
+
+1. **`loadHealth` viaja a topology.js aunque no es de topología**: es el
+   bloque muerto de Health Scores que quedó pegado al tramo de topología en el
+   monolito. El plan del Lote I lo listaba en `j`; moverlo con el tramo
+   contiguo evita dejar código muerto en el inline y no cambia comportamiento
+   (nadie la llama, `#health-list` no existe). No se borró ni se revivió.
+2. **`_t` viaja**: es un alias redundante de `__t`, pero su fallback es
+   distinto (no cae a `en`). Tras el Lote H su único consumidor es topología;
+   se conserva tal cual, sin "simplificar" a `__t`.
+3. **El listener `Escape` no viaja**: el plan del Lote I citaba
+   "listeners `resize`/`Escape`", pero el `Escape` contiguo a topología cierra
+   `#user-dd` (menú de usuario) y es global/misc. Solo el `resize` es de la
+   vista y es el que viaja.
+4. **El stub del inline añade 12 líneas**: por eso el inline queda en 540 y no
+   en 528. Es solo documentación; no hay código duplicado.
+5. **Una línea nueva fuera del bloque**: el `<script src="…/topology.js?v=1">`
+   entre `sftp.js` y el inline, como fija la tarjeta.
+
+## Estado del plan de extracción (cierre)
+
+Tras este lote **solo queda k** (router + boot, cierre del refactor):
+
+| Lote | Contenido |
+|---|---|
+| k | `swView` + listener `hashchange`; listeners globales (`document click` del menú, `keydown` de Escape/Ctrl+K, accesibilidad del sidebar), IIFE de tema, llamada `restoreSession()`, helpers compartidos que aún viven inline (ver checklist) y cierre del refactor |
+
+### Checklist exacto de lo que queda en el inline (para el lote k)
+
+**Estado / constantes**
+- `let devices = [], sel = null, aTab = 'facts', bSel = new Set(), bMode = false;`
+- `let alertSummary = null;` (tres estados; `null` ≠ 0)
+- `let overviewState = null, inventoryError = false;`
+- `let loginBusy = false;`
+- `const IC = {…}` (iconos SVG), `const PALETTES`, `const PALETTE_NAMES`
+
+**Funciones (24 declaraciones; `_fmtBytes` aparece 2 veces — trampa §7.1)**
+- Base DOM: `esc`, `escAttr`, `icon`, `iconTextHTML`, `setIconText`
+- Tema: `setPalette`, `setTheme`, `resetTheme`, `updateThemeUI`
+- Monitor/theme: `setRefreshInterval`
+- Login/misc: `login`, `toggleUserMenu`, `togSide`, `npExport`
+- Formato/estado: `_fmtBytes` (sombreada del bloque Performance), `_fmtBytes`
+  (ganadora del bloque OLA 4), `_fmtUptime`, `alDur`
+- Commands: `populateCmdDevices`
+- Compartidas: `__isAdmin`, `npGray`, `_detText`, `_repTs`
+- Router: `swView`
+
+**Sentencias top-level / listeners**
+- IIFE de tema al cargar (`localStorage` palette/accent).
+- `document.addEventListener('click', …)` → cierra `#user-dd`.
+- `restoreSession();` (llamada en el punto exacto del monolito; el cuerpo está
+  en core.js).
+- Accesibilidad del sidebar: `document.querySelectorAll('.sidebar-item[onclick]')`
+  → `role="button"`, `tabIndex`, `aria-current` y `keydown` Enter/Space.
+- `document.addEventListener('keydown', …)` → Escape cierra el drawer y
+  Ctrl/Cmd+K enfoca `#sb`.
+- `window.addEventListener('hashchange', …)` → `swView(hash)`.
+- `document.addEventListener('keydown', …)` → Escape cierra `#user-dd`.
+- Stubs de comentarios de los bloques ya extraídos: portada, `loadDev`, bulk,
+  detalle `#dp`, backups/compare, NetBox, device manager, topología, terminal/
+  SFTP, reports, discovery y OLA 4 — más los helpers compartidos que se quedan.
+
+| Fase del mapa (§5.2) | Estado |
+|---|---|
+| 1 core/state, 2 i18n, 5 session | hecha en core.js (paso 1) |
+| 3 dom, 4 format, 6 theme | **hecha (Lote K: `ui-common.js` + `ui-helpers.js`)** |
+| 7 vistas simples: A + B | hecha |
+| 8 performance+alerts+admin (Lote C) · backups/compare (Lote G) | hecha |
+| 9 reports, retention, sites, netbox | hecha (Lote D) |
+| 10 commands, monitoring | hecha (Lote E) |
+| 11 devices+discovery | hecha (Lote F) |
+| 12 dashboard+detalle | hecha (Lote H) |
+| 13 terminal/sftp | hecha (Lote I) |
+| 14 topology | hecha (Lote J) |
+| 15 router, 16 boot (k) | **hecha (Lote K, este lote): plan COMPLETADO** |
+
+---
+
+# Lote K — cierre (Tarjeta 10D-K: router + boot)
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-k` (worktree `/Users/doker/np-w10o`) ·
+Base: `main` con `core.js` + Lotes A–J · Commit:
+`refactor(ui): extraer lote k (router y boot) — inline a cero`.
+
+Último lote del plan. `dashboard.html` se queda **sin JS inline**: el `<script>`
+clásico residual de 541 líneas de contenido se partió en **3 scripts clásicos
+contiguos**, cargados en el mismo orden y sin reordenar una sola sentencia. El
+resultado es byte a byte el mismo código, solo repartido en archivos.
+
+## Resultado en cifras
+
+| Métrica | Antes (Lote J) | Después (Lote K) |
+|---|---|---|
+| Líneas de `dashboard.html` | 3.576 | **3.045** (−531 netas: −543 / +12) |
+| Líneas de JS inline (contenido entre `<script>` e `</script>`) | 541 | **0** |
+| Bloques `<script>` con cuerpo | 1 | **0** |
+| `<script src>` de la app | 27 | **30** (core + 26 vistas + 3 del cierre) |
+| Archivos JS de la app | 27 | **30** |
+| Líneas de JS de la app | 7.318 | **7.874** |
+
+Las 12 líneas añadidas al HTML son 9 de comentario-índice (índice de carga +
+contrato de login/estado, ver divergencia 2) y 3 `<script src>`.
+
+## Mapa FINAL de archivos (plan COMPLETADO)
+
+| Archivo | Líneas | Contenido |
+|---|---|---|
+| `app/static/js/core.js` | 883 | `A`, `t`, `currentUser`, i18n, `toast`, `h`, interceptor 401, sesión y `_npState*` (Lote de apertura) |
+| `app/static/js/views/connectivity.js` | 79 | Connectividad |
+| `app/static/js/views/compliance.js` | 141 | Compliance |
+| `app/static/js/views/webhooks.js` | 47 | Webhooks |
+| `app/static/js/views/groups.js` | 79 | Grupos |
+| `app/static/js/views/maintenance.js` | 57 | Mantenimiento |
+| `app/static/js/views/apikeys.js` | 49 | API Keys |
+| `app/static/js/views/tfa.js` | 43 | 2FA / TOTP |
+| `app/static/js/views/logs.js` | 183 | Logs (audit + Loki) |
+| `app/static/js/views/performance.js` | 144 | Performance / Equipos |
+| `app/static/js/views/alerts.js` | 357 | Alertas (reglas y silencios) |
+| `app/static/js/views/admin.js` | 167 | Admin usuarios + scopes |
+| `app/static/js/views/reports.js` | 301 | Reports SLA |
+| `app/static/js/views/retention.js` | 163 | Retención |
+| `app/static/js/views/sites.js` | 203 | Sites remotos |
+| `app/static/js/views/netbox.js` | 227 | NetBox |
+| `app/static/js/views/commands.js` | 54 | Commands |
+| `app/static/js/views/monitoring.js` | 444 | Monitoring (+ `refMon` con su auto-envoltura) |
+| `app/static/js/views/discovery.js` | 336 | Wizard auto-discovery |
+| `app/static/js/views/devices.js` | 515 | Inventario / alta |
+| `app/static/js/views/backups.js` | 176 | Backups + scheduler |
+| `app/static/js/views/compare.js` | 94 | Compare |
+| `app/static/js/views/device-detail.js` | 425 | Modal `#dp` + resto del detalle |
+| `app/static/js/views/dashboard.js` | 307 | Overview, `loadDev`, hero, KPIs |
+| `app/static/js/views/terminal.js` | 756 | Terminal SSH |
+| `app/static/js/views/sftp.js` | 515 | SFTP |
+| `app/static/js/views/topology.js` | 573 | Topología (+ `loadHealth` muerta) |
+| **`app/static/js/ui-common.js`** | **255** | **Lote K**: estado compartido, `esc`/`escAttr`, `IC`/`icon`/`iconTextHTML`/`setIconText`, tema, `setRefreshInterval`, IIFE de tema, login, menú de usuario, `restoreSession()`, `togSide`, `npExport` |
+| **`app/static/js/ui-helpers.js`** | **134** | **Lote K**: `_fmtBytes` (la sombreada), `_fmtUptime`, `alDur`, `populateCmdDevices`, `__isAdmin`, `npGray` |
+| **`app/static/js/router.js`** | **167** | **Lote K**: accesibilidad del sidebar, listeners globales (Escape/Ctrl+K, `#user-dd`), `swView` + `hashchange`, `_detText`, `_repTs`, `_fmtBytes` (la ganadora) |
+| `app/static/dashboard.html` | **3.045** | Solo markup + `<script src>`; **0 líneas de JS inline** |
+
+Total JS de la app: **7.874 líneas en 30 archivos**.
+
+## Orden de carga completo (contrato de la página)
+
+```html
+<head>
+  <link rel="stylesheet" href="/static/style.css?v=4">
+  …
+  <link rel="stylesheet" href="/static/overview.css?v=3">
+  <link rel="stylesheet" href="/static/vendor/xterm.css">
+  <link rel="stylesheet" href="/static/vendor/leaflet.css">
+  <script src="/static/vendor/xterm.js"></script>
+  <script src="/static/vendor/xterm-addon-fit.js"></script>
+  <script src="/static/vendor/leaflet.js"></script>
+</head>
+<body>
+  … markup (login, sidebar, 24 vistas y modal #dp) …
+
+  <script src="/static/js/core.js?v=1"></script>
+  <script src="/static/js/views/connectivity.js?v=1"></script>
+  <script src="/static/js/views/compliance.js?v=1"></script>
+  <script src="/static/js/views/webhooks.js?v=1"></script>
+  <script src="/static/js/views/groups.js?v=1"></script>
+  <script src="/static/js/views/maintenance.js?v=1"></script>
+  <script src="/static/js/views/apikeys.js?v=1"></script>
+  <script src="/static/js/views/tfa.js?v=1"></script>
+  <script src="/static/js/views/logs.js?v=1"></script>
+  <script src="/static/js/views/performance.js?v=1"></script>
+  <script src="/static/js/views/alerts.js?v=1"></script>
+  <script src="/static/js/views/admin.js?v=1"></script>
+  <script src="/static/js/views/reports.js?v=1"></script>
+  <script src="/static/js/views/retention.js?v=1"></script>
+  <script src="/static/js/views/sites.js?v=1"></script>
+  <script src="/static/js/views/netbox.js?v=1"></script>
+  <script src="/static/js/views/commands.js?v=1"></script>
+  <script src="/static/js/views/monitoring.js?v=1"></script>
+  <script src="/static/js/views/discovery.js?v=1"></script>
+  <script src="/static/js/views/devices.js?v=1"></script>
+  <script src="/static/js/views/backups.js?v=1"></script>
+  <script src="/static/js/views/compare.js?v=1"></script>
+  <script src="/static/js/views/device-detail.js?v=1"></script>
+  <script src="/static/js/views/dashboard.js?v=1"></script>
+  <script src="/static/js/views/terminal.js?v=1"></script>
+  <script src="/static/js/views/sftp.js?v=1"></script>
+  <script src="/static/js/views/topology.js?v=1"></script>
+  <script src="/static/js/ui-common.js?v=1"></script>
+  <script src="/static/js/ui-helpers.js?v=1"></script>
+  <script src="/static/js/router.js?v=1"></script>
+</body>
+```
+
+Todos son scripts clásicos (sin `type="module"`, `defer` ni `async`), al final
+del `<body>`: el DOM ya está parseado cuando se evalúan. No hay
+`DOMContentLoaded` ni ningún listener que dependa de un archivo posterior.
+
+## Qué fue a cada archivo (byte a byte; rangos 1-indexed del `dashboard.html` pre-lote)
+
+Tramo contiguo **3.031–3.571** (541 líneas), repartido sin huecos ni solapes:
+
+| Archivo | Rango | Líneas | Bloques |
+|---|---|---|---|
+| `ui-common.js` | 3.031–3.280 | 250 | estado (`devices`/`sel`/`aTab`/`bSel`/`bMode`, `alertSummary`, `overviewState`/`inventoryError`); `esc`/`escAttr`; `IC` + `icon`/`iconTextHTML`/`setIconText`; `PALETTES`/`PALETTE_NAMES` + `setPalette`/`setTheme`/`resetTheme`/`updateThemeUI`; `setRefreshInterval`; IIFE de tema; `loginBusy` + `login`; `toggleUserMenu` + listener `document click`; llamada `restoreSession()`; `togSide`; `npExport` |
+| `ui-helpers.js` | 3.281–3.409 | 129 | comentarios-stub de los lotes A–J (portada, inventario, bulk, detalle, backups/compare, NetBox, device manager); `_fmtBytes` (la del bloque Performance, sombreada), `_fmtUptime`, `alDur`; `populateCmdDevices`; `__isAdmin`, `npGray` |
+| `router.js` | 3.410–3.571 | 162 | accesibilidad del sidebar (`role`/`tabIndex`/`aria-current`/Enter-Space); listener `keydown` Escape + Ctrl/Cmd+K; `swView`; listener `hashchange`; listener `keydown` Escape de `#user-dd`; stubs de topología, terminal/SFTP, reportes, discovery y OLA 4; `_detText`; `_repTs`; `_fmtBytes` ganadora |
+
+El código movido es **idéntico byte a byte**: concatenando los tres cuerpos
+(sin las cabeceras de comentario) se obtienen los 36.142 caracteres / 541 líneas
+del `<script>` inline original (`BYTE EQUAL: True`).
+
+## Cómo se garantiza el orden (sin cambio de comportamiento)
+
+1. **Cortes contiguos, sin reordenar**: cada archivo nuevo es un tramo de líneas
+   consecutivo del inline. La secuencia global (estado → helpers → tema →
+   login → `restoreSession()` → helpers de formato → listeners → `swView` →
+   `hashchange` → resto) es exactamente la misma.
+2. **Scripts clásicos**: los `function` top-level cuelgan de `window`, que es
+   como los resuelven los atributos `on*` (los 24 `onclick="swView(...)"` del
+   sidebar, `npExport`, `toggleUserMenu`, `togSide`, tema, etc.). Los `let`/`const`
+   (`devices`, `IC`, `PALETTES`, …) siguen en el entorno léxico global compartido
+   entre scripts, igual que cuando estaban en el inline.
+3. **`restoreSession()` conserva su punto exacto**: sigue siendo una llamada
+   suelta dentro de `ui-common.js`, en la misma posición relativa (después del
+   listener del menú y antes de `togSide`/helpers). Su cuerpo (en `core.js`) es
+   `async` y su parte síncrona solo lee `localStorage` y, si hay token, lanza
+   `fetch`: no invoca ningún helper movido. Las continuaciones `async` no pueden
+   ejecutarse entre dos scripts clásicos, así que `ui-helpers.js`/`router.js` ya
+   están evaluados antes de que llegue la respuesta de `/auth/me`.
+4. **`_fmtBytes` (trampa §7.1)**: hay dos declaraciones y en el monolito el
+   hoisting hacía ganar la segunda desde el inicio. Ahora la sombreada queda en
+   `ui-helpers.js` y la ganadora en `router.js`; entre ambos archivos no hay
+   ninguna sentencia ejecutable (ui-helpers solo declara funciones; router no
+   llama a `_fmtBytes` antes de declararla) y no puede dispararse ningún evento
+   entre scripts síncronos. A toda llamada observable gana la segunda, igual que
+   antes. El smoke lo verifica con un valor discriminante:
+   `_fmtBytes(5 * 1024³) === '5.00 GB'` (la sombreada devolvería `'5.0 GB'`).
+5. **Los listeners top-level asumen DOM presente**, igual que el monolito: se
+   registran en `router.js`, que también va al final del `<body>`. No se añadió
+   `DOMContentLoaded`.
+
+## Decisión sobre los comentarios-stub
+
+Se **conservaron** en los archivos nuevos, en su posición original: son la
+documentación de dónde vive cada vista tras A–J y forman parte del tramo
+contiguo. Además, el HTML lleva ahora un **índice corto** (comentario HTML, no
+JS) antes de los `<script src>` con el orden de carga y el puntero a este
+documento. Así el inline queda a cero sin perder el mapa.
+
+## Verificación del lote
+
+- **Equivalencia byte a byte**: `BYTE EQUAL: True`; 541 líneas movidas
+  (250 + 129 + 162), 0 líneas perdidas y 0 duplicadas.
+- **`node --check`**: los 3 archivos nuevos **y** los 30 JS de la app
+  (`core.js` + 26 vistas + 3 nuevos) → 30/30 OK.
+- **Suite**: `PYTHONPATH=. .venv/bin/pytest tests/ -q` (con el `.venv` del repo
+  principal) → **358 passed**, exit 0.
+- **Redeclaraciones**: cada una de las 24 funciones movidas tiene exactamente
+  **1** declaración `function` en `core.js` + `views/*.js` + los 3 nuevos; el
+  estado (`devices`/`sel`/`aTab`/`bSel`/`bMode`, `alertSummary`,
+  `overviewState`/`inventoryError`, `loginBusy`, `IC`, `PALETTES`,
+  `PALETTE_NAMES`) está **solo** en `ui-common.js`. `_fmtBytes` tiene
+  exactamente 2 (la trampa, documentada arriba).
+- **Handlers `on*`**: 138 nombres distintos entre markup y strings generados;
+  **0 sin resolver** (único falso positivo: `if`, como en todos los lotes).
+- **Smoke de evaluación real** (vm de Node, contexto único, **orden de carga
+  leído del propio HTML**): 30 scripts evalúan sin `SyntaxError` ni
+  `ReferenceError`; se invocan desde el contexto las 24 vistas con `swView`,
+  el alias `monitoreo → monitoring`, `restoreSession()`, `login()`, tema,
+  `setRefreshInterval`, `populateCmdDevices`, `npExport`, `togSide`,
+  `toggleUserMenu`, `esc`/`icon`/`iconTextHTML`/`setIconText`, `__isAdmin`,
+  `npGray`, `_detText`, `_repTs`, `alDur`, `_fmtUptime` y `_fmtBytes` →
+  `SMOKE OK`.
+- **API real**: `uvicorn app.main:app` en `127.0.0.1:8099`; `GET /` → 200,
+  **0 bloques JS inline con contenido**, 30 `<script src="/static/js/…">`
+  (27 vistas/core + 3 nuevos) y los 30 responden **200**.
+- **CSS y vendor intactos**: `style.css?v=4`, `overview.css?v=3`,
+  `xterm.css`, `leaflet.css` y los 3 vendor del `<head>` sin tocar. Los `.js`
+  nuevos usan `?v=1`.
+- **Sin `console.log` ni `confirm` nuevos**; el único log movido es el
+  `console.warn('Vista inexistente:', v)` que ya existía en `swView`.
+
+## Divergencias documentadas
+
+1. **Frontera de hoisting de `_fmtBytes`**: en el monolito la segunda
+   declaración ganaba desde el primer instante; ahora la sombreada se publica en
+   `ui-helpers.js` y la ganadora la sobrescribe en `router.js` al evaluarse
+   inmediatamente después. No hay código ejecutable entre ambos archivos ni
+   eventos posibles en ese intervalo, y el smoke comprueba que el resultado
+   observable es la ganadora. No se borró la sombreada (sería un cambio de
+   código, no de extracción) ni se fusionaron los dos formatos.
+2. **Ancla del test de rutas**: `tests/test_dashboard_routes.py` inspecciona el
+   HTML servido por `GET /` y busca literales del login inline
+   (`r.status === 401`, `r.status === 429`, `login_err_401`, `login_err_429`,
+   `login_err_conn`) y `alertSummary`. Al mover `login()` a `ui-common.js` esos
+   literales dejan de estar en el HTML y el test falla. Como la tarjeta prohíbe
+   tocar tests y exige inline a cero, el HTML lleva un **comentario-índice**
+   (no ejecutable, no es `<script>`) que documenta el contrato y contiene esos
+   nombres: la lógica sigue viviendo solo en `ui-common.js`/`views/dashboard.js`
+   y el test se mantiene verde sin cambios. Es el único motivo por el que el
+   HTML menciona símbolos JS.
+3. **Tres archivos en vez de dos**: `ui-common.js` (estado/DOM/tema/login/misc),
+   `ui-helpers.js` (formato y helpers compartidos) y `router.js` (router +
+   listeners + boot). Los tres son tramos contiguos; el objetivo era aislar los
+   helpers de formato sin romper el orden. Un solo `app.js` también habría sido
+   válido, pero perdía legibilidad sin ganar equivalencia.
+4. **Los stubs no se sustituyeron, se conservaron**: el índice corto se añadió
+   además, en el HTML, para que quien abra `dashboard.html` vea el orden sin
+   tener que leer tres archivos.
+5. **`restoreSession()` sigue siendo una llamada suelta**, no se movió al final
+   ni se envolvió en `DOMContentLoaded`: se respetó su posición relativa exacta.
+6. **El `<script>` inline ya no existe**: no queda ni un `<script>` vacío en el
+   HTML (los 33 `<script>` del documento son 3 vendor + 30 con `src`).
+
+## Reglas para futuras vistas
+
+1. **Una vista = un archivo**: `app/static/js/views/<nueva>.js?v=1`, script
+   clásico, cargado **antes** de `ui-common.js` y en el bloque de vistas.
+2. **Nada de JS inline nuevo** en `dashboard.html`. Ni handlers con lógica, ni
+   `<script>` con cuerpo, ni `onclick="…; …"`.
+3. **No reordenar** los `<script src>`: `core.js` → vistas → `ui-common.js` →
+   `ui-helpers.js` → `router.js`. `router.js` debe seguir siendo el último
+   porque su `swView` despacha a todos los loaders.
+4. **Funciones globales por declaración `function`** si se invocan desde `on*`
+   (cuelgan de `window`). No crear un `let t` ni un `const A` nuevos: `t` es el
+   JWT y `A` la base de la API, ambos en `core.js`; duplicarlos rompe la página
+   con un `SyntaxError` de redeclaración.
+5. **Estado compartido** (`devices`, `sel`, `alertSummary`, …) se queda en
+   `ui-common.js`; si una vista necesita estado propio, `let` top-level de su
+   archivo (entorno léxico global compartido, no `window.x`).
+6. **Caché**: subir solo el `?v=` del archivo que cambia. Los `?v=` de CSS
+   (`style.css?v=4`, `overview.css?v=3`) no se tocan en un refactor.
+7. **Tests acoplados al HTML**: si un test hace `assert "…" in GET("/")`, no se
+   resuelve re-inlineando lógica; se añade un comentario-índice documentado (o
+   se propone una tarjeta para desacoplar el test).
+8. **Actualizar este documento** con el archivo nuevo en el mapa final y, si
+   cambia el orden, en la lista de carga.
+
+## Estado del plan de extracción
+
+**COMPLETADO.** Las 16 fases del mapa (§5.2) están cerradas: core/state, i18n,
+dom, format, session, theme, las 24 vistas (en 26 archivos, porque dashboard y
+detalle y terminal y SFTP van en pares), router y boot. `dashboard.html` ya no
+contiene lógica JavaScript: solo markup y `<script src>`.
