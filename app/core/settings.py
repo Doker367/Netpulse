@@ -157,6 +157,26 @@ SNMP_TIMEOUT = int(os.getenv("NETPULSE_SNMP_TIMEOUT", "5"))
 METRICS_ENABLED = os.getenv("NETPULSE_METRICS_ENABLED", "false").lower() == "true"
 METRICS_INTERVAL = int(os.getenv("NETPULSE_METRICS_INTERVAL", "60"))
 
+# ── Watchdog de sites remotos ────────────────────────────────
+# Defaults de arranque; el watchdog relee el entorno en cada ciclo para que
+# los cambios de NETPULSE_SITE_WATCHDOG_* no exijan reiniciar la API.
+# Ver app/services/remote/watchdog_svc.py y docs/handoffs/collectors-site.md.
+SITE_WATCHDOG_ENABLED_DEFAULT = (
+    os.getenv("NETPULSE_SITE_WATCHDOG_ENABLED", "true").lower() == "true"
+)
+
+
+def _int_env(name: str, default: int) -> int:
+    """Lee un entero de entorno sin romper el arranque si está malformado."""
+    try:
+        return int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        return default
+
+
+SITE_WATCHDOG_INTERVAL_S_DEFAULT = _int_env("NETPULSE_SITE_WATCHDOG_INTERVAL_S", 60)
+SITE_STALE_AFTER_S_DEFAULT = _int_env("NETPULSE_SITE_STALE_AFTER_S", 300)
+
 # ── Notificaciones (Telegram / Email / Slack) ───────────────
 
 TELEGRAM_BOT_TOKEN = os.getenv("NETPULSE_TELEGRAM_TOKEN", "")

@@ -59,9 +59,28 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"⚠️ Metrics poller no arrancó: {e}")
 
+    # Arrancar watchdog de sites remotos (alerta de colector enmudecido)
+    try:
+        from app.services.remote import watchdog_svc
+        if await watchdog_svc.start():
+            print(
+                f"🐕 Site watchdog iniciado (intervalo {watchdog_svc.interval_s()}s, "
+                f"stale_after {watchdog_svc.stale_after_s()}s)"
+            )
+        else:
+            print("🐕 Site watchdog deshabilitado")
+    except Exception as e:
+        print(f"⚠️ Site watchdog no arrancó: {e}")
+
     yield
 
     # Shutdown: detener collectors
+    try:
+        from app.services.remote import watchdog_svc
+        await watchdog_svc.stop()
+    except Exception:
+        pass
+
     try:
         from app.services.collectors import syslog_svc
         syslog_svc.stop_syslog_collector()

@@ -66,6 +66,49 @@ config/loki-config.yml. Si el disco del host está >98%, Loki volverá
 a fallar — vigilar con `df -h /`.
 
 ================================================================
+1c) WATCHDOG DE SITES REMOTOS (colector enmudecido)
+================================================================
+
+La API arranca una tarea en segundo plano que vigila los sites de
+colectores remotos. Si un site deja de reportar (enlace caído, host
+muerto) emite UNA alerta por episodio y la resuelve sola cuando el
+site vuelve. No hay que mirar la pantalla para enterarse.
+
+Cómo se consulta:
+
+  # Alerta de site incluida junto a las de Prometheus (JWT de usuario)
+  curl -s -H "Authorization: Bearer $JWT" \
+       http://127.0.0.1:8082/api/alerts/active
+
+  # Estado del watchdog (viewer o superior)
+  curl -s -H "Authorization: Bearer $JWT" \
+       http://127.0.0.1:8082/api/remote/watchdog
+
+Las alertas de site llevan source="watchdog", site_id, collector_id,
+minutes_without_contact, reason ("sin contacto" o "sin heartbeat") y
+last_error si el colector lo reportó. También se notifican por los
+canales ya configurados (webhooks, Telegram, Slack, email). Los
+webhooks deben suscribirse a los eventos site_stale y site_recovered.
+
+Variables (se releen en cada ciclo):
+
+  NETPULSE_SITE_WATCHDOG_ENABLED=true      # false lo desactiva
+  NETPULSE_SITE_WATCHDOG_INTERVAL_S=60     # cada cuánto evalúa
+  NETPULSE_SITE_STALE_AFTER_S=300          # silencio para alertar
+  NETPULSE_SITE_WATCHDOG_STATE=runtime/site_watchdog.json
+
+El umbral efectivo es el mayor entre NETPULSE_SITE_STALE_AFTER_S y
+3 x probe_interval_s del colector (la misma regla que usa la UI).
+Un site provisionado que nunca contactó se alerta como
+"sin heartbeat" tras el margen de despliegue; nunca se asume verde.
+
+LÍMITE HONESTO: si el central entero se cae, este watchdog no corre
+y no puede avisar de su propia caída. Eso lo cubre el monitoreo
+externo del proceso/API (systemd, contenedor o Prometheus externo).
+Para llevar además la señal a Prometheus, ver la mejora documentada
+en docs/handoffs/collectors-site.md §15.7.
+
+================================================================
 2) ARRANCAR TODO EL PROYECTO (FRÍO / DESDE CERO)
 ================================================================
 

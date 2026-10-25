@@ -52,6 +52,7 @@ def _collector_payload(row, now: datetime) -> dict[str, Any]:
         "collector_id": row["collector_id"],
         "version": row["collector_version"],
         "contact": contact,
+        "probe_interval_s": row["probe_interval_s"],
         "stale_after_s": stale_after,
         "first_seen_at": row["first_seen_at"],
         "last_seen_at": row["last_seen_at"],
