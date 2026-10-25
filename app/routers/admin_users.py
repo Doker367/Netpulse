@@ -6,6 +6,7 @@ Endpoints (todos requieren rol admin):
 - GET    /api/admin/users/{username} — Obtener info de un usuario
 - PUT    /api/admin/users/{username} — Actualizar un usuario
 - DELETE /api/admin/users/{username} — Eliminar un usuario
+- POST   /api/admin/users/{username}/revoke-sessions — Cerrar todas sus sesiones
 """
 
 import yaml
@@ -17,6 +18,7 @@ from app.core.security import hash_password
 from app.models.schemas import UserCreate, UserUpdate, UserResponse, UserRole
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import requires_role, get_current_user
+from app.services import audit_svc
 
 router = APIRouter(
     prefix="/api/admin",
@@ -111,6 +113,7 @@ def create_user(body: UserCreate):
         "plain_password": None,
         "scope_group": body.scope_group,
         "scope_sites": body.scope_sites,
+        "token_version": 0,
     }
     users.append(new_user)
     _save_users(users)
@@ -144,7 +147,8 @@ def update_user(username: str, body: UserUpdate):
 
     user = users[idx]
 
-    # Actualizar solo los campos proporcionados
+    # Actualizar solo los campos proporcionados. token_version no se toca:
+    # editar rol/scope/nombre no debe resucitar sesiones ya revocadas.
     if body.password is not None:
         user["password_hash"] = hash_password(body.password)
         user["plain_password"] = None
@@ -191,3 +195,45 @@ def delete_user(username: str, request: Request):
     _save_users(users)
     _invalidate_auth_cache()
     return None
+
+
+@router.post("/users/{username}/revoke-sessions")
+def revoke_user_sessions(username: str, request: Request):
+    """Cierra todas las sesiones de un usuario incrementando su versión.
+
+    El JWT de usuario incluye ``tv`` (versión de sesión). Al incrementar
+    ``token_version`` en config/users.yaml, todos los tokens emitidos antes
+    dejan de validar de inmediato (401) y tampoco pueden renovarse con
+    ``POST /api/auth/refresh``. No afecta a otros usuarios ni a las API keys.
+
+    Devuelve ``{username, token_version}`` con la versión nueva.
+    """
+    from app.routers.auth import user_token_version
+
+    users = _load_users_raw()
+    idx = _find_user(users, username)
+    if idx is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Usuario '{username}' no encontrado",
+        )
+
+    user = users[idx]
+    previous = user_token_version(user)
+    user["token_version"] = previous + 1
+    users[idx] = user
+    _save_users(users)
+    _invalidate_auth_cache()
+
+    audit_svc.log_event(
+        action="user_revoke_sessions",
+        username=get_current_user(request).get("sub", "anonymous"),
+        details=(
+            f"target={username} token_version={previous}->{user['token_version']}"
+        ),
+        ip_address=request.client.host if request.client else None,
+        path=f"/api/admin/users/{username}/revoke-sessions",
+        method="POST",
+        response_status=200,
+    )
+    return {"username": username, "token_version": user["token_version"]}

@@ -31,6 +31,18 @@ USERS_FILE = Path(__file__).resolve().parent.parent.parent / "config" / "users.y
 _users_cache: dict[str, dict] = {}
 
 
+def user_token_version(user: dict) -> int:
+    """Versión de sesión de un usuario; ausente o inválida equivale a 0.
+
+    Los usuarios creados antes de existir ``token_version`` no necesitan
+    migración: se tratan como versión 0, igual que un JWT sin claim ``tv``.
+    """
+    try:
+        return int(user.get("token_version") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _load_users() -> dict[str, dict]:
     """Carga usuarios desde config/users.yaml y hashea contraseñas."""
     users: dict[str, dict] = {}
@@ -51,6 +63,7 @@ def _load_users() -> dict[str, dict]:
             "role": u.get("role", "viewer"),
             "scope_group": u.get("scope_group"),
             "scope_sites": u.get("scope_sites"),
+            "token_version": user_token_version(u),
             "password_hash": pwd_hash,
         }
 
@@ -69,9 +82,11 @@ def _token_claims(user: dict) -> dict:
     """Claims del JWT para un usuario de config/users.yaml.
 
     Login y refresh comparten esta función para que el contrato del token sea
-    idéntico: sub, role y, solo si están definidos, scope_group/scope_sites.
+    idéntico: sub, role, tv y, solo si están definidos, scope_group/scope_sites.
     """
     claims = {"sub": user["username"], "role": user["role"]}
+    # Versión de sesión: el middleware la compara con config/users.yaml.
+    claims["tv"] = user_token_version(user)
     # Sin asignación, el token no incluye el claim (acceso no restringido).
     for field in ("scope_group", "scope_sites"):
         if user.get(field) is not None:
@@ -86,7 +101,7 @@ def _token_claims(user: dict) -> dict:
 def login(request: Request, body: LoginRequest):
     """Inicia sesión con usuario y contraseña.
 
-    Devuelve un JWT con sub, role y, si existen, scope_group/scope_sites.
+    Devuelve un JWT con sub, role, tv y, si existen, scope_group/scope_sites.
     Límite: 5 intentos por minuto por IP (anti fuerza bruta).
     """
     users = _get_users()
@@ -120,8 +135,11 @@ def refresh_token(user: dict = Depends(get_current_user)):
     emitió el token original, el token renovado refleja el valor actual. Un
     usuario eliminado de la configuración no puede renovar.
 
-    No hay estado en servidor: el token anterior sigue siendo válido hasta su
-    propio `exp` (ver docs/handoffs/auth-session.md).
+    Si el token está revocado (su claim ``tv`` no coincide con el
+    ``token_version`` actual), el middleware responde 401 antes de llegar aquí,
+    de modo que un token viejo no puede resucitar mediante refresh. Sin
+    revocación explícita, el token anterior sigue válido hasta su propio `exp`
+    (ver docs/handoffs/auth-session.md).
     """
     username = user.get("sub")
 

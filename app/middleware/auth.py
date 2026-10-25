@@ -72,6 +72,49 @@ class JWTBearer(HTTPBearer):
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+        # Revocación stateless por versión: el JWT lleva ``tv`` y debe coincidir
+        # con ``token_version`` del usuario en config/users.yaml. Un token
+        # emitido antes de una revocación deja de valer sin blacklist.
+        _reject_revoked_session(payload)
+
         # Guardar payload en request.state para uso posterior
         request.state.user = payload
         return credentials
+
+
+def _reject_revoked_session(payload: dict) -> None:
+    """Lanza 401 si el token pertenece a una sesión revocada.
+
+    - Token con ``tv``: se compara con la versión actual del usuario. Si el
+      usuario ya no existe en la configuración, también se rechaza (un token
+      nuevo nunca debe sobrevivir al borrado de su usuario).
+    - Token legado sin ``tv``: se interpreta como versión 0. Si el usuario
+      existe con versión > 0, la revocación también lo invalida; si el usuario
+      no existe, se mantiene el comportamiento anterior (válido hasta ``exp``)
+      para no romper tokens emitidos antes de esta tarjeta.
+
+    Las API keys ``np_`` se resuelven antes de llegar aquí y no son JWT.
+    """
+    sub = payload.get("sub")
+    if not isinstance(sub, str) or sub.startswith("apikey:"):
+        return
+
+    # Import perezoso: app.routers.auth importa este módulo al cargarse.
+    from app.routers.auth import _get_users, user_token_version
+
+    current = _get_users().get(sub)
+    if current is None:
+        if "tv" in payload:
+            _raise_revoked()
+        return
+
+    if payload.get("tv", 0) != user_token_version(current):
+        _raise_revoked()
+
+
+def _raise_revoked() -> None:
+    raise HTTPException(
+        status_code=401,
+        detail="Sesión revocada; vuelve a entrar",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
