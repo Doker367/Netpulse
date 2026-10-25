@@ -158,6 +158,19 @@ def list_sites():
         ) from exc
 
 
+@router.get("/watchdog", dependencies=VIEWER)
+def watchdog_status():
+    """Estado del watchdog de sites enmudecidos y sus alertas activas.
+
+    ``active_count > 0`` significa que hay sites sin contacto (o sin heartbeat)
+    que ya se notificaron por los canales existentes. No evalúa: solo lee el
+    estado persistido y el último ciclo ejecutado.
+    """
+    from app.services.remote import watchdog_svc
+
+    return watchdog_svc.status_snapshot()
+
+
 @router.get("/sites/{site_id}", dependencies=VIEWER)
 def get_site(site_id: str):
     try:
