@@ -11,6 +11,9 @@ Notas de conexión:
   los passwords Fernet del inventario. Aquí no se vuelve a descifrar.
 - Cada fallo se traduce a un ``detail`` literal en español para que la UI
   pueda explicar la causa; nunca se devuelve una lista vacía como éxito.
+- Listar y descargar son lectura y siguen siendo globales (decisión de
+  producto de RBAC fase 1). Subir es una mutación y valida el grupo real del
+  inventario antes de abrir SSH.
 - ``SSHClient.connect(timeout=...)`` no es solo el timeout TCP: también limita
   el *kex* SSH. RouterOS del laboratorio tarda 8–26 s en negociarlo, así que
   el default es 30 s (``NETPULSE_SFTP_CONNECT_TIMEOUT_S``). Un kex incompleto
@@ -28,7 +31,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app.middleware.auth import JWTBearer
-from app.middleware.rbac import requires_role
+from app.middleware.rbac import requires_role, requires_scope
 from app.services import napalm_svc
 
 logger = logging.getLogger(__name__)
@@ -598,7 +601,12 @@ async def upload_file_to_device(
     filename: str = Query(..., description="Nombre del archivo a guardar"),
     remote_dir: str = Query("/", description="Directorio remoto de destino"),
 ):
-    """Sube un archivo desde la máquina local al dispositivo de red vía SFTP."""
+    """Sube un archivo desde la máquina local al dispositivo de red vía SFTP.
+
+    Es una mutación: un token con scope debe pertenecer al grupo real del
+    equipo antes de que se abra la sesión SSH.
+    """
+    requires_scope(device_id=device_id, request=request)
     client, sftp = _get_ssh_client_and_sftp(device_id)
     try:
         clean_name = os.path.basename(filename or "uploaded_file")

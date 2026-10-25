@@ -19,7 +19,7 @@ from urllib.parse import urlparse, urlunparse
 
 import httpx
 import yaml
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.core.settings import (
     NETBOX_TOKEN,
@@ -28,7 +28,7 @@ from app.core.settings import (
     netbox_auth_header,
 )
 from app.middleware.auth import JWTBearer
-from app.middleware.rbac import requires_role
+from app.middleware.rbac import get_current_user, requires_role, scope_error
 from app.models.schemas import UserRole
 from app.services.inventory_svc import invalidate_cache
 
@@ -417,10 +417,15 @@ def _write_devices_yaml(data: dict) -> None:
 
 
 def _build_local_entry(nb_dev: dict) -> dict:
-    """Convierte un dispositivo de NetBox en la entrada de devices.yaml."""
+    """Convierte un dispositivo de NetBox en la entrada de devices.yaml.
+
+    ``group`` solo se copia si NetBox lo entrega como texto no vacío; el
+    payload estándar de NetBox no lo incluye, así que en la práctica el grupo
+    de un equipo existente se conserva y uno nuevo queda sin grupo.
+    """
     dev_name = nb_dev.get("name") or f"netbox-{nb_dev['id']}"
     dev_id = f"netbox-{nb_dev['id']}"
-    return {
+    entry = {
         "id": dev_id,
         "hostname": _extract_ip(nb_dev),
         "port": 22,
@@ -432,10 +437,14 @@ def _build_local_entry(nb_dev: dict) -> dict:
         "netbox_name": dev_name,
         "netbox_url": f"{NETBOX_URL}/dcim/devices/{nb_dev['id']}/",
     }
+    group = nb_dev.get("group")
+    if isinstance(group, str) and group.strip():
+        entry["group"] = group
+    return entry
 
 
 @router.post("/sync")
-async def sync_from_netbox():
+async def sync_from_netbox(request: Request):
     """Sincroniza desde NetBox → devices.yaml local y devuelve un resumen.
 
     NetBox es la fuente de verdad para los campos importados. Garantías:
@@ -445,6 +454,10 @@ async def sync_from_netbox():
     - **No toca credenciales** locales ni el puerto de un equipo existente.
     - Los equipos de NetBox **sin primary_ip se saltan** con motivo: no se
       inventa ``127.0.0.1``.
+    - Con un token restringido, cada equipo candidato se valida contra el
+      grupo destino real antes de escribir. Los que quedan fuera de scope se
+      informan en ``saltados[{device_id, motivo}]`` (no son errores) y el
+      resto se importa con normalidad; no hay 403 global.
     - Listas ordenadas por ``device_id`` (respuesta determinista).
     - Escritura atómica; si falla, el inventario anterior queda intacto.
 
@@ -455,6 +468,7 @@ async def sync_from_netbox():
         actual.
     """
     _require_netbox_configured()
+    user = get_current_user(request)
 
     netbox_devices = await _netbox_paginated("/dcim/devices/")
 
@@ -521,6 +535,25 @@ async def sync_from_netbox():
 
         dev_name = local_entry["netbox_name"]
         target = existing.get(dev_name) or existing.get(dev_id)
+
+        # Grupo destino real: el que quedará escrito en devices.yaml. Un
+        # equipo existente conserva su grupo salvo que NetBox aporte uno;
+        # uno nuevo solo lo tiene si NetBox lo entrega (si no, queda sin
+        # grupo y un token restringido no puede crearlo).
+        if target is not None:
+            current_group = target.get("group")
+            dest_group = local_entry.get("group")
+            scope_detail = scope_error(user, current_group)
+            if scope_detail is None and dest_group is not None:
+                scope_detail = scope_error(user, dest_group)
+            target_id = target.get("id") or dev_id
+        else:
+            scope_detail = scope_error(user, local_entry.get("group"))
+            target_id = dev_id
+
+        if scope_detail:
+            saltados.append({"device_id": target_id, "motivo": scope_detail})
+            continue
 
         if target is None:
             existing[dev_id] = local_entry
