@@ -4,10 +4,10 @@ Endpoints para verificar y gestionar compliance de configuraciones
 de red contra líneas base (baselines) por grupo de dispositivos.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.middleware.auth import JWTBearer
-from app.middleware.rbac import requires_role
+from app.middleware.rbac import requires_role, requires_scope
 from app.models.schemas import (
     ComplianceBaselineRequest,
     ComplianceBaselineResponse,
@@ -64,12 +64,17 @@ def check_compliance(body: ComplianceCheckRequest):
 
 
 @router.post("/baseline", response_model=ComplianceBaselineResponse)
-def set_baseline(body: ComplianceBaselineRequest):
+def set_baseline(body: ComplianceBaselineRequest, request: Request):
     """Establece la configuración baseline para un grupo de dispositivos.
 
     El baseline se almacena en config/baselines/<group>.cfg y sirve
     como referencia para las verificaciones de compliance.
+
+    Es una mutación sobre un grupo: un token con scope solo puede escribir
+    la baseline de sus grupos autorizados. ``check`` y ``report`` son
+    lectura y siguen globales.
     """
+    requires_scope(group=body.group, request=request)
     config = compliance_svc.set_baseline(body.group, body.config)
     return ComplianceBaselineResponse(
         group=body.group,

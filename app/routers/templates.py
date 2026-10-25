@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.middleware.auth import JWTBearer
-from app.middleware.rbac import requires_role, get_current_user
+from app.middleware.rbac import requires_role, get_current_user, requires_scope
 from app.services import templates_svc
 
 router = APIRouter(
@@ -169,6 +169,10 @@ def apply_template(name: str, body: TemplateApplyRequest, request: Request):
     user = get_current_user(request)
     username = user.get("username", "anonymous")
 
+    # Mutación sobre un equipo concreto: el scope se comprueba por el grupo
+    # real del inventario antes de renderizar y antes de cualquier dry-run.
+    requires_scope(device_id=body.device_id, request=request)
+
     result = templates_svc.apply_template(
         device_id=body.device_id,
         template_name=name,
@@ -206,6 +210,13 @@ def confirm_template_apply(name: str, body: TemplateConfirmRequest, request: Req
     """
     user = get_current_user(request)
     username = user.get("username", "anonymous")
+
+    # El commit real vuelve a validar el device de la sesión pendiente: un
+    # session_token no debe permitir confirmar fuera del scope del llamante.
+    # La sesión la consume el servicio; aquí solo se consulta para el scope.
+    pending = getattr(templates_svc, "_pending_sessions", {}).get(body.session_token)
+    if pending:
+        requires_scope(device_id=pending.get("device_id"), request=request)
 
     result = templates_svc.confirm_apply(
         session_token=body.session_token,
