@@ -1551,7 +1551,7 @@ Tras este lote **solo queda k** (router + boot, cierre del refactor):
 | Fase del mapa (§5.2) | Estado |
 |---|---|
 | 1 core/state, 2 i18n, 5 session | hecha en core.js (paso 1) |
-| 3 dom, 4 format, 6 theme | pendiente (inline conserva esc/escAttr/IC/icon/tema) |
+| 3 dom, 4 format, 6 theme | **hecha (Lote K: `ui-common.js` + `ui-helpers.js`)** |
 | 7 vistas simples: A + B | hecha |
 | 8 performance+alerts+admin (Lote C) · backups/compare (Lote G) | hecha |
 | 9 reports, retention, sites, netbox | hecha (Lote D) |
@@ -1559,5 +1559,271 @@ Tras este lote **solo queda k** (router + boot, cierre del refactor):
 | 11 devices+discovery | hecha (Lote F) |
 | 12 dashboard+detalle | hecha (Lote H) |
 | 13 terminal/sftp | hecha (Lote I) |
-| 14 topology | **hecha (este lote)** |
-| 15 router, 16 boot (k) | **único pendiente: cierre** |
+| 14 topology | hecha (Lote J) |
+| 15 router, 16 boot (k) | **hecha (Lote K, este lote): plan COMPLETADO** |
+
+---
+
+# Lote K — cierre (Tarjeta 10D-K: router + boot)
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-k` (worktree `/Users/doker/np-w10o`) ·
+Base: `main` con `core.js` + Lotes A–J · Commit:
+`refactor(ui): extraer lote k (router y boot) — inline a cero`.
+
+Último lote del plan. `dashboard.html` se queda **sin JS inline**: el `<script>`
+clásico residual de 541 líneas de contenido se partió en **3 scripts clásicos
+contiguos**, cargados en el mismo orden y sin reordenar una sola sentencia. El
+resultado es byte a byte el mismo código, solo repartido en archivos.
+
+## Resultado en cifras
+
+| Métrica | Antes (Lote J) | Después (Lote K) |
+|---|---|---|
+| Líneas de `dashboard.html` | 3.576 | **3.045** (−531 netas: −543 / +12) |
+| Líneas de JS inline (contenido entre `<script>` e `</script>`) | 541 | **0** |
+| Bloques `<script>` con cuerpo | 1 | **0** |
+| `<script src>` de la app | 27 | **30** (core + 26 vistas + 3 del cierre) |
+| Archivos JS de la app | 27 | **30** |
+| Líneas de JS de la app | 7.318 | **7.874** |
+
+Las 12 líneas añadidas al HTML son 9 de comentario-índice (índice de carga +
+contrato de login/estado, ver divergencia 2) y 3 `<script src>`.
+
+## Mapa FINAL de archivos (plan COMPLETADO)
+
+| Archivo | Líneas | Contenido |
+|---|---|---|
+| `app/static/js/core.js` | 883 | `A`, `t`, `currentUser`, i18n, `toast`, `h`, interceptor 401, sesión y `_npState*` (Lote de apertura) |
+| `app/static/js/views/connectivity.js` | 79 | Connectividad |
+| `app/static/js/views/compliance.js` | 141 | Compliance |
+| `app/static/js/views/webhooks.js` | 47 | Webhooks |
+| `app/static/js/views/groups.js` | 79 | Grupos |
+| `app/static/js/views/maintenance.js` | 57 | Mantenimiento |
+| `app/static/js/views/apikeys.js` | 49 | API Keys |
+| `app/static/js/views/tfa.js` | 43 | 2FA / TOTP |
+| `app/static/js/views/logs.js` | 183 | Logs (audit + Loki) |
+| `app/static/js/views/performance.js` | 144 | Performance / Equipos |
+| `app/static/js/views/alerts.js` | 357 | Alertas (reglas y silencios) |
+| `app/static/js/views/admin.js` | 167 | Admin usuarios + scopes |
+| `app/static/js/views/reports.js` | 301 | Reports SLA |
+| `app/static/js/views/retention.js` | 163 | Retención |
+| `app/static/js/views/sites.js` | 203 | Sites remotos |
+| `app/static/js/views/netbox.js` | 227 | NetBox |
+| `app/static/js/views/commands.js` | 54 | Commands |
+| `app/static/js/views/monitoring.js` | 444 | Monitoring (+ `refMon` con su auto-envoltura) |
+| `app/static/js/views/discovery.js` | 336 | Wizard auto-discovery |
+| `app/static/js/views/devices.js` | 515 | Inventario / alta |
+| `app/static/js/views/backups.js` | 176 | Backups + scheduler |
+| `app/static/js/views/compare.js` | 94 | Compare |
+| `app/static/js/views/device-detail.js` | 425 | Modal `#dp` + resto del detalle |
+| `app/static/js/views/dashboard.js` | 307 | Overview, `loadDev`, hero, KPIs |
+| `app/static/js/views/terminal.js` | 756 | Terminal SSH |
+| `app/static/js/views/sftp.js` | 515 | SFTP |
+| `app/static/js/views/topology.js` | 573 | Topología (+ `loadHealth` muerta) |
+| **`app/static/js/ui-common.js`** | **255** | **Lote K**: estado compartido, `esc`/`escAttr`, `IC`/`icon`/`iconTextHTML`/`setIconText`, tema, `setRefreshInterval`, IIFE de tema, login, menú de usuario, `restoreSession()`, `togSide`, `npExport` |
+| **`app/static/js/ui-helpers.js`** | **134** | **Lote K**: `_fmtBytes` (la sombreada), `_fmtUptime`, `alDur`, `populateCmdDevices`, `__isAdmin`, `npGray` |
+| **`app/static/js/router.js`** | **167** | **Lote K**: accesibilidad del sidebar, listeners globales (Escape/Ctrl+K, `#user-dd`), `swView` + `hashchange`, `_detText`, `_repTs`, `_fmtBytes` (la ganadora) |
+| `app/static/dashboard.html` | **3.045** | Solo markup + `<script src>`; **0 líneas de JS inline** |
+
+Total JS de la app: **7.874 líneas en 30 archivos**.
+
+## Orden de carga completo (contrato de la página)
+
+```html
+<head>
+  <link rel="stylesheet" href="/static/style.css?v=4">
+  …
+  <link rel="stylesheet" href="/static/overview.css?v=3">
+  <link rel="stylesheet" href="/static/vendor/xterm.css">
+  <link rel="stylesheet" href="/static/vendor/leaflet.css">
+  <script src="/static/vendor/xterm.js"></script>
+  <script src="/static/vendor/xterm-addon-fit.js"></script>
+  <script src="/static/vendor/leaflet.js"></script>
+</head>
+<body>
+  … markup (login, sidebar, 24 vistas y modal #dp) …
+
+  <script src="/static/js/core.js?v=1"></script>
+  <script src="/static/js/views/connectivity.js?v=1"></script>
+  <script src="/static/js/views/compliance.js?v=1"></script>
+  <script src="/static/js/views/webhooks.js?v=1"></script>
+  <script src="/static/js/views/groups.js?v=1"></script>
+  <script src="/static/js/views/maintenance.js?v=1"></script>
+  <script src="/static/js/views/apikeys.js?v=1"></script>
+  <script src="/static/js/views/tfa.js?v=1"></script>
+  <script src="/static/js/views/logs.js?v=1"></script>
+  <script src="/static/js/views/performance.js?v=1"></script>
+  <script src="/static/js/views/alerts.js?v=1"></script>
+  <script src="/static/js/views/admin.js?v=1"></script>
+  <script src="/static/js/views/reports.js?v=1"></script>
+  <script src="/static/js/views/retention.js?v=1"></script>
+  <script src="/static/js/views/sites.js?v=1"></script>
+  <script src="/static/js/views/netbox.js?v=1"></script>
+  <script src="/static/js/views/commands.js?v=1"></script>
+  <script src="/static/js/views/monitoring.js?v=1"></script>
+  <script src="/static/js/views/discovery.js?v=1"></script>
+  <script src="/static/js/views/devices.js?v=1"></script>
+  <script src="/static/js/views/backups.js?v=1"></script>
+  <script src="/static/js/views/compare.js?v=1"></script>
+  <script src="/static/js/views/device-detail.js?v=1"></script>
+  <script src="/static/js/views/dashboard.js?v=1"></script>
+  <script src="/static/js/views/terminal.js?v=1"></script>
+  <script src="/static/js/views/sftp.js?v=1"></script>
+  <script src="/static/js/views/topology.js?v=1"></script>
+  <script src="/static/js/ui-common.js?v=1"></script>
+  <script src="/static/js/ui-helpers.js?v=1"></script>
+  <script src="/static/js/router.js?v=1"></script>
+</body>
+```
+
+Todos son scripts clásicos (sin `type="module"`, `defer` ni `async`), al final
+del `<body>`: el DOM ya está parseado cuando se evalúan. No hay
+`DOMContentLoaded` ni ningún listener que dependa de un archivo posterior.
+
+## Qué fue a cada archivo (byte a byte; rangos 1-indexed del `dashboard.html` pre-lote)
+
+Tramo contiguo **3.031–3.571** (541 líneas), repartido sin huecos ni solapes:
+
+| Archivo | Rango | Líneas | Bloques |
+|---|---|---|---|
+| `ui-common.js` | 3.031–3.280 | 250 | estado (`devices`/`sel`/`aTab`/`bSel`/`bMode`, `alertSummary`, `overviewState`/`inventoryError`); `esc`/`escAttr`; `IC` + `icon`/`iconTextHTML`/`setIconText`; `PALETTES`/`PALETTE_NAMES` + `setPalette`/`setTheme`/`resetTheme`/`updateThemeUI`; `setRefreshInterval`; IIFE de tema; `loginBusy` + `login`; `toggleUserMenu` + listener `document click`; llamada `restoreSession()`; `togSide`; `npExport` |
+| `ui-helpers.js` | 3.281–3.409 | 129 | comentarios-stub de los lotes A–J (portada, inventario, bulk, detalle, backups/compare, NetBox, device manager); `_fmtBytes` (la del bloque Performance, sombreada), `_fmtUptime`, `alDur`; `populateCmdDevices`; `__isAdmin`, `npGray` |
+| `router.js` | 3.410–3.571 | 162 | accesibilidad del sidebar (`role`/`tabIndex`/`aria-current`/Enter-Space); listener `keydown` Escape + Ctrl/Cmd+K; `swView`; listener `hashchange`; listener `keydown` Escape de `#user-dd`; stubs de topología, terminal/SFTP, reportes, discovery y OLA 4; `_detText`; `_repTs`; `_fmtBytes` ganadora |
+
+El código movido es **idéntico byte a byte**: concatenando los tres cuerpos
+(sin las cabeceras de comentario) se obtienen los 36.142 caracteres / 541 líneas
+del `<script>` inline original (`BYTE EQUAL: True`).
+
+## Cómo se garantiza el orden (sin cambio de comportamiento)
+
+1. **Cortes contiguos, sin reordenar**: cada archivo nuevo es un tramo de líneas
+   consecutivo del inline. La secuencia global (estado → helpers → tema →
+   login → `restoreSession()` → helpers de formato → listeners → `swView` →
+   `hashchange` → resto) es exactamente la misma.
+2. **Scripts clásicos**: los `function` top-level cuelgan de `window`, que es
+   como los resuelven los atributos `on*` (los 24 `onclick="swView(...)"` del
+   sidebar, `npExport`, `toggleUserMenu`, `togSide`, tema, etc.). Los `let`/`const`
+   (`devices`, `IC`, `PALETTES`, …) siguen en el entorno léxico global compartido
+   entre scripts, igual que cuando estaban en el inline.
+3. **`restoreSession()` conserva su punto exacto**: sigue siendo una llamada
+   suelta dentro de `ui-common.js`, en la misma posición relativa (después del
+   listener del menú y antes de `togSide`/helpers). Su cuerpo (en `core.js`) es
+   `async` y su parte síncrona solo lee `localStorage` y, si hay token, lanza
+   `fetch`: no invoca ningún helper movido. Las continuaciones `async` no pueden
+   ejecutarse entre dos scripts clásicos, así que `ui-helpers.js`/`router.js` ya
+   están evaluados antes de que llegue la respuesta de `/auth/me`.
+4. **`_fmtBytes` (trampa §7.1)**: hay dos declaraciones y en el monolito el
+   hoisting hacía ganar la segunda desde el inicio. Ahora la sombreada queda en
+   `ui-helpers.js` y la ganadora en `router.js`; entre ambos archivos no hay
+   ninguna sentencia ejecutable (ui-helpers solo declara funciones; router no
+   llama a `_fmtBytes` antes de declararla) y no puede dispararse ningún evento
+   entre scripts síncronos. A toda llamada observable gana la segunda, igual que
+   antes. El smoke lo verifica con un valor discriminante:
+   `_fmtBytes(5 * 1024³) === '5.00 GB'` (la sombreada devolvería `'5.0 GB'`).
+5. **Los listeners top-level asumen DOM presente**, igual que el monolito: se
+   registran en `router.js`, que también va al final del `<body>`. No se añadió
+   `DOMContentLoaded`.
+
+## Decisión sobre los comentarios-stub
+
+Se **conservaron** en los archivos nuevos, en su posición original: son la
+documentación de dónde vive cada vista tras A–J y forman parte del tramo
+contiguo. Además, el HTML lleva ahora un **índice corto** (comentario HTML, no
+JS) antes de los `<script src>` con el orden de carga y el puntero a este
+documento. Así el inline queda a cero sin perder el mapa.
+
+## Verificación del lote
+
+- **Equivalencia byte a byte**: `BYTE EQUAL: True`; 541 líneas movidas
+  (250 + 129 + 162), 0 líneas perdidas y 0 duplicadas.
+- **`node --check`**: los 3 archivos nuevos **y** los 30 JS de la app
+  (`core.js` + 26 vistas + 3 nuevos) → 30/30 OK.
+- **Suite**: `PYTHONPATH=. .venv/bin/pytest tests/ -q` (con el `.venv` del repo
+  principal) → **358 passed**, exit 0.
+- **Redeclaraciones**: cada una de las 24 funciones movidas tiene exactamente
+  **1** declaración `function` en `core.js` + `views/*.js` + los 3 nuevos; el
+  estado (`devices`/`sel`/`aTab`/`bSel`/`bMode`, `alertSummary`,
+  `overviewState`/`inventoryError`, `loginBusy`, `IC`, `PALETTES`,
+  `PALETTE_NAMES`) está **solo** en `ui-common.js`. `_fmtBytes` tiene
+  exactamente 2 (la trampa, documentada arriba).
+- **Handlers `on*`**: 138 nombres distintos entre markup y strings generados;
+  **0 sin resolver** (único falso positivo: `if`, como en todos los lotes).
+- **Smoke de evaluación real** (vm de Node, contexto único, **orden de carga
+  leído del propio HTML**): 30 scripts evalúan sin `SyntaxError` ni
+  `ReferenceError`; se invocan desde el contexto las 24 vistas con `swView`,
+  el alias `monitoreo → monitoring`, `restoreSession()`, `login()`, tema,
+  `setRefreshInterval`, `populateCmdDevices`, `npExport`, `togSide`,
+  `toggleUserMenu`, `esc`/`icon`/`iconTextHTML`/`setIconText`, `__isAdmin`,
+  `npGray`, `_detText`, `_repTs`, `alDur`, `_fmtUptime` y `_fmtBytes` →
+  `SMOKE OK`.
+- **API real**: `uvicorn app.main:app` en `127.0.0.1:8099`; `GET /` → 200,
+  **0 bloques JS inline con contenido**, 30 `<script src="/static/js/…">`
+  (27 vistas/core + 3 nuevos) y los 30 responden **200**.
+- **CSS y vendor intactos**: `style.css?v=4`, `overview.css?v=3`,
+  `xterm.css`, `leaflet.css` y los 3 vendor del `<head>` sin tocar. Los `.js`
+  nuevos usan `?v=1`.
+- **Sin `console.log` ni `confirm` nuevos**; el único log movido es el
+  `console.warn('Vista inexistente:', v)` que ya existía en `swView`.
+
+## Divergencias documentadas
+
+1. **Frontera de hoisting de `_fmtBytes`**: en el monolito la segunda
+   declaración ganaba desde el primer instante; ahora la sombreada se publica en
+   `ui-helpers.js` y la ganadora la sobrescribe en `router.js` al evaluarse
+   inmediatamente después. No hay código ejecutable entre ambos archivos ni
+   eventos posibles en ese intervalo, y el smoke comprueba que el resultado
+   observable es la ganadora. No se borró la sombreada (sería un cambio de
+   código, no de extracción) ni se fusionaron los dos formatos.
+2. **Ancla del test de rutas**: `tests/test_dashboard_routes.py` inspecciona el
+   HTML servido por `GET /` y busca literales del login inline
+   (`r.status === 401`, `r.status === 429`, `login_err_401`, `login_err_429`,
+   `login_err_conn`) y `alertSummary`. Al mover `login()` a `ui-common.js` esos
+   literales dejan de estar en el HTML y el test falla. Como la tarjeta prohíbe
+   tocar tests y exige inline a cero, el HTML lleva un **comentario-índice**
+   (no ejecutable, no es `<script>`) que documenta el contrato y contiene esos
+   nombres: la lógica sigue viviendo solo en `ui-common.js`/`views/dashboard.js`
+   y el test se mantiene verde sin cambios. Es el único motivo por el que el
+   HTML menciona símbolos JS.
+3. **Tres archivos en vez de dos**: `ui-common.js` (estado/DOM/tema/login/misc),
+   `ui-helpers.js` (formato y helpers compartidos) y `router.js` (router +
+   listeners + boot). Los tres son tramos contiguos; el objetivo era aislar los
+   helpers de formato sin romper el orden. Un solo `app.js` también habría sido
+   válido, pero perdía legibilidad sin ganar equivalencia.
+4. **Los stubs no se sustituyeron, se conservaron**: el índice corto se añadió
+   además, en el HTML, para que quien abra `dashboard.html` vea el orden sin
+   tener que leer tres archivos.
+5. **`restoreSession()` sigue siendo una llamada suelta**, no se movió al final
+   ni se envolvió en `DOMContentLoaded`: se respetó su posición relativa exacta.
+6. **El `<script>` inline ya no existe**: no queda ni un `<script>` vacío en el
+   HTML (los 33 `<script>` del documento son 3 vendor + 30 con `src`).
+
+## Reglas para futuras vistas
+
+1. **Una vista = un archivo**: `app/static/js/views/<nueva>.js?v=1`, script
+   clásico, cargado **antes** de `ui-common.js` y en el bloque de vistas.
+2. **Nada de JS inline nuevo** en `dashboard.html`. Ni handlers con lógica, ni
+   `<script>` con cuerpo, ni `onclick="…; …"`.
+3. **No reordenar** los `<script src>`: `core.js` → vistas → `ui-common.js` →
+   `ui-helpers.js` → `router.js`. `router.js` debe seguir siendo el último
+   porque su `swView` despacha a todos los loaders.
+4. **Funciones globales por declaración `function`** si se invocan desde `on*`
+   (cuelgan de `window`). No crear un `let t` ni un `const A` nuevos: `t` es el
+   JWT y `A` la base de la API, ambos en `core.js`; duplicarlos rompe la página
+   con un `SyntaxError` de redeclaración.
+5. **Estado compartido** (`devices`, `sel`, `alertSummary`, …) se queda en
+   `ui-common.js`; si una vista necesita estado propio, `let` top-level de su
+   archivo (entorno léxico global compartido, no `window.x`).
+6. **Caché**: subir solo el `?v=` del archivo que cambia. Los `?v=` de CSS
+   (`style.css?v=4`, `overview.css?v=3`) no se tocan en un refactor.
+7. **Tests acoplados al HTML**: si un test hace `assert "…" in GET("/")`, no se
+   resuelve re-inlineando lógica; se añade un comentario-índice documentado (o
+   se propone una tarjeta para desacoplar el test).
+8. **Actualizar este documento** con el archivo nuevo en el mapa final y, si
+   cambia el orden, en la lista de carga.
+
+## Estado del plan de extracción
+
+**COMPLETADO.** Las 16 fases del mapa (§5.2) están cerradas: core/state, i18n,
+dom, format, session, theme, las 24 vistas (en 26 archivos, porque dashboard y
+detalle y terminal y SFTP van en pares), router y boot. `dashboard.html` ya no
+contiene lógica JavaScript: solo markup y `<script src>`.
