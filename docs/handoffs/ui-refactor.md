@@ -1,0 +1,106 @@
+# Handoff — Refactor UI paso 1: `core.js` (TARJETA 10C)
+
+Fecha: 2026-10-24 · Rama: `feat/ui-core` · Commit: `refactor(ui): extraer core.js sin cambio de comportamiento`
+Base: `main` · Zona: `app/static/dashboard.html` (solo extracción), `app/static/js/core.js` (nuevo), este doc.
+
+## Qué es core.js
+
+`app/static/js/core.js` (~830 líneas) contiene EXCLUSIVAMENTE la infraestructura
+compartida del panel, extraída línea a línea del `<script>` inline de
+`dashboard.html` (path del refactor: las vistas se extraen en pasos posteriores,
+esta tarjeta no toca ninguna vista):
+
+| Bloque | Contenido nombre a nombre |
+|---|---|
+| Base API | `const A` (origen + `/api`) |
+| Estado de sesión | `let t` (JWT), `let currentUser`, `let _refreshTimer`, `let _np401Done`, `const _npOrigFetch`, `const NP_REFRESH_MS` |
+| i18n | `const I18N` **completo** (es/en, las 22 llamadas `Object.assign(I18N…)` íntegras y sin claves nuevas ni perdidas), `function setLang`, `function __t` (el traductor se llama `__t`, no `t`: `t` es el token) |
+| Avisos genéricos | `function toast`, `function showLoginError` (compartidos por varias vistas; no son solo de una) |
+| Sesión | `function h` (headers auth), interceptor 401 de `window.fetch` (exclusiones `/auth/login`, `/auth/refresh`, `/auth/me` + 401 de SFTP vía `detail`), `function sessionExpired`, `function _npTick`, `function scheduleRefresh`, `function stopRefresh`, `function refreshSession`, `function enterSession`, `function logout`, `function restoreSession` |
+| Estado recordado | `_npStateKey`, `_npStateGet`, `_npStateSet`, `_npStateClear` (prefijo por usuario `np_u:<username>:`) |
+| Exposición | `window.logout = logout;` … (bloque final con la API pública del core, ver abajo) |
+
+Verificación de equivalencia: cada línea borrada del inline aparece en `core.js`
+en el mismo orden (auditado con script). Únicas transformaciones, ambas mecánicas:
+1. El `let t = '', devices = [], …, currentUser = null;` combinado se partió:
+   sesión (`t`, `currentUser`) → core.js; estado de vista (`devices`, `sel`,
+   `aTab`, `cmdH`, `bSel`, `bMode`) → queda en el inline tal cual.
+2. La IIFE `(async function restoreSession() { … })();` es ahora
+   `async function restoreSession() { … }` en core.js; **la invocación sigue
+   dentro del inline en el punto exacto** donde estaba (para no adelantar el
+   `fetch` de `/auth/me` respecto del comportamiento original).
+
+### Lo que se decidió NO mover (y por qué)
+
+- `swView` — NO es infraestructura pura: es el despachador que se acopla a
+  loaders de cada vista (`loadBk`, `loadInventory`, `loadMonitoring`, …).
+  Decisión: queda en dashboard.html; cuando se extraigan vistas habrá que
+  decidir si swView mantiene los `if (v === …)` con llamadas directas o pasa a
+  un registro de vistas.
+- `login()` — manipula la pantalla de login (DOM de la vista de login) y muestra
+  el texto `r.status === 401/429` que cubren los tests de rutas.
+- `esc`, `escAttr`, `IC`, `icon`, `iconTextHTML`, `setIconText`, `PALETTES`,
+  tema/paleta — genéricos-leaning pero fuera del alcance de la tarjeta; core
+  los usa en tiempo de llamada (ver enlaces cruzados). Podrían migrar en un
+  paso posterior si se quiere core autosuficiente.
+- `toggleUserMenu`, listener global de cierre de menú, `togSide`, `npExport`.
+
+### Enlaces cruzados que quedan (resueltos en tiempo de llamada, como antes)
+
+- core → dashboard: `setIconText` (en `setLang`/`toast`), `updateDashboardHero`
+  (en `setLang`), `init` (en `enterSession`), `repState`/`_invGroupsCache`
+  (asignado a `null` en `logout`). Resuelven por ser `function`/`let` top-level
+  del inline (entorno léxico global compartido / props de window).
+- dashboard → core: `login()` usa `__t`/`h`/`showLoginError`; `init`, vistas y
+  renders usan `__t`, `I18N`, `currentLang`, `t`, `A`, `toast`, `_npStateGet/Set`.
+
+## Orden de carga (decisión)
+
+En `dashboard.html`, línea ~3003, inmediatamente después del markup:
+
+```html
+<script src="/static/js/core.js?v=1"></script>
+<script> /* inline restante */ </script>
+```
+
+- Script clásico, SIN `defer` ni `async`, SIEMPRE antes del inline y antes de
+  cualquier `static/js/views/*.js` futuro: el top-level del inline y las vistas
+  leen `A`, `t`, `singleLanguage`, etc. en su primera pasada.
+- Caché: misma convención de query versionada que el resto de estáticos
+  (`style.css?v=4`, `overview.css?v=3`). El HTML se sirve con `no-cache`
+  (test de rutas lo cubre), pero los estáticos pueden cachearse: al tocar
+  `core.js`, subir `?v=N` **en dashboard.html**.
+- Los vendor (`xterm`, `leaflet`) van en `<head>` y no dependen del core en
+  module-level; se mantienen como estaban.
+
+## Restricciones para quien toque dashboard/core desde ahora
+
+1. NO re-inlinear el contenido de core.js ni declarar de nuevo `let`/`const`/
+   `function` con esos nombres ni en el inline ni en las vistas (redeclarar
+   `let t` o `const A` rompe TODA la página con SyntaxError).
+2. NO usar `defer`/`async` en el `<script src="/static/js/core.js?v=N">`.
+3. NO mover la llamada `restoreSession()` del punto donde está (tarde el
+   `fetch` de `/auth/me` — existe verificado en este punto exacto).
+4. Claves i18n nuevas van en core.js (`I18N.es/.en`); ninguna vista define
+   su propio diccionario hasta que su tarjeta lo diga.
+5. `t` es el token y `__t` es el traductor; no renombrar ni crear `window.t`
+   (el token no debe exponerse a mano: los bindings léxicos ya lo comparten).
+6. Cualquier `onclick`/`onchange` del HTML nuevo que llame a algo del core
+   solo funcionará si ese nombre está en el bloque de exposición del footer
+   de core.js. Los `function` top-level ya cuelgan de window; los
+   `let`/`const` NO, y no son accesibles desde atributos HTML.
+7. Al cambiar core.js, correr: `node --check` del core Y del inline extraído,
+   más `PYTHONPATH=. .venv/bin/pytest tests/ -q` (355 verdes).
+
+## Pendiente para las siguientes tarjetas
+
+- Paso 2+: extraer vistas a `app/static/js/views/<vista>.js` de una en una,
+  cargándolas DESPUÉS de core.js (mismo patrón clásico sin defer); el core
+  no toca DOM de vistas: si una función del core necesita algo de vista, es
+  señal de que pertenece a la vista (o hay que parametrizarla).
+- `swView` sigue en el inline; al extraer vistas conviene moverla última y
+  con un registro de loaders.
+- `esc/escAttr/IC/icon/setIconText`, tema/paleta y el login pueden migrar
+  después si se decide; hoy son atendidos por resolución en tiempo de llamada.
+- Tests que referencian cadenas movidas: ninguno rompió; futuros tests que
+  busquen texto de core.js deben apuntar a `/static/js/core.js`.
