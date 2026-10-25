@@ -40,6 +40,9 @@
  *   de estado compartido del inline (tiempo de llamada) y llama fDev al
  *   final. Los onclick que genera (tB2 bulk, selD detalle) resuelven por
  *   window (tB2 en views/devices.js, selD en device-detail.js).
+ *   Tarjeta 12E: con >100 equipos pinta solo DASH_CARD_LIMIT tarjetas y añade
+ *   #dash-limit-note (aviso honesto); con ≤100 no cambia nada. `loadDonuts`
+ *   pide facts solo de las tarjetas pintadas.
  * - listener top-level #grid — delegación: click en tarjeta abre selD salvo
  *   en modo bulk; consulta bMode (inline).
  * - `goToOverviewDevices` y `showAddDevicePanel` — acciones del hero (swView
@@ -59,10 +62,40 @@
  * archivo.
  */
 
+    // ── ESCALA (Tarjeta 12E): límite de tarjetas en la grilla del dashboard ──
+    // Con >100 equipos pintar 500 tarjetas cuesta ~50 ms por render (latido de
+    // salud cada 10 s) y deja 25 000 nodos en el DOM. Aquí se pintan como mucho
+    // 100 y se avisa con un texto honesto; con ≤100 equipos el comportamiento es
+    // EXACTAMENTE el de antes (sin nota, sin recorte).
+    // La búsqueda global (#sb, fDev) sigue ocultando sobre las tarjetas pintadas
+    // (coste O(tarjetas), no O(inventario)) y, además, cuenta las coincidencias
+    // del inventario completo para poder avisar en la nota.
+    const DASH_CARD_LIMIT = 100;
+    Object.assign(I18N.en, {
+      ov_limited_show: 'Showing',
+      ov_limited_of: 'of',
+      ov_limited_devices: 'devices (current filter applied)',
+      ov_limited_rest: '— use Devices for the rest.',
+      ov_limited_open: 'Open full inventory',
+      ov_limited_nohit: 'None of the visible cards matches — search the full inventory in Devices.'
+    });
+    Object.assign(I18N.es, {
+      ov_limited_show: 'Mostrando',
+      ov_limited_of: 'de',
+      ov_limited_devices: 'equipos (según el filtro actual)',
+      ov_limited_rest: '— usa Equipos para ver el resto.',
+      ov_limited_open: 'Abrir inventario completo',
+      ov_limited_nohit: 'Ninguna de las tarjetas visibles coincide — busca en todo el inventario desde Equipos.'
+    });
+
 
     // ── DEVICE PARAMS ──
     async function loadDonuts() {
-      devices.forEach(async d => {
+      // Solo se piden recursos de los equipos que tienen tarjeta en el DOM: con
+      // >100 equipos la grilla está limitada, y pedir 500 recursos NAPALM cada
+      // 2 min saturaba el servidor sin mostrar nada (medido en la tarjeta 12E).
+      const rendered = devices.filter(d => document.getElementById(`rcpu-${d.id}`));
+      rendered.forEach(async d => {
         const dC = document.getElementById(`rcpu-${d.id}`);
         const dM = document.getElementById(`rmem-${d.id}`);
         const dD = document.getElementById(`rdsk-${d.id}`);
@@ -168,14 +201,59 @@
         renderD(); updStats();
       }
     }
+    function _dashHaystack(d) {
+      return [d.id, d.hostname, d.driver, d.type, ...(d.tags || [])].join(' ').toLowerCase();
+    }
     function fDev() {
-      const q = document.getElementById('sb').value.toLowerCase();
-      document.querySelectorAll('#grid .dc').forEach(c => c.classList.toggle('hidden', !(c.dataset.s || '').toLowerCase().includes(q)))
+      const q = (document.getElementById('sb').value || '').toLowerCase();
+      // Recorte por página fija: se oculta en las tarjetas ya pintadas (igual que
+      // antes, coste O(tarjetas pintadas), no O(inventario)).
+      document.querySelectorAll('#grid .dc').forEach(c => c.classList.toggle('hidden', !(c.dataset.s || '').toLowerCase().includes(q)));
+      overLimitNoteTotals(q);
     }
 
-    function renderD() {
-      const grid = document.getElementById('grid');
-      grid.innerHTML = devices.map(d => `
+    // Crea (una vez) la nota de recorte del dashboard y actualiza sus números.
+    function _dashLimitNote(grid) {
+      let note = document.getElementById('dash-limit-note');
+      if (!note) {
+        note = document.createElement('div');
+        note.id = 'dash-limit-note';
+        note.setAttribute('role', 'status');
+        note.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 14px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);font-size:11px;color:var(--text-secondary)';
+        note.innerHTML = `<span>
+            <span data-i18n="ov_limited_show">${esc(__t('ov_limited_show'))}</span>
+            <strong id="dash-limit-shown" style="color:var(--text)">100</strong>
+            <span data-i18n="ov_limited_of">${esc(__t('ov_limited_of'))}</span>
+            <strong id="dash-limit-total" style="color:var(--text)">0</strong>
+            <span data-i18n="ov_limited_devices">${esc(__t('ov_limited_devices'))}</span>
+            <span data-i18n="ov_limited_rest">${esc(__t('ov_limited_rest'))}</span>
+          </span>
+          <span id="dash-limit-hint" data-i18n="ov_limited_nohit" style="display:none;flex-basis:100%;color:var(--yellow)">${esc(__t('ov_limited_nohit'))}</span>
+          <button type="button" class="btn btn-o btn-xs" onclick="swView('devices')"
+            data-i18n="ov_limited_open" style="margin-left:auto;padding:4px 10px;font-size:10px">${esc(__t('ov_limited_open'))}</button>`;
+        grid.parentNode.insertBefore(note, grid);
+      }
+      return note;
+    }
+
+    function overLimitNoteTotals(q) {
+      const note = document.getElementById('dash-limit-note');
+      if (!note) return;
+      const matching = q ? devices.filter(d => _dashHaystack(d).includes(q)).length : devices.length;
+      const visible = [...document.querySelectorAll('#grid .dc')].filter(c => !c.classList.contains('hidden')).length;
+      const shown = document.getElementById('dash-limit-shown');
+      const total = document.getElementById('dash-limit-total');
+      if (shown) shown.textContent = String(visible);
+      if (total) total.textContent = String(matching);
+      const hint = document.getElementById('dash-limit-hint');
+      if (hint) hint.style.display = (q && visible === 0 && matching > 0) ? '' : 'none';
+      // La nota solo tiene sentido si de verdad se está ocultando algo: con un
+      // filtro que cabe entero en las tarjetas pintadas no hay nada que avisar.
+      note.style.display = (matching > visible) ? 'flex' : 'none';
+    }
+
+    function _dashCard(d) {
+      return `
     <div class="dc${sel?.id === d.id ? ' selected' : ''}${bSel.has(d.id) ? ' bulk' : ''}${d._online === true ? ' online' : d._online === false ? ' offline' : ''}" style="display:flex;flex-direction:column;align-items:flex-start;position:relative;cursor:pointer" data-id="${escAttr(d.id)}" data-s="${escAttr([d.id, d.hostname, d.driver, d.type, ...(d.tags || [])].join(' '))}">
       <input type="checkbox" class="bulk-cb"${bSel.has(d.id) ? ' checked' : ''} onchange="tB2(this.closest('.dc').dataset.id,this.checked)" onclick="event.stopPropagation()" aria-label="Seleccionar ${escAttr(d.id)}" style="position:absolute;top:16px;right:16px;z-index:var(--z-control);">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;width:100%;padding-right:24px;">
@@ -213,7 +291,21 @@
         <div style="font-size:11px;color:var(--text-ter)"><span data-i18n="card_latency">Latencia:</span> <span style="color:var(--text);font-weight:600" id="rlat-${escAttr(d.id)}">${d._online ? (d._lat || '<1ms') : '—'}</span></div>
       </div>
       <button class="ops-device-open" type="button" data-i18n="ov_detail">Ver detalle</button>
-    </div>`).join(''); fDev();
+    </div>`;
+    }
+
+    function renderD() {
+      const grid = document.getElementById('grid');
+      if (!grid) return;
+      const overLimit = devices.length > DASH_CARD_LIMIT;
+      const shown = overLimit ? devices.slice(0, DASH_CARD_LIMIT) : devices;
+      grid.innerHTML = shown.map(_dashCard).join('');
+      if (overLimit) _dashLimitNote(grid);
+      else {
+        const stale = document.getElementById('dash-limit-note');
+        if (stale) stale.remove();
+      }
+      fDev();
     }
     document.getElementById('grid').addEventListener('click', event => {
       if (event.target.closest('.bulk-cb')) return;

@@ -1827,3 +1827,149 @@ documento. Así el inline queda a cero sin perder el mapa.
 dom, format, session, theme, las 24 vistas (en 26 archivos, porque dashboard y
 detalle y terminal y SFTP van en pares), router y boot. `dashboard.html` ya no
 contiene lógica JavaScript: solo markup y `<script src>`.
+
+## Anexo — Tarjeta 12E: la UI con 500 equipos (medido)
+
+Fecha: 2026-10-25. Rama `feat/escala-500`. Objetivo: que el panel siga siendo
+usable con 500 equipos sin cambiar nada con ≤100.
+
+### Qué se tocó
+
+| Archivo | Cambio |
+|---|---|
+| `app/static/js/views/devices.js` | **Paginación client-side** del inventario: página de 50/100, contador «Página X de Y», Anterior/Siguiente y **filtro sobre el conjunto completo** (`_invRows`), no sobre la página. La barra y el pie se inyectan en `#inv-list` desde JS: no hubo que tocar el HTML. |
+| `app/static/js/views/dashboard.js` | La grilla pinta como máximo `DASH_CARD_LIMIT = 100` tarjetas y añade `#dash-limit-note` («Mostrando N de M equipos — usa Equipos para el resto») solo cuando recorta. `loadDonuts` pide facts **solo de las tarjetas pintadas** (antes 1 petición NAPALM por equipo cada 2 min). |
+| `app/static/dashboard.html` | Solo cache-bump: `devices.js?v=2` y `dashboard.js?v=2`. Sin markup nuevo, sin JS inline. |
+| `app/routers/devices.py` | **Sin cambios.** `GET /api/devices` sigue devolviendo el inventario completo; la paginación es de cliente (el JSON de 500 equipos son ~90 KB y se refresca cada 30 s). La paginación de servidor retro-compatible quedó descartada por innecesaria. |
+
+**Con ≤100 equipos el comportamiento es el de antes**: `renderD` pinta todos los
+equipos, no hay nota, y `fDev` sigue ocultando/mostrando tarjetas con la clase
+`.hidden`. La paginación del inventario sí aparece siempre (es una vista de
+tabla), pero con ≤50 filas se ve una sola página.
+
+### i18n
+
+Las claves nuevas se declaran en las propias vistas con `Object.assign(I18N.en/es, …)`
+(no se tocó `core.js`, fuera del alcance de la tarjeta). Claves:
+
+- inventario: `inv_page_search`, `inv_page_size`, `inv_page_size_aria`,
+  `inv_page_word`, `inv_page_of`, `inv_page_devices`, `inv_page_prev`,
+  `inv_page_next`, `inv_page_prev_aria`, `inv_page_next_aria`, `inv_page_none`.
+- dashboard: `ov_limited_show`, `ov_limited_of`, `ov_limited_devices`,
+  `ov_limited_rest`, `ov_limited_open`, `ov_limited_nohit`.
+
+Los textos estáticos llevan `data-i18n`, así que `setLang()` los traduce en
+caliente. El **placeholder** del filtro del inventario se fija al crear la barra
+y no se re-traduce hasta recargar la vista; su `title`/`aria-label` sí cambian
+con el idioma. Es la única costura conocida de este cambio.
+
+### Montaje de la medición (no es producción)
+
+- API local (`uvicorn`, **un worker**, `127.0.0.1:54931`) desde el worktree, con
+  `NETPULSE_METRICS_ENABLED=false` y el watchdog de sites apagado.
+- **500 equipos creados por API** (`POST /api/devices`, rotando
+  `X-Forwarded-For` para no chocar con el límite de 100/min). Credenciales y
+  equipos de prueba borrados al terminar.
+- Cada equipo apunta a un **stub TCP local** que saluda como SSH y cierra: el
+  health los ve «en línea» y `/api/facts` falla en ~2 s sin dejar 500 sesiones
+  NAPALM colgadas. Es un banco de pruebas, no inventario real.
+- El **rate limiter se desactivó solo en esta instancia** (igual en el antes y en
+  el después): con 500 tarjetas el fan-out de facts lo agotaría y falsearía la
+  medición de UI.
+- Chrome **155 headless** por CDP, perfil limpio, ventana 1600×1200, la misma
+  sesión (login real, JWT en `localStorage`) y los mismos 500 equipos en ambas
+  pasadas. Cada métrica se repite 3–5 veces; la tabla usa la **mediana**.
+- El «antes» es el código de `main` sin tocar; el «después», el de esta rama.
+
+### Antes / después (500 equipos, medianas)
+
+| Métrica | Antes | Después | Δ |
+|---|---:|---:|---:|
+| `renderD()` (grilla del dashboard) | **45.7 ms** (41–63.2) | **7.5 ms** (6.1–14) | **6.1× más rápido** |
+| `loadInventory()` (vista Equipos) | **27.4 ms** (23.8–33.1) | **14.8 ms** (13.1–33.8) | **1.9×** |
+| Tarjetas en `#grid` | 500 | 100 | −80 % |
+| Filas en la tabla de inventario | 500 | 50 (una página) | −90 % |
+| Nodos del documento | 25 836 | 7 766 | **−70 %** |
+| Heap JS usado | 8.5 MiB | 4.5 MiB | −47 % |
+| Tareas largas al arrancar (`longtask`) | 1 × **83 ms** | **0** | — |
+| Tareas largas por `loadDev()` | 2–3 (máx. **105–139 ms**) | **0** | — |
+| Tareas largas en `renderD`/`loadInventory` | 0 | 0 | — |
+| Búsqueda global: 10 pulsaciones (`#sb`) | 2.5–2.7 ms | 3.3–4.2 ms | +1 ms total (0.35 ms/tecla) |
+| Peticiones `/api/facts` al arrancar | **500** | **100** | −80 % |
+| Peticiones `/api/facts` en la sesión medida | 3 000 | 600 | −80 % |
+| `loadInventory` tras un ciclo de `loadDev`: saturación del servidor | 30.5 s hasta recuperar | 3.4 s | — |
+
+Inventario paginado (después): 10 páginas de 50; pasar de página **1.9 ms**;
+cambiar a 100/página **3.4 ms**; filtrar escribiendo 10 caracteres **29.2 ms**
+total (~2.9 ms/tecla, re-pinta solo 50 filas).
+
+`loadDev()` completo **no se usa para comparar**: 2.15–17.15 s antes y
+3.15–5.78 s después, pero está dominado por `GET /devices/health`, que esta
+tarjeta no toca y que se midió en **3.1–6.1 s** con 500 equipos (500 sondeos TCP
++ un `docker stats` bloqueante de **2.03 s** dentro del handler async). El primer
+render del grid (3.44 s antes / 0.14 s después) tampoco es comparable: la segunda
+pasada encontró caliente la caché de 8 s del health del servidor.
+
+### Nota de recorte: cuándo aparece y qué dice
+
+La nota **solo** se muestra si de verdad se está ocultando algo:
+
+| Estado | Tarjetas visibles | Nota |
+|---|---:|---|
+| Sin filtro (500 equipos) | 100 | «Mostrando 100 de 500 equipos (según el filtro actual) — usa Equipos para ver el resto.» + «Abrir inventario completo» |
+| Filtro que cabe en las 100 pintadas (`perf-edge-0042`) | 1 | oculta (no hay nada que avisar) |
+| Filtro cuya coincidencia está **fuera** de las 100 (`perf-edge-0499`) | 0 | «Mostrando 0 de 1 equipos…» + «Ninguna de las tarjetas visibles coincide — busca en todo el inventario desde Equipos.» |
+| Filtro sin coincidencias en ningún sitio (`zzz-none`) | 0 | oculta (no hay coincidencias que prometer) |
+
+La búsqueda del dashboard sigue siendo O(tarjetas pintadas) para ocultar, y
+además cuenta coincidencias sobre los 500 en memoria (0.35 ms/tecla). En la
+vista Equipos el filtro **sí** recorre el inventario completo y pagina el
+resultado: buscar `perf-edge-0499` devuelve 1 fila y el contador «(1 / 500)».
+
+### Verificación en navegador real (CDP)
+
+Comprobado en Chrome 155 headless con los 500 equipos y **0 errores de consola**:
+
+- dashboard: 500 equipos → 100 tarjetas, nota visible, KPIs intactos (500/500 en
+  línea, 100 % disponibilidad);
+- inventario: 10 páginas × 50, «Página 1 de 10 · 50 equipos (500)», botón
+  Siguiente real → página 2 empieza en `perf-edge-0051`, Anterior se habilita,
+  página 10 empieza en `perf-edge-0451`, 100/página → 5 páginas, filtro → 1 fila;
+- ≤100: con 42 equipos en memoria, `renderD` pinta 42 tarjetas, **sin nota**, y
+  el filtro oculta/muestra como antes; al restaurar 500 vuelven las 100 tarjetas;
+- i18n: `setLang('en')` traduce nota y pie («Showing 100 of 500 devices…»,
+  «Page 1 of 10 · 50 devices (500)»); `setLang('es')` vuelve al texto español.
+
+### Límites y lo que queda pendiente
+
+- Chrome **headless** en la misma máquina que la API: sirve para comparar antes
+  vs después, no es una medición de portátil de operador con GPU.
+- Los 500 equipos son sintéticos y el stub SSH hace fallar `/api/facts` en ~2 s;
+  los tiempos de *red* no representan una WAN real.
+- **`GET /devices/health` es el siguiente cuello**: 3.1–6.1 s con 500 equipos,
+  llamado cada 10 s por el panel. El culpable medido es `docker stats` (2.03 s,
+  subprocess síncrono dentro de un handler `async`) más 500 sondeos. Fuera del
+  alcance de esta tarjeta; merece tarjeta propia.
+- El **alta/edición por API** de inventario es O(n) por escritura: 500 `PUT`
+  tardaron 242.8 s (~0.49 s cada uno) porque cada cambio reescribe
+  `devices.yaml` completo. No es UI, pero es el otro límite a 500 equipos.
+- `VACUUM`, backups y retención no se tocan aquí: ver
+  `docs/capacidad.md` §9 (poda y concurrencia medidas).
+
+### Tests añadidos
+
+`tests/test_ui_scale_pagination.py` (8 tests): el HTML sirve las versiones `?v=2`
+de ambas vistas; `devices.js` contiene paginación/filtro/contadores y sus claves
+i18n en es/en; `dashboard.js` contiene el límite de 100, la nota honesta, el
+filtro de `loadDonuts` y la rama ≤100; `node --check` de ambos archivos (se
+salta si no hay `node`); el banco de poda se niega a usar una DB dentro del repo
+y su `--help` documenta la retención. La suite completa queda en **405 tests**
+(397 previos + 8).
+
+### Reproducción
+
+El banco de UI (creación de los 500 por API, stub SSH, cliente CDP y las
+consultas `performance.now()`/`PerformanceObserver('longtask')`) vivió en
+`/tmp` y **no** se commitea: dependía de la instancia de medición y no es parte
+del producto. Los pasos y las cifras están arriba para poder repetirlo a mano;
+`scripts/capacity_prune_bench.py` sí queda en el repo para la parte de SQLite.
