@@ -376,8 +376,152 @@ líneas) y los tres helpers siguen en el inline bajo el comentario
 | 3 dom, 4 format, 6 theme | pendiente (inline conserva esc/escAttr/IC/icon/tema) |
 | 7 vistas simples: connectivity, compliance, webhooks, groups | hecha (Lote A) |
 | 7 resto: maintenance, apikeys, tfa, logs | hecha (Lote B) |
-| 8 performance+alerts+admin | **hecha (este lote)** · NOTA: backups y compare del mismo "fase 8" del mapa quedan fuera: acopladas a `loadDev` (tarjeta especial aparte) |
-| 9 reports, retention, sites, netbox | después; usan `__isAdmin`/`npGray`/`_detText`/`_npState*`/`_fmtBytes` (la ganadora, hoy solo la llama Retention) |
-| 10 commands, monitoring (con reasignación de `refMon` en el mismo archivo) | después |
+| 8 performance+alerts+admin | hecha (Lote C) · NOTA: backups y compare del mismo "fase 8" del mapa quedan fuera: acopladas a `loadDev` (tarjeta especial aparte) |
+| 9 reports, retention, sites, netbox | **hecha (Lote D, siguiente anexo)** |
+| 10 commands, monitoring (con reasignación de `refMon` en el mismo archivo) | siguiente |
 | 11 devices+discovery, 12 dashboard+device-detail, 13 terminal/sftp, 14 topology | pendiente (más riesgosas) |
 | 15 router (`swView`), 16 boot | al final por diseño |
+
+---
+
+# Lote D — Tarjeta 10D-D: reports, retention, sites, netbox
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-d` (worktree `/Users/doker/np-w10h`) ·
+Commit: `refactor(ui): extraer lote d (reports, retention, sites, netbox)`.
+
+Mismo enfoque que los Lotes A/B/C: función a función con verificación de
+solapamiento por grep; dashboard.html pasó de 7900 → 7158 líneas
+(−742 líneas netas, +4 `<script src>`).
+
+## Orden de carga en dashboard.html (tras core.js y los 11 previos, antes del inline)
+
+```html
+<script src="/static/js/views/admin.js?v=1"></script>
+<script src="/static/js/views/reports.js?v=1"></script>
+<script src="/static/js/views/retention.js?v=1"></script>
+<script src="/static/js/views/sites.js?v=1"></script>
+<script src="/static/js/views/netbox.js?v=1"></script>
+<script> /* inline restante */ </script>
+```
+
+Los 4 son scripts clásicos (sin defer/async). Ninguno lee un símbolo del
+inline ni de otro .js a la carga (top-level = declaraciones `function`,
+`let`/`const` de estado y constantes NB_SVG_*, sin llamadas top-level); todas
+las dependencias (`A`, `h`, `t`, `__t`, `toast`, `_npState*`, `devices`,
+`loadDev`, `esc`, `escAttr`, `__isAdmin`, `npGray`, `_detText`, `_repTs`,
+`_fmtUptime`, `_fmtBytes`, `alDur`) resuelven en tiempo de llamada. El orden
+que fija la tarjeta (reports → retention → sites → netbox) es distinto del
+orden de líneas del monolito (netbox < reports < sites < retention): no es
+observable porque nada movido se lee al evaluar.
+
+## Qué fue a cada archivo
+
+| Archivo | Contenido movido (mismo orden relativo; rangos 1-indexed del archivo pre-lote) |
+|---|---|
+| `views/reports.js` | comentario de contratos + estado `let repState` / `let repGroupsCache` (7001–7007), `_ymd`, `_repDur`, `repBanner`, `_repGroups`, `loadReports`, `_repFillRestored`, `repPreset`, `repWindow`, `repParams`, `repQS`, `repApply`, `repRender` (7021–7270), y `_donut` (4216–4220, antes en el bloque PERFORMANCE del inline) |
+| `views/retention.js` | comentario del contrato + `let _retPreview` (7762–7763), `loadRetention`, `retInvalidate`, `retDet` (alias muerto de `_detText`, mapa §2.3), `retPruneDry`, `retPruneConfirm`, `retPruneExec` (7765–7894) |
+| `views/sites.js` | comentario del bloque OLA 4, `const _r4Epochs` (7587), `_det40` (alias muerto, 7589), `_ageHuman` + `_isoLocal` (7599–7610), `loadSites` + `_devState` + `_sitesCard` + `siteToggle` + `siteHist` (7612–7760) |
+| `views/netbox.js` | comentario de contrato + constantes `NB_SVG_LOCK/SYNC/OK/NO` + `loadNetbox`, `nbLoadSites`, `nbSyncConfirm`, `nbSyncCancel`, `nbList`, `nbRenderResult`, `nbFailBanner`, `nbSyncRun` (4676–4879, el bloque completo) |
+
+Los `function` top-level cuelgan de window: los onclick del markup
+(`loadReports/loadNetbox/loadSites/loadRetention` en los botones Refresh),
+los despachos de `swView` (inline) y los onclick generados (`repApply`,
+`repPreset`, `siteToggle`, `siteHist`, `retInvalidate`, `retPruneDry`,
+`retPruneConfirm`, `retPruneExec`, `nbSyncConfirm/Run/Cancel`) siguen
+resolviendo sin cambios. El estado recordado 'rep'/'site' usa `_npState*`
+de core.js (intacto).
+
+## Decisión de helpers (grep de exclusividad previo a mover nada)
+
+| Helper | Consumidores (grep post-Lote C) | Decisión |
+|---|---|---|
+| `_fmtBytes` | DOS declaraciones en el inline: L4202 (bloque Performance, sombreada) y L7591 (bloque OLA 4, ganadora por hoisting, cuerpos NO equivalentes: la ganadora formatea con KB/MB/GB y se detiene en GB). ÚNICA llamada: `loadRetention` (`_fmtBytes(b.uso_bytes)`) | QUEDAN las dos en el inline, IN SITU. Mover la ganadora a views/retention.js haría ganar la sombreada (el inline se evalúa después de las vistas) y cambiaría el formateo de tamaños — la trampa §7.1 del mapa. `loadRetention` (views/retention.js) la resuelve en tiempo de llamada contra la ganadora tal como hoy |
+| `_fmtUptime` | `views/performance.js` (Lote C) y `_repDur` (Reports, movida) | QUEDA en el inline; `_repDur` resuelve en tiempo de llamada |
+| `_donut` | Única llamada: `repRender` (movida). `loadDonuts` del dashboard NO la usa (pinta donuts en su template). Divergencia con el Lote C: entonces repRender seguía inline; ahora viajó | VIAJA a views/reports.js, respetando su orden relativo original (4216 < 7006). El stub del bloque PERFORMANCE en el inline lo documenta |
+| `_repTs` | `repRender`/`loadReports` (movidas) y el wizard de discovery `dwRender` (`dw_scan_done`/`dw_reused`, inline residual) | QUEDA en el inline |
+| `_detText` | NetBox, SFTP, wizard discovery, views/admin.js y la propia Reports | QUEDA en el inline (bloque REPORTES SLA, entre los stubs) |
+| `_isoLocal` | Sites (2) + Retention (4); el mapa citaba dwStep2/3 pero en el código actual el wizard la usa con `_repTs` | UNA copia única, viaja a views/sites.js (su bloque original); retention la consume en tiempo de llamada (se evalúa antes, pero todas las llamadas son runtime). Sin duplicar |
+| `_ageHuman` | Solo `_sitesCard` (movida) | VIAJA a views/sites.js; su llamada a `alDur` (inline) resuelve en tiempo de llamada |
+| `_det40` / `retDet` | Alias muertos de `_detText` (mapa §2.3, no borrar sin tarjeta aparte) | Viajan tal cual con su vista (sites/retention) |
+| `__isAdmin` / `npGray` | Compliance, Reports, NetBox, Sites, Retention, Admin | QUEDAN en el inline (decisión Lote A respetada; NetBox conserva el banner 403/SOLO admin) |
+| `alDur` | `views/alerts.js` (Lote C) + `_ageHuman` | QUEDA en el inline |
+| `esc` / `escAttr` | Compartidos | QUEDAN en el inline |
+
+## Estado movido
+
+- `repState`, `repGroupsCache` → views/reports.js (`let` top-level: binding del
+  entorno léxico global compartido entre scripts clásicos). `logout` (core.js)
+  asigna `repState = null` y lo resuelve en tiempo de llamada (imposible que
+  corra antes de que los 17 scripts estén evaluados: el logout solo existe tras
+  un login completo).
+- `_r4Epochs` → views/sites.js; `_retPreview` → views/retention.js.
+- `NB_SVG_*` → views/netbox.js (`const`; solo las consumen las funciones del
+  propio fichero).
+- Verificado por grep: ninguna de esas variables la lee el inline residual ni
+  otras vistas ('site' y 'rep' son las ÚNICAS claves de `_npState*` en todo el
+  árbol; publishes/mapa/topología no las tocan).
+
+## Qué NO se movió (verificado por grep)
+
+- `_fmtBytes` (×2), `_fmtUptime`, `_repTs`, `_detText`, `__isAdmin`, `npGray`,
+  `alDur`, `esc`/`escAttr` — ver tabla de decisiones arriba.
+- Las 4 vistas de este lote mantienen sus IDs DOM exclusivos (`rep-*`,
+  `ret-*`, `sites-*`/`sh-chart-*`, `nb-*`/`netbox-content`): ninguna otra
+  vista ni el dashboard los escribe. `loadInventory` (devices/discovery) y su
+  `selD(...)` no se tocan; el modal `#dp` tampoco.
+- `loadDonuts`/`refreshAlertSummary`/dashboard: no se tocaron.
+
+## Verificación del lote
+
+- `node --check`: los 4 archivos nuevos OK + inline restante extraído a
+  temporal (4133 líneas) OK.
+- Auditoría de equivalencia: las 600 líneas no-vacías movidas (rangos
+  4216–4220, 4676–4879, 7001–7007, 7021–7270, 7587–7589, 7599–7610,
+  7612–7760, 7762–7894 del archivo pre-lote) aparecen byte a byte en los .js
+  nuevos; 0 líneas perdidas (contadores de líneas before − after − vistas).
+  Cada bloque original aparece como subsecuencia contigua en su destino
+  (orden relativo preservado; único reorden: `_donut` va delante de su
+  contrato en reports.js, igual que su posición original 4216 < 7006).
+- Grep de redeclaración: los 34 nombres movidos quedan con exactamente 1
+  `function` en todo el árbol (core.js + views/*.js + inline);
+  `_fmtBytes` mantiene sus 2 (ambas inline), `_fmtUptime`/`_detText`/
+  `_repTs`/`__isAdmin`/`npGray`/`alDur`/`esc`/`escAttr`/`loadDev` solo inline/core.
+- Handlers invocados desde atributos on* (markup + strings generados):
+  0 sin resolver.
+- `tests/`: 358 passed (con el .venv del repo principal).
+- `<link>` CSS intactos (style.css?v=4, overview.css?v=3); los 4 .js nuevos
+  con `?v=1`. Sin console.log/confirm nuevos.
+
+## Divergencias documentadas
+
+1. `_donut` viaja (reports.js): diverge del apunte del Lote C ("queda"),
+   correcto entonces porque repRender seguía inline; el grep regla 2 ahora da
+   un único consumidor movido. El header de views/reports.js lo explica.
+2. `_fmtBytes` NO viaja aunque su único llamador (loadRetention) sí:
+   la victoria por hoisting solo vale dentro del mismo script; repetir la
+   declaración en views/retention.js (prohibido por la regla 1) o mover la
+   ganadora promovería a la sombreada (cuerpos distintos), con cambio de
+   formateo. Queda in situ documentada en el stub del bloque OLA 4.
+3. `_isoLocal` viaja a views/sites.js aunque Retention también la usa (y
+   retention.js se evalúa ANTES que sites.js): resoluciones en tiempo de
+   llamada, ninguna llamada a nivel de evaluación; una sola copia.
+4. Orden de carga (reports → retention → sites → netbox) ≠ orden de líneas
+   del monolito (netbox 4676 < reports 7001 < sites 7581 < retention 7762):
+   fija la tarjeta; no observable porque ningún símbolo movido se lee al
+   evaluar los scripts.
+
+## Estado del plan de extracción (siguiente ronda)
+
+| Fase del mapa (§5.2) | Estado |
+|---|---|
+| 1 core/state, 2 i18n, 5 session | hecha en core.js (paso 1) |
+| 3 dom, 4 format, 6 theme | pendiente (inline conserva esc/escAttr/IC/icon/tema) |
+| 7 vistas simples: connectivity, compliance, webhooks, groups | hecha (Lote A) |
+| 7 resto: maintenance, apikeys, tfa, logs | hecha (Lote B) |
+| 8 performance+alerts+admin | hecha (Lote C) · backups y compare quedan como tarjeta especial acoplada a `loadDev` |
+| 9 reports, retention, sites, netbox | **hecha (este lote)** |
+| 10 commands, monitoring (con reasignación de `refMon` en el mismo archivo) | siguiente |
+| 11 devices+discovery, 12 dashboard+detalle | después |
+| 13 terminal+sftp, 14 topology | después |
+| router (`swView`) | después |
+| boot | al final por diseño |
