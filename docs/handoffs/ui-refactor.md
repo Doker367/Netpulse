@@ -803,3 +803,185 @@ fases 12–16 pendientes en el orden g/h/i/j/k.
 | 11 devices+discovery | **hecha (este lote)** |
 | 12 dashboard+detalle (lote h), 13 terminal/sftp (i), 14 topology (j) | después |
 | 15 router, 16 boot (k) | al final por diseño |
+
+---
+
+# Lote G — Tarjeta 10D-G: backups + compare (las acopladas)
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-g` (worktree `/Users/doker/np-w10k`) ·
+Commit: `refactor(ui): extraer lote g (backups, compare)`.
+
+Mismo enfoque que los Lotes A–F: función a función con verificación de
+solapamiento por grep; dashboard.html pasó de 6004 → 5828 líneas (−176 líneas
+netas: −200/+24, las 24 añadidas son 22 de stubs/comentarios y 2 `<script src>`).
+
+## Orden de carga en dashboard.html (tras core.js y los 21 previos, antes del inline)
+
+```html
+<script src="/static/js/views/devices.js?v=1"></script>
+<script src="/static/js/views/backups.js?v=1"></script>
+<script src="/static/js/views/compare.js?v=1"></script>
+<script> /* inline restante */ </script>
+```
+
+Ambos son scripts clásicos (sin defer/async, posición que fija la tarjeta:
+backups → compare). Top-level de ambos = SOLO declaraciones `function` del
+inline movidas tal cual: nada se lee ni se ejecuta a la evaluación, así que no
+hay inversión de orden observable. Todas las dependencias (`A`, `h`, `t`,
+`__t`/`toast` de core; `devices`, `esc`, `_npTick` del inline) resuelven en
+tiempo de llamada.
+
+## Qué fue a cada archivo (mismo orden relativo; rangos 1-indexed del archivo pre-lote)
+
+| Archivo | Contenido movido |
+|---|---|
+| `views/backups.js` | `buildSchedForms` (3364–3371, PINTA los selects de la vista: la llaman `loadDev` — views/devices.js, latido 30 s, trampa §7.6 conservada tal cual — y `swView('backups')`); comentario `── BACKUP ALL ──` + `backupAllDevices` (3742–3755); comentario `── BACKUPS ──` + `offsiteExport` (3989–3997); `loadBk` (4040–4090, latido 60 s + KPIs `#bk-kpis` + tabla `#bk-list` + badges `#sb-bk`/`#info-bk`), `dlBackup` (4092–4102) y bloque `── SCHEDULER ──` completo: `loadJobs`, `doBackupMulti`, `scheduleBackup`, `scheduleRecurring`, `cancelJob` (4104–4140) |
+| `views/compare.js` | comentario `── COMPARE ──` + `dCmp` (3965–3987), `bdPopulateDevices` (3999–4006), `bdLoadBackups` (4008–4020), `bdDiff` (4022–4039) |
+
+Los `function` top-level cuelgan de window: los onclick del markup de
+`#v-backups` (`backupAllDevices()`, `offsiteExport()`, `loadBk()`), los
+onchange/onclick de `#v-compare` (`dCmp()`, `bdLoadBackups()`, `bdDiff()`), los
+onclick generados dentro de los propios cuerpos movidos (`dlBackup` en la
+tabla de `loadBk`; `cancelJob` en `loadJobs`; `scheduleBackup`/
+`scheduleRecurring` en los formularios que pinta `buildSchedForms`), el
+despacho de `swView` (inline: `if (v==='backups') { loadBk(); buildSchedForms();
+loadJobs(); }` e `if (v==='compare') bdPopulateDevices();`), los latidos
+`_npTick(loadBk, 60000)` y `await loadBk()` de `init` (inline), `backupAllDevices`
+terminando en `loadBk()` y las acciones rápidas del modal `#dp` (`qaB`/`qaM`,
+inline residual) llamando `loadBk()`/`dCmp()` — todos resuelven contra window
+en tiempo de llamada, sin cambios.
+
+## Las trampas de la tarjeta — decisiones (grep de exclusividad previo a mover nada)
+
+| Símbolo | Consumidores (grep post-Lote F) | Decisión |
+|---|---|---|
+| `loadBk` | markup de #v-backups, `init` (inline: `await loadBk()` + `_npTick(loadBk, 60000)`), `swView('backups')`, `qaB` (modal #dp, inline), `backupAllDevices` (movida) | **VIAJA a backups.js**; todos los consumidores son tiempo de llamada (nadie la lee al evaluar) |
+| `buildSchedForms` | `loadDev` (views/devices.js línea 110, en cada latido de 30 s) y `swView('backups')` (inline) | **VIAJA a backups.js**: exclusiva de Backups (solo pinta `#sched-*`); los 2 consumidores (una movida — devices.js — y uno inline) la resuelven en tiempo de llamada. El pisado de formularios en cada latido (§7.6) queda intacto |
+| `populateCmdDevices` |Tras mover TODO lo de backups: `loadBk` (backups.js, en cada latido de 60 s y tras cada backup) y `swView('commands')` (INLINE residual, única despachante) | **QUEDA en el inline** (bloque `── GLOBAL COMMAND CENTER ──` intacto). La reevaluación que pedía la tarjeta da N=2 usuarios (backups.js + router inline del lote k), no un único consumidor; además editar views/commands.js (Lote E) está fuera de la ZONA de esta tarjeta. Resolución por window en el latido, como hoy |
+| `qaB` / `qaM` | onclick generados por `selD` (modal `#dp` del detalle, INLINE residual) | **QUEDAN en el inline**: son del detalle de equipo (lote h, fuera de la ZONA); ninguna función movida los declara. `qaB`→`loadBk` (backups.js) y `qaM`→`dCmp` (compare.js) resuelven en tiempo de llamada |
+| scheduler completo (`loadJobs`, `doBackupMulti`, `scheduleBackup`, `scheduleRecurring`, `cancelJob`) | `loadJobs`: markup-latido de Backups vía `swView`, `doBackupMulti` (movida), `cancelJob` (movida); onclick de `scheduleBackup`/`scheduleRecurring` generados en `buildSchedForms` (movida); onclick de `cancelJob` generado en `loadJobs` (movida) | **VIAJAN a backups.js**: exclusivos de Backups (grep: cero referencias fuera del bloque) |
+| Helpers de badges (`sb-bk`, `info-bk`) | SOLO `loadBk` (grep: 2 escrituras en líneas 4048–4049 pre-lote; nadie más los toca) | **VIAJAN de la mano de loadBk** (no hay helper externo que los repinte; el badge del sidebar de alerts lo actualiza `refreshAlertSummary` sobre OTROS ids `sb-*`) |
+| `dCmp` | onchange de `#cmp-a`/`#cmp-b` (markup de `#v-compare`) y `qaM` (modal #dp, inline) | **VIAJA a compare.js**; ambos consumidores resuelven en tiempo de llamada |
+| `bdPopulateDevices` | `swView('compare')` (inline) y guard-cláusula interna; onchange `#bd-dev` → `bdLoadBackups` | **VIAJA a compare.js** |
+| `bdLoadBackups` / `bdDiff` | onchange `#bd-dev` y onclick "Comparar backups" del markup; callee interna (movida) | **VIAJAN a compare.js** |
+| `__isAdmin`/`npGray`, `esc`/`escAttr`, `_detText`, `alDur`, `_fmtBytes` (×2), `_fmtUptime`, `_isoLocal` | compartidos (decisiones de Lotes A–D) | **QUEDAN** (inline/core; ninguna función movida los declara; todas las llamadas resuelven en tiempo de llamada) |
+| `devices`, `sel` | estado compartido del inline (`bdPopulateDevices` y `doBackupMulti` los leen; `loadDev` de devices.js es la fuente) | **QUEDAN en el inline** (regla 2; lecturas de comparar NO pasan a top level: compare.js no lee selects al evaluarse — regla de la tarjeta) |
+
+Ninguna función movida declara `let`/`const` de estado: ambos archivos son
+100 % declaraciones (0 top-level ejecutable), por lo que ni `window.x`
+explícito ni estado de módulo fueron necesarios (regla 4: solo `function` →
+globales por hoisting de script clásico).
+
+## Qué NO se tocó
+
+- Markup de TODAS las vistas y del modal `#dp` (los 3 cortes son del
+  `<script>` inline; `#v-backups`/`#v-compare` quedan byte a byte).
+- `swView` con su despacho `if (v==='backups') { loadBk(); buildSchedForms();
+  loadJobs(); }` (inline, lote k/router): ninguna línea suya se recorta.
+- `populateCmdDevices` y su comentario de sección (decisión de arriba; el
+  header de views/commands.js del Lote E sigue siendo válido: lo que ahí se
+  decía de loadBk sigue aplicando y ahora loadBk vive en backups.js).
+- `_fmtBytes` (×2 sombreada/ganadora, §7.1), `_fmtUptime`, `_detText`,
+  `_repTs`, `alDur`, `__isAdmin`, `npGray`, `esc`/`escAttr`, `loadDev`,
+  `selD`, `renderD`, `loadDonuts`, `updStats`, `refreshAlertSummary`,
+  `loadH`, `init`: ninguno se movió ni se tocó (consumidores inline
+  residuales; lote h).
+- Trampas §7.6 (loadDev pisa `#cmp-a`/`#cmp-b` con `selectedIndex=1` y llama
+  `buildSchedForms` en cada latido) y §7.7 (`loadBk` reconstruye `#cmd-dev` en
+  cada latido de 60 s, perdiendo la selección de Commands): defectos
+  preexistentes conservados tal cual según la regla 1; su tarjeta específica
+  sigue pendiente (no es parte del refactor).
+
+## Verificación del lote
+
+- `node --check`: views/backups.js (176 líneas), views/compare.js (94 líneas),
+  core.js, los 20 .js previos y el inline restante extraído a temporal
+  (2798 líneas) → OK todos.
+- Auditoría de equivalencia: los 3 tramos extraídos (3364–3371, 3742–3755,
+  3989–4140 del archivo pre-lote, con los sub-cortes compare 3965–3987 y
+  3999–4039) aparecen BYTE A BYTE en los .js nuevos (assert en el script de
+  corte, 0 diffs); el orden relativo dentro de cada archivo se conserva
+  (backups: buildSchedForms → backupAllDevices → offsiteExport → loadBk →
+  dlBackup → scheduler; compare: dCmp → bdPopulateDevices → bdLoadBackups →
+  bdDiff; único añadido: su separación por línea en blanco y el header doc).
+- Grep de redeclaración: los 14 nombres movidos con EXACTAMENTE 1
+  `(async )?function <nombre>` en core.js + views/*.js + inline;
+  `qaB`/`qaM`/`populateCmdDevices` siguen con su única declaración en el
+  inline.
+- Handlers invocados desde atributos `on*` (markup, 132, + strings generados
+  en todos los .js e inline): **0 sin resolver** (verificador §6.4 del mapa:
+  único falso positivo `if`, como en Lotes C–F).
+- Conteos: 6004 − 200/+24 = 5828 líneas (−176 netas = 196 líneas movidas más
+  4 de comentario ajustado + 2 `<script src>` añadidos; git numstat 24/200).
+- `tests/`: **358 passed** (con el .venv del repo principal,
+  `PYTHONPATH=.`).
+- `<link>` CSS intactos (style.css?v=4 línea 12, overview.css?v=3 línea
+  1505); los 2 .js nuevos con `?v=1` en dashboard.html líneas 3023–3024. Sin
+  console.log/confirm nuevos (grep = 0 en los archivos nuevos).
+- Ids DOM de las dos vistas verificados de uno a uno: `sched-*`, `bk-*`,
+  `jobs-list`, `bd-*`, `sb-bk`, `info-bk` aparecen solo en el markup de su
+  vista + su .js (control de colisión de prefijos: `cmp-b*`/`cmp-r*` del grep
+  grosso eran los `cmp-bl-*`/`cmp-result` de Compliance; el uso real de
+  `#cmp-a/#cmp-b/#cmp-r` queda solo en compare.js + qaM (inline, lote h) + el
+  comentario de loadDev en devices.js).
+
+## BONUS — verificador del mapa §6.4 sobre el árbol completo (posición tras Lote G)
+
+`node --check` de los 23 .js (core + 21 vistas + backups/compare) + inline
+temporal: OK. Verificador de handlers (`on(click|change|input|submit|keydown)`
+del markup y de los strings generados, resueltos contra core.js + views/*.js +
+inline): **0 sin resolver** — lista completa vacía salvo el falso positivo `if`
+(no es función; preexistente en todos los lotes). Red de consumidores
+recalculada post-movida: los `on*` que invocan símbolos de lote g
+(`backupAllDevices`, `offsiteExport`, `loadBk`, `dCmp`, `bdLoadBackups`,
+`bdDiff` + los generados `dlBackup`, `cancelJob`, `scheduleBackup`,
+`scheduleRecurring`) resuelven todos contra backups.js/compare.js por window.
+
+## Divergencias documentadas
+
+1. `populateCmdDevices` NO viaja pese a que "Commands es su única despachante
+   inline": tras mover `loadBk` su tabulación da N=2 usuarios (loadBk en
+   backups.js + swView('commands') en el inline), no un único consumidor; la
+   regla de la tarjeta ("si su ÚNICO consumidor restante es commands o
+   backups, puede viajar") no se cumple. Se documenta además por la ZONA:
+   views/commands.js ya extraída (Lote E) no es editable en esta tarjeta.
+   El latido 60 s de Backups sigue repintando `#cmd-dev` (§7.7) tal cual.
+2. `buildSchedForms` viaja a backups.js pese a que su punto de llamada más
+   frecuente es `loadDev` (devices.js, Lote F): es el pintor de los selects de
+   Backups y los 2 consumidores resuelven en tiempo de llamada; devices.js no
+   se editó (su línea 110 sigue llamando `buildSchedForms()` igual, ahora
+   window-resuelta).
+3. `qaB`/`qaM` (modal `#dp`) NO viajan aunque qaM toca los selects de Compare:
+   pertenecen al detalle de equipo (lote h, fuera de la ZONA); sus llamadas a
+   `loadBk`/`dCmp`/`swView` son tiempo de llamada.
+4. Orden de carga (backups → compare) ≠ orden de líneas del monolito (dCmp
+   3965 < offsiteExport 3989 < loadBk 4040): el `── COMPARE ──` va delante de
+   parte de los `── BACKUPS ──` en el monolito intercalado; en los archivos
+   nuevos cada bloque mantiene su orden interno y nada movido se lee a la
+   evaluación, así que la reordenación entre ARCHIVOS no es observable.
+
+## Estado del plan de extracción (siguiente ronda)
+
+Tras este lote (las acopladas ya no lo son: las dependencias con `loadDev`
+quedaron como llamadas window en tiempo de llamada en ambos sentidos) quedan:
+
+| Lote | Contenido |
+|---|---|
+| h | dashboard+detalle, corazón del monolito: `setDTab`/`rCmdBig`/`c-big`/`t-big`/`qa*`/`dlC`/`renderD`/`updStats`/`loadDonuts`/`loadH`/`refreshAlertSummary`/`init`… (modal `#dp` + latidos + listener del grid/ops-focus) |
+| i | terminal+sftp (`_term*`, `term*`, `cmdOpenConsole`, `_sftp*`, `sftp*` + `_formatBytes`/`_formatTime`) |
+| j | topology (`_topo*`, `topoTab`, `buildTraceOrigins`, …) |
+| k | router (swView+hashchange) y boot (init+listeners+IIFE de tema/restoreSession) — cierre |
+
+## Resumen por fase del mapa (§5.2) tras este lote
+
+| Fase del mapa (§5.2) | Estado |
+|---|---|
+| 1 core/state, 2 i18n, 5 session | hecha en core.js (paso 1) |
+| 3 dom, 4 format, 6 theme | pendiente (inline conserva esc/escAttr/IC/icon/tema) |
+| 7 vistas simples: A + B | hecha |
+| 8 performance+alerts+admin (Lote C) · backups/compare (lote g) | hecha / **hecha (este lote)** |
+| 9 reports, retention, sites, netbox | hecha (Lote D) |
+| 10 commands, monitoring | hecha (Lote E) |
+| 11 devices+discovery | hecha (Lote F) |
+| 12 dashboard+detalle (lote h), 13 terminal/sftp (i), 14 topology (j) | después |
+| 15 router, 16 boot (k) | al final por diseño |

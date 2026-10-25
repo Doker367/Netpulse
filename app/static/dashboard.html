@@ -3020,6 +3020,8 @@
   <script src="/static/js/views/monitoring.js?v=1"></script>
   <script src="/static/js/views/discovery.js?v=1"></script>
   <script src="/static/js/views/devices.js?v=1"></script>
+  <script src="/static/js/views/backups.js?v=1"></script>
+  <script src="/static/js/views/compare.js?v=1"></script>
   <script>
     let devices = [], sel = null, aTab = 'facts', cmdH = [], bSel = new Set(), bMode = false;
     let alertSummary = null; // null significa fuente sin verificar, no cero alertas.
@@ -3359,16 +3361,12 @@
     // delDev/addInventoryDevice (views/devices.js), dwOpen/dwImport
     // (views/discovery.js), loadReports (views/reports.js) y swView('terminal')
     // — todos lo resuelven en tiempo de llamada contra window. Quedan aquí sus
-    // acoples del latido: renderD/loadDonuts/updStats/buildSchedForms y el
-    // repintado de #cmp-a/#cmp-b (trampa §7.6, tarjeta backups/compare, lote g).
-    function buildSchedForms() {
-      const opts = '<option value="all">-- TODOS LOS DISPOSITIVOS --</option>' + devices.map(d => `<option value="${d.id}">${d.id} (${d.driver})</option>`).join('');
-      const u = `<select class="sched-unit" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:6px;width:90px;font-size:11px"><option value="1">Minutos</option><option value="60">Horas</option><option value="1440">Días</option><option value="10080">Semanas</option><option value="43200">Meses</option></select>`;
-      const s = document.getElementById('sched-single-form'); if (s) s.innerHTML = `<div class="fg"><label>Dispositivo / Grupo</label><select id="sched-dev" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;width:100%;font-size:12px">${opts}</select></div>
-    <div class="fg" style="margin-top:6px"><label>Dentro de cuánto tiempo</label><div style="display:flex;gap:6px"><input id="sched-delay" type="number" placeholder="30" value="30" style="flex:1;min-width:0">${u.replace('class="sched-unit"', 'id="sched-delay-unit"')}<button class="btn btn-p btn-sm" onclick="scheduleBackup()" style="white-space:nowrap"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg> Programar</button></div></div>`;
-      const r = document.getElementById('sched-rec-form'); if (r) r.innerHTML = `<div class="fg"><label>Dispositivo / Grupo</label><select id="sched-rec-dev" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;width:100%;font-size:12px">${opts}</select></div>
-    <div class="fg" style="margin-top:6px"><label>Ejecutar repetitivamente cada</label><div style="display:flex;gap:6px"><input id="sched-rec-int" type="number" placeholder="1" value="1" style="flex:1;min-width:0">${u.replace('class="sched-unit"', 'id="sched-rec-unit"')}<button class="btn btn-p btn-sm" onclick="scheduleRecurring()" style="white-space:nowrap"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg> Programar</button></div></div>`
-    }
+    // acoples del latido: renderD/loadDonuts/updStats y el repintado de
+    // #cmp-a/#cmp-b (trampa §7.6, conservada).
+    // buildSchedForms viajó a views/backups.js (Lote G): pinta los selects
+    // #sched-single-form/#sched-rec-form desde el inventario (trampa §7.6 del
+    // mapa, conservada). Consumidores: loadDev (views/devices.js, latido 30 s)
+    // y swView('backups') — ambos la resuelven en tiempo de llamada.
     async function loadH() {
       try {
         const r = await fetch(`${A}/devices/health`); if (!r.ok) throw new Error('salud no disponible'); const hl = await r.json();
@@ -3739,20 +3737,9 @@
       if (s) s.innerHTML = devices.map(d => `<option value="${d.id}">${d.id} (${d.driver})</option>`).join('');
     }
 
-    // ── BACKUP ALL ──
-    async function backupAllDevices() {
-      toast('<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 3 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8M7.5 5.5l9 5"/></svg> Iniciando backup masivo...', 'i');
-      let ok = 0, fail = 0;
-      for (const d of devices) {
-        try {
-          const r = await fetch(`${A}/config/${encodeURIComponent(d.id)}/backup`, { method: 'POST', headers: h() });
-          const res = await r.json();
-          if (res.success) ok++; else fail++;
-        } catch (e) { fail++; }
-      }
-      toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> ${ok} backups exitosos, ${fail} fallidos`, ok > 0 ? 's' : 'error');
-      loadBk();
-    }
+    // backupAllDevices viajó a views/backups.js (Lote G): su único consumidor
+    // es el onclick del botón "Backup All" de #v-backups (markup), window en el
+    // click; llama loadBk (backups.js) al terminar.
 
     // delDev viajó a views/devices.js (Lote F): su único llamador es el
     // onclick="delDev(sel.id)" del modal #dp (markup, aquí), resuelto contra
@@ -3962,182 +3949,19 @@
       } catch (e) { el.innerHTML = `<div style="color:var(--red)">${e.message}</div>` }
     }
 
-    // ── COMPARE ──
-    async function dCmp() {
-      const a = document.getElementById('cmp-a').value, b = document.getElementById('cmp-b').value;
-      if (!a || !b || a === b) { document.getElementById('cmp-r').innerHTML = '<pre style="color:var(--text-ter)">Seleccioná dos diferentes</pre>'; return }
-      const el = document.getElementById('cmp-r'); el.innerHTML = '<div class="sp"></div>';
-      try {
-        const ra = await fetch(`${A}/config/${a}/raw`, { headers: h() }), ta = await ra.text();
-        const rb = await fetch(`${A}/config/${b}/raw`, { headers: h() }), tb = await rb.text();
-        const aNoCfg = ta.includes('\u26a0\ufe0f') || ta.includes('Config no disponible');
-        const bNoCfg = tb.includes('\u26a0\ufe0f') || tb.includes('Config no disponible');
-        if (aNoCfg || bNoCfg) {
-          el.innerHTML = `<div class="empty"><span class="icon"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 8h18m-4-4 4 4-4 4M21 16H3m4-4-4 4 4 4"/></svg></span><br>${aNoCfg ? a : b} no tiene config disponible vía NAPALM.<br><small style="color:var(--text-ter)">${aNoCfg && bNoCfg ? 'Ambos dispositivos usan API propietaria.' : 'Usá Facts para comparar información.'}</small></div>`;
-          return;
-        }
-        el.innerHTML = `<div class="cg2"><div class="col"><h3><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> ${a}</h3><pre style="max-height:300px;font-size:9px">${esc(ta)}</pre></div><div class="col"><h3><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> ${b}</h3><pre style="max-height:300px;font-size:9px">${esc(tb)}</pre></div></div>`;
-        const la = ta.split('\n'), lb = tb.split('\n'); let diff = '';
-        for (let i = 0; i < Math.max(la.length, lb.length); i++)if (la[i] !== lb[i]) {
-          if (la[i] !== undefined) diff += `<span class="diff-d">-${esc(la[i])}</span>`;
-          if (lb[i] !== undefined) diff += `<span class="diff-a">+${esc(lb[i])}</span>`
-        }
-        if (diff) el.innerHTML += `<div style="margin-top:8px"><h3 style="font-size:11px;color:var(--text-ter);text-transform:uppercase;margin-bottom:4px"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/></svg><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/></svg> Diferencias</h3><pre style="max-height:200px;font-size:9px">${diff}</pre></div>`
-      } catch (e) { el.innerHTML = `<pre style="color:var(--red)">${e.message}</pre>` }
-    }
-
-    // ── BACKUPS ──
-    async function offsiteExport() {
-      try {
-        const r = await fetch(`${A}/config/offsite/export`, { method: 'POST', headers: h() });
-        const d = await r.json();
-        if (!r.ok) { toast(d.detail || 'Error offsite', ''); return }
-        toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 16a4 4 0 0 0-.88-7.9A7 7 0 1 0 4 16Z"/></svg> Offsite: ${d.uploaded || 0} subidos, ${d.failed || 0} fallos${d.skipped ? ' (' + d.skipped + ')' : ''}`, d.failed ? '' : 's');
-      } catch (e) { toast('Error offsite', ''); }
-    }
-
-    function bdPopulateDevices() {
-      const sel = document.getElementById('bd-dev');
-      if (!sel) return;
-      const cur = sel.value;
-      sel.innerHTML = (devices || []).map(d => `<option value="${esc(d.id)}">${esc(d.id)}</option>`).join('');
-      if (cur) sel.value = cur;
-      bdLoadBackups();
-    }
-
-    async function bdLoadBackups() {
-      const dev = document.getElementById('bd-dev')?.value;
-      if (!dev) return;
-      try {
-        const r = await fetch(`${A}/config/${encodeURIComponent(dev)}/backups`, { headers: h() });
-        const list = r.ok ? await r.json() : [];
-        const opts = list.map(b => `<option value="${esc(b.filename)}">${esc(b.filename)} · ${new Date(b.timestamp * 1000).toLocaleString('es')}</option>`).join('');
-        const A = document.getElementById('bd-a'), B = document.getElementById('bd-b');
-        if (A) A.innerHTML = opts || '<option value="">(sin backups)</option>';
-        if (B) B.innerHTML = opts || '<option value="">(sin backups)</option>';
-        if (list.length > 1) { A.selectedIndex = 1; B.selectedIndex = 0; }
-      } catch (e) { }
-    }
-
-    async function bdDiff() {
-      const dev = document.getElementById('bd-dev')?.value;
-      const a = document.getElementById('bd-a')?.value, b = document.getElementById('bd-b')?.value;
-      const box = document.getElementById('bd-r'), statsEl = document.getElementById('bd-stats');
-      if (!dev || !a || !b) { box.innerHTML = '<pre style="color:var(--text-ter)">Seleccioná dispositivo y dos backups</pre>'; return }
-      box.innerHTML = '<div class="sp"></div>'; statsEl.textContent = '';
-      try {
-        const r = await fetch(`${A}/config/${encodeURIComponent(dev)}/backups/diff?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`, { headers: h() });
-        const d = await r.json();
-        if (!r.ok) { box.innerHTML = `<pre style="color:var(--red)">${esc(d.detail || 'Error')}</pre>`; return }
-        statsEl.innerHTML = `<span style="color:var(--green)">+${d.stats.added}</span> · <span style="color:var(--red)">−${d.stats.removed}</span> · ${d.stats.total} líneas`;
-        const rows = d.rows.map(rw => `<div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--border)">
-          <div style="padding:1px 6px;white-space:pre-wrap;word-break:break-all;${rw.type === 'del' || rw.type === 'change' ? 'background:rgba(239,68,68,.12);color:var(--red)' : 'color:var(--text-secondary)'}">${rw.a == null ? '' : esc(rw.a)}</div>
-          <div style="padding:1px 6px;white-space:pre-wrap;word-break:break-all;border-left:1px solid var(--border);${rw.type === 'add' || rw.type === 'change' ? 'background:rgba(35,165,90,.12);color:var(--green)' : 'color:var(--text-secondary)'}">${rw.b == null ? '' : esc(rw.b)}</div>
-        </div>`).join('');
-        box.innerHTML = `<div style="font-family:var(--mono);font-size:10px;max-height:420px;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:8px">${rows}</div>`;
-      } catch (e) { box.innerHTML = `<pre style="color:var(--red)">${e.message}</pre>` }
-    }
-    async function loadBk() {
-      if (!t) return;
-      try {
-        let all = [];
-        for (const d of devices) {
-          try { const r = await fetch(`${A}/config/${encodeURIComponent(d.id)}/backups`, { headers: h() }); if (r.ok) { const l = await r.json(); all = all.concat(l.map(b => ({ ...b, device: d.id }))) } } catch (e) { }
-        }
-        all.sort((a, b) => b.timestamp - a.timestamp);
-        document.getElementById('sb-bk').textContent = all.length;
-        document.getElementById('info-bk').textContent = all.length;
-        populateCmdDevices();
-
-        // KPIs
-        const kpis = document.getElementById('bk-kpis');
-        const totalSize = all.reduce((s, b) => s + (b.size || 0), 0);
-        const uniqueDevs = new Set(all.map(b => b.device || b.filename?.split('_')[0])).size;
-        const lastBk = all.length ? new Date(all[0].timestamp * 1000).toLocaleString('es', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
-        if (kpis) kpis.innerHTML = [
-          { label: 'Total Backups', val: all.length, color: 'var(--accent)' },
-          { label: 'Almacenamiento', val: totalSize > 1024 * 1024 ? (totalSize / 1024 / 1024).toFixed(1) + ' MB' : (totalSize / 1024).toFixed(1) + ' KB', color: 'var(--green)' },
-          { label: 'Dispositivos', val: uniqueDevs, color: 'var(--yellow)' },
-          { label: 'Último Backup', val: lastBk, color: 'var(--accent)' },
-        ].map(k => `<div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 16px;border-left:3px solid ${k.color}">
-          <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${k.label}</div>
-          <div style="font-weight:700;font-size:15px;color:var(--text)">${k.val}</div>
-        </div>`).join('');
-
-        // Table
-        const bel = document.getElementById('bk-list');
-        if (bel) bel.innerHTML = all.length ? `<table style="width:100%;border-collapse:collapse">
-          <thead><tr style="border-bottom:1px solid var(--border)">
-            <th style="padding:12px 16px;text-align:left;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Dispositivo</th>
-            <th style="padding:12px 16px;text-align:left;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Archivo</th>
-            <th style="padding:12px 16px;text-align:left;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Tamaño</th>
-            <th style="padding:12px 16px;text-align:left;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Fecha</th>
-            <th style="padding:12px 16px;text-align:right;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px">Acción</th>
-          </tr></thead>
-          <tbody>${all.slice(0, 50).map(b => {
-          const dev = b.device || b.filename?.split('_')[0] || '?';
-          const sz = b.size > 1024 ? (b.size / 1024).toFixed(1) + ' KB' : b.size + ' B';
-          const dt = new Date(b.timestamp * 1000).toLocaleString('es', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-          return `<tr style="border-bottom:1px solid var(--border-s);transition:background .15s" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='transparent'">
-              <td style="padding:10px 16px;font-weight:600;font-size:12px;color:var(--text)">${dev}</td>
-              <td style="padding:10px 16px;font-family:var(--mono);font-size:11px;color:var(--text-secondary)">${esc(b.filename)}</td>
-              <td style="padding:10px 16px;font-size:11px;color:var(--text-ter)">${sz}</td>
-              <td style="padding:10px 16px;font-size:11px;color:var(--text-ter)">${dt}</td>
-              <td style="padding:10px 16px;text-align:right"><button class="btn btn-o btn-xs" onclick="dlBackup('${dev}','${esc(b.filename)}')" style="font-size:10px"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M12 3v12m-5-5 5 5 5-5"/></svg> Download</button></td>
-            </tr>`}).join('')}</tbody>
-        </table>` : '<div style="padding:40px;text-align:center;color:var(--text-ter)"><div style="font-size:32px;margin-bottom:12px"><svg class="ic" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="opacity:0.4;color:var(--text-ter)"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg></div>No hay backups guardados.<br><small>Usa el botón "Backup All" o ejecuta un backup desde cada dispositivo.</small></div>';
-      } catch (e) { }
-    }
-
-    async function dlBackup(id, fname) {
-      try {
-        const r = await fetch(`${A}/config/${encodeURIComponent(id)}/backups/${encodeURIComponent(fname)}`, { headers: h() });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        const blob = await r.blob();
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = fname;
-        a.click(); URL.revokeObjectURL(a.href); toast('<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M12 3v12m-5-5 5 5 5-5"/></svg> Descargado', 'info')
-      } catch (e) { toast('Error al descargar', 'error') }
-    }
-
-    // ── SCHEDULER ──
-    async function loadJobs() {
-      const el = document.getElementById('jobs-list'); if (!el || !t) return;
-      try {
-        const r = await fetch(`${A}/scheduler/jobs`, { headers: h() });
-        const jobs = await r.json();
-        if (!Array.isArray(jobs) || !jobs.length) { el.innerHTML = '<div class="empty"><span class="icon"><svg class="ic" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="opacity:0.4;color:var(--text-ter)"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><br>No hay trabajos programados</div>'; return }
-        const activeJobs = jobs.filter(j => j.status !== 'cancelled');
-        if (!activeJobs.length) { el.innerHTML = '<div class="empty"><span class="icon"><svg class="ic" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="opacity:0.4;color:var(--text-ter)"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span><br>No hay trabajos activos (solo históricos cancelados)</div>'; return }
-        el.innerHTML = `<div style="border:1px solid var(--border);border-radius:6px"><table><tr><th>Dispositivo</th><th>Tipo</th><th>Estado</th><th>Programado</th><th>Acción</th></tr>
-      ${activeJobs.map(j => `<tr><td style="font-weight:500">${esc(j.device_id === 'all' ? 'Todos' : j.device_id || '?')}</td>
-      <td>${j.job_type === 'recurring' ? '<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg> Recurrente' : '<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 2h14M5 22h14M7 2v4l10 12v4M17 2v4L7 18v4"/></svg> Único'}</td>
-      <td><span class="badge ${j.status === 'pending' || j.status === 'scheduled' ? 'badge-b' : j.status === 'completed' ? 'badge-g' : 'badge-r'}">${j.status || '?'}</span></td>
-      <td style="font-size:10px">${j.run_at ? new Date(j.run_at).toLocaleString() : j.interval_minutes ? `Cada ${j.interval_minutes} min` : '—'}</td>
-      <td><button class="btn btn-o btn-xs" onclick="cancelJob('${j.job_id || j.id}')" title="Cancelar"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></td></tr>`).join('')}</table></div>`
-      } catch (e) { if (document.getElementById('jobs-list')) document.getElementById('jobs-list').innerHTML = '<div style="font-size:11px;color:var(--text-ter)">Error</div>' }
-    }
-    async function doBackupMulti(isRec, dev, val, unit) {
-      if (!dev || !val) return;
-      const totalMin = parseInt(val) * parseInt(unit || 1);
-      const devs = dev === 'all' ? devices.map(d => d.id) : [dev];
-      try {
-        for (let d of devs) {
-          const ep = isRec ? '/scheduler/backup/recurring' : '/scheduler/backup';
-          const body = isRec ? { device_id: d, interval_minutes: totalMin } : { device_id: d, delay_minutes: totalMin };
-          await fetch(`${A}${ep}`, { method: 'POST', headers: h(), body: JSON.stringify(body) });
-        }
-        toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> Programa activado para ${devs.length} equipo(s)`, 's'); loadJobs();
-      } catch (e) { toast('Error al programar múltiples o individual', 'error') }
-    }
-
-    function scheduleBackup() { doBackupMulti(false, document.getElementById('sched-dev')?.value, document.getElementById('sched-delay')?.value, document.getElementById('sched-delay-unit')?.value); }
-    function scheduleRecurring() { doBackupMulti(true, document.getElementById('sched-rec-dev')?.value, document.getElementById('sched-rec-int')?.value, document.getElementById('sched-rec-unit')?.value); }
-    async function cancelJob(id) {
-      try { await fetch(`${A}/scheduler/jobs/${id}`, { method: 'DELETE', headers: h() }); toast('<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Trabajo cancelado', 'info'); loadJobs() }
-      catch (e) { toast('Error al cancelar', 'error') }
-    }
+    // ── BACKUPS y COMPARE — viajaron (Lote G) ──
+    // dCmp, bdPopulateDevices, bdLoadBackups y bdDiff → views/compare.js:
+    // consumidores = onchange de #cmp-a/#cmp-b/#bd-dev y onclick de #v-compare
+    // (markup), swView('compare') y qaM (modal #dp, inline residual) — todos en
+    // tiempo de llamada contra window; nada top-level lee los selects.
+    // offsiteExport, loadBk (latido 60 s), dlBackup y el scheduler completo
+    // (loadJobs, doBackupMulti, scheduleBackup, scheduleRecurring, cancelJob)
+    // → views/backups.js. La llamada populateCmdDevices() de loadBk resuelve el
+    // símbolo inline del bloque GLOBAL COMMAND CENTER (decisión del Lote G:
+    // sus consumidores restantes son loadBk en backups.js y swView('commands')
+    // aquí — N>1 usuarios, regla 2). qaB/qaM del modal #dp siguen en el inline;
+    // todas sus llamadas (fetch/loadBk/dCmp/swView) resuelven en tiempo de
+    // llamada.
 
     // ── GRUPOS DE DISPOSITIVOS (módulo dormido: GET /api/groups) ──
     // Contrato real: GET /api/groups → 200 para viewer con [{name, description, device_count}].
