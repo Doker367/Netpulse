@@ -104,3 +104,94 @@ En `dashboard.html`, línea ~3003, inmediatamente después del markup:
   después si se decide; hoy son atendidos por resolución en tiempo de llamada.
 - Tests que referencian cadenas movidas: ninguno rompió; futuros tests que
   busquen texto de core.js deben apuntar a `/static/js/core.js`.
+
+---
+
+# Lote A — Tarjeta 10D-B: vistas simples (connectivity, compliance, webhooks, groups)
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-a` (worktree `/Users/doker/np-w10e`) ·
+Commit: `refactor(ui): extraer vistas simples (connectivity, compliance, webhooks, groups)`.
+
+ROUND 2 del plan (§5.2 del mapa, fase 7): 4 vistas simples extraídas a
+archivos propios. El enfoque es **función a función con verificación de
+solapamiento por grep**, no "bloque completo": cualquier nombre usado por otra
+vista o por infraestructura SE QUEDA donde estaba.
+
+## Orden de carga en dashboard.html
+
+```html
+<script src="/static/js/core.js?v=1"></script>
+<script src="/static/js/views/connectivity.js?v=1"></script>
+<script src="/static/js/views/compliance.js?v=1"></script>
+<script src="/static/js/views/webhooks.js?v=1"></script>
+<script src="/static/js/views/groups.js?v=1"></script>
+<script> /* inline restante */ </script>
+```
+
+Los 4 son scripts clásicos (sin defer/async) cargados ENTRE core.js y el
+inline. Argumento de orden (regla 5): los loaders que `swView` (inline) despacha
+— `loadConn`, `loadWebhooks` — y los que resuelven inline HTML generado
+(`setBaseline`, `checkCompliance`, `loadCompReport`, `grpDevs`, `createGroup`,
+`addWebhook`, `deleteWebhook`) se resuelven contra window en el momento del
+click/llamada, y para entonces los 4 scripts estáticos ya evaluaron
+(top-level sin ejecución: solo declaraciones `function`). El inline no leer
+ningún símbolo de estas vistas a la carga, así que no hay inversión de orden.
+Cada archivo lleva su propio `?v=1`; los `<link>` CSS (v4 / v3) intactos.
+
+## Qué función fue a cada archivo
+
+| Archivo | Funciones movidas (declaración original en el inline de main) |
+|---|---|
+| `views/connectivity.js` | `_pingCard`, `loadConn` (+ comentario de sección del bloque) |
+| `views/compliance.js` | `loadCompliance`, `setBaseline`, `checkCompliance`, `loadCompReport` (+ comentario de sección) |
+| `views/webhooks.js` | `loadWebhooks`, `addWebhook`, `deleteWebhook` (+ comentario de sección) |
+| `views/groups.js` | `loadGroups`, `grpDevs`, `createGroup` |
+
+Cada cuerpo se copió línea a línea en el mismo orden relativo; los archivos
+solo añaden un header de documentación. Las `function` top-level de un script
+clásico cuelgan de window, así que los `onclick` inline del markup
+(`onclick="loadConn()"` en `#v-connectivity`, `onclick="loadWebhooks()"`
+en `#v-webhooks`) y los generados en strings siguen resolviendo sin cambios.
+
+## Qué NO se movió (verificado por grep, compartido)
+
+- **`__isAdmin()` y `npGray()`** — declaran en el bloque de Groups del inline
+  (L5503/L5504 del mapa) pero lo usan Compliance, NetBox, Admin/userScope,
+  Sites, Retention y Reports. Regla 2: quedan en el inline, sin duplicar.
+  En `dashboard.html` conservan su comentario de sección y el contrato del
+  API de grupos que las documentaba (el header de `views/groups.js` explica
+  por qué no viajaron).
+- **`esc` / `escAttr`** — núcleo de escape compartido (inline L3009–L3010,
+  fuera del alcance de core.js en el paso 1); las 4 vistas los usan en
+  tiempo de llamada. Quedan en el inline.
+- **`A`, `t`, `h`, `toast`, `__t`, `currentLang`, `devices`** — core o estado
+  compartido; resuelven por el entorno léxico global / window en tiempo de
+  llamada. `loadCompliance` lee el array `devices` (estado del dashboard):
+  sigue declarado en el inline, no se movió.
+- **`swView`** — no tocado (sigue en el inline con todos sus despachos).
+
+## Verificación del lote
+
+- `node --check`: los 4 archivos nuevos + el inline extraído a un archivo
+  temporal → OK los 5.
+- Grep de redeclaración: cada uno de los 12 nombres movidos queda con
+  exactamente 1 `function <nombre>` en todo el árbol (views + core + inline);
+  `__isAdmin`/`npGray` quedan solo en el inline.
+- `tests/`: suite verde (355 tests, exit 0, sin tests tocados — ninguno
+  referenciaba texto de estas funciones).
+- `<link>` CSS sin cambios (style.css?v=4, overview.css?v=3).
+
+## Estado del plan de extracción (siguiente ronda)
+
+| Fase del mapa (§5.2) | Estado |
+|---|---|
+| 1 core/state, 2 i18n, 5 session | hecha en core.js (paso 1) |
+| 3 dom, 4 format, 6 theme | pendiente (inline conserva esc/escAttr/IC/icon/tema) |
+| 7 vistas simples: connectivity, compliance, webhooks, groups | **hecha (este lote)** |
+| 7 resto: maintenance, apikeys, tfa, logs | pendiente; siguiente tanda de "vistas simples". Nota: `logs` tiene 2 fuentes (audit/Loki) y `switchLogSource` comparte helpers de Loki |
+| 8 backups+compare+performance+alerts+admin(userScope+`_r4Groups`) | pendiente; acoplamientos: `loadBk→populateCmdDevices`, performance/compare leen `devices` de dashboard |
+| 9 reports, retention, sites, netbox | pendiente; usan `__isAdmin`/`npGray`/`_detText`/`_npState*` (core ya tiene _npState*) |
+| 10 commands, monitoring (con reasignación de `refMon` en el mismo archivo) | pendiente |
+| 11 devices+discovery, 12 dashboard+device-detail, 13 terminal/sftp, 14 topology | pendiente (más riesgosas) |
+| 15 router (`swView`), 16 boot | al final por diseño |
+
