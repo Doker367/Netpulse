@@ -3001,6 +3001,10 @@
   </div>
 
   <script src="/static/js/core.js?v=1"></script>
+  <script src="/static/js/views/connectivity.js?v=1"></script>
+  <script src="/static/js/views/compliance.js?v=1"></script>
+  <script src="/static/js/views/webhooks.js?v=1"></script>
+  <script src="/static/js/views/groups.js?v=1"></script>
   <script>
     let devices = [], sel = null, aTab = 'facts', cmdH = [], bSel = new Set(), bMode = false;
     let alertSummary = null; // null significa fuente sin verificar, no cero alertas.
@@ -3250,68 +3254,6 @@
           toast('<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M12 3v12m-5-5 5 5 5-5"/></svg> Export iniciado', 's');
         })
         .catch(e => toast('<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Error al exportar: ' + e.message, 'error'));
-    }
-
-    // ── CONECTIVIDAD (ping a targets externos) ──
-    function _pingCard(d) {
-      const ok = d && d.success;
-      const rtt = d && d.rtt_avg ? Number(d.rtt_avg).toFixed(1) : '—';
-      const loss = d ? Math.round(d.packet_loss || 0) : 100;
-      const color = ok ? 'var(--green)' : 'var(--red)';
-      return `<div style="display:flex;gap:16px;align-items:center;font-size:12px;padding:6px 4px;flex-wrap:wrap">
-        <span style="color:${color};font-weight:700">${ok ? '<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> Online' : '<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Sin respuesta'}</span>
-        <span><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="13" r="8"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="9" y1="2" x2="15" y2="2"/></svg> <strong>${rtt} ms</strong></span>
-        <span><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m22 17-8.5-8.5-5 5L2 7M16 17h6v-6"/></svg> pérdida <strong>${loss}%</strong></span>
-        <span style="color:var(--text-ter)">${d ? (d.probes_received || 0) : 0}/${d ? (d.probes_sent || 0) : 0} paquetes</span>
-      </div>`;
-    }
-    async function loadConn() {
-      const g = document.getElementById('conn-grid'); if (!g || !t) return;
-      g.innerHTML = '<div class="sp"></div>';
-      const targets = [
-        { host: '8.8.8.8', label: 'Internet (Google DNS)' },
-        { host: '1.1.1.1', label: 'Internet (Cloudflare)' },
-      ];
-      g.innerHTML = targets.map(tg =>
-        `<div class="mp"><h4 class="mph"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 12m-2 0a2 2 0 1 0 4 0a2 2 0 1 0-4 0"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><path d="M7.76 16.24a6 6 0 0 1 0-8.49"/></svg> ${tg.label} <span style="font-weight:400;font-size:10px;color:var(--text-muted)">desde el servidor NetPulse</span></h4><div id="sping-${tg.host}" style="padding:8px"><div class="sp"></div></div></div>`
-      ).join('') +
-        `<div class="mp" style="grid-column:1/-1"><h4 class="mph"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Latencia a dispositivos <span style="font-weight:400;font-size:10px;color:var(--text-muted)">(medida por el poller)</span></h4><div id="conn-devices" style="padding:4px"><div class="sp"></div></div></div>`;
-
-      // Pings desde el servidor (independiente de la CLI de los equipos)
-      await Promise.all(targets.map(async tg => {
-        const el = document.getElementById(`sping-${tg.host}`); if (!el) return;
-        try {
-          const r = await fetch(`${A}/system/ping?target=${encodeURIComponent(tg.host)}&count=3`, { method: 'POST', headers: h(), signal: AbortSignal.timeout(12000) });
-          el.innerHTML = _pingCard(await r.json());
-        } catch (e) { el.innerHTML = '<span style="color:var(--red)"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Error de sondeo</span>'; }
-      }));
-
-      // Latencia/pérdida por dispositivo (snapshot del poller)
-      try {
-        const r = await fetch(`${A}/system/devices`, { headers: h() });
-        const snap = await r.json();
-        const devs = Object.values(snap.devices || {}).sort((a, b) => (a.device_id || '').localeCompare(b.device_id || ''));
-        const dv = document.getElementById('conn-devices');
-        if (!devs.length) { dv.innerHTML = '<div style="padding:16px;color:var(--text-ter);font-size:12px">Sin datos aún. El poller recolecta cada ' + (snap.interval || 60) + 's.</div>'; return; }
-        dv.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px">
-          <thead><tr style="border-bottom:1px solid var(--border);color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.5px">
-            <th style="padding:10px;text-align:left">Dispositivo</th><th style="padding:10px;text-align:left">Estado</th>
-            <th style="padding:10px;text-align:left">Latencia</th><th style="padding:10px;text-align:left">Pérdida</th>
-            <th style="padding:10px;text-align:left">Último error</th></tr></thead>
-          <tbody>${devs.map(m => {
-            const online = m.online !== false;
-            return `<tr style="border-bottom:1px solid var(--border-s)">
-              <td style="padding:10px;font-weight:600;color:var(--text)">${esc(m.device_id)} <span class="badge" style="background:var(--surface);font-size:9px">${esc((m.driver || '').toUpperCase())}</span></td>
-              <td style="padding:10px"><span class="badge ${online ? 'badge-g' : 'badge-r'}">${online ? 'ONLINE' : 'OFFLINE'}</span></td>
-              <td style="padding:10px;color:var(--text-secondary)">${m.latency_ms ? Number(m.latency_ms).toFixed(2) + ' ms' : '—'}</td>
-              <td style="padding:10px;color:${(m.packet_loss || 0) > 0 ? 'var(--orange)' : 'var(--text-secondary)'}">${Math.round(m.packet_loss || 0)}%</td>
-              <td style="padding:10px;color:var(--text-ter);font-size:11px">${esc(m.error || '—')}</td>
-            </tr>`;
-          }).join('')}</tbody></table>`;
-      } catch (e) {
-        const dv = document.getElementById('conn-devices');
-        if (dv) dv.innerHTML = '<div style="padding:16px;color:var(--red);font-size:12px"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> No se pudo obtener la latencia de dispositivos</div>';
-      }
     }
 
     // ── MONITOREO (Prometheus nativo) ──
@@ -5372,130 +5314,6 @@
       catch (e) { toast('No puedes eliminarte a ti mismo', 'error') }
     }
 
-    // ── COMPLIANCE (existente; /api/compliance/* es SOLO admin, 403 con operator) ──
-    async function loadCompliance() {
-      const el = document.getElementById('compliance-content'); if (!el || !t) return;
-      // Guardia de rol honesta: sin rol admin no hay vista, ni verdes, ni error genérico.
-      if (!__isAdmin()) {
-        el.innerHTML = npGray(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> ${__t('comp_admin_required')}`);
-        return;
-      }
-      el.innerHTML = '<div class="empty"><div class="sp"></div></div>';
-      let baselines = null, groups = null, groupsNote = '';
-      try {
-        const [rB, rG] = await Promise.all([
-          fetch(`${A}/compliance/baselines`, { headers: h(), signal: AbortSignal.timeout(15000) }),
-          fetch(`${A}/groups`, { headers: h(), signal: AbortSignal.timeout(15000) })
-        ]);
-        baselines = rB.ok ? await rB.json() : null;
-        if (rG.ok) { const gl = await rG.json().catch(() => []); groups = Array.isArray(gl) ? gl.map(g => g.name).filter(Boolean) : []; }
-        else groupsNote = `<div style="font-size:10px;margin-top:4px">${esc(__t('grp_list_unverified'))} · HTTP ${rG.status}</div>`;
-      } catch (e) { baselines = null; }
-      // Fallo de la API (403 u otro) → gris "no verificable", nunca pasos vacíos ni verdes.
-      if (baselines === null) {
-        el.innerHTML = npGray(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> ${__t('np_unverified')}`);
-        return;
-      }
-      const bl = Array.isArray(baselines) ? baselines.filter(b => typeof b === 'string') : [];
-      const blHeader = bl.length
-        ? `<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg> ${__t('comp_baselines')}: <b>${bl.map(esc).join(', ')}</b>`
-        : `<span style="color:var(--text-ter)"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg> ${esc(__t('comp_no_baselines'))}</span>`;
-      const grpSub = !groupsNote && Array.isArray(groups) ? (groups.length ? '' : `<div style="font-size:10px;color:var(--text-ter);margin-top:4px">${esc(__t('grp_empty'))}</div>`) : groupsNote;
-      const dl = (Array.isArray(groups) ? groups : []).map(g => `<option value="${escAttr(g)}">${esc(g)}</option>`).join('');
-      el.innerHTML = `<div style="margin-bottom:16px;font-size:12px;color:var(--text-ter)">${blHeader}${grpSub}</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-      <div class="sc">
-        <div class="c-step" onclick="document.getElementById('cmp-bl-group').focus()"><span class="cs-n">1</span><div><div class="cs-t">${__t('comp_step1')}</div><div class="cs-d">${__t('comp_step1_d')}</div></div></div>
-        <div class="fg" style="margin:12px 0 6px"><label>Grupo</label>
-          <input id="cmp-bl-group" list="cmp-bl-groups" placeholder="Core" style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;width:100%;font-size:12px">
-          <datalist id="cmp-bl-groups">${dl}</datalist>
-        </div>
-        <div class="c-step"><span class="cs-n">2</span><div><div class="cs-t">${__t('comp_step2')}</div><div class="cs-d">${__t('comp_step2_d')}</div></div></div>
-        <textarea id="cmp-bl-config" placeholder="! Escribe aquí la configuración deseada (baseline)..." style="min-height:100px;margin-top:8px;font-size:11px"></textarea>
-        <button class="btn btn-p btn-sm" onclick="setBaseline()" style="margin-top:6px"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg> ${__t('comp_save_baseline')}</button>
-      </div>
-      <div class="sc">
-        <div class="c-step"><span class="cs-n">3</span><div><div class="cs-t">${__t('comp_step3')}</div><div class="cs-d">${__t('comp_step3_d')}</div></div></div>
-        <div style="margin-top:6px;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:4px">
-          ${(devices || []).length ? devices.map(d => `<label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:5px 8px;cursor:pointer;border-radius:4px;transition:background .1s" onmouseover="this.style.background='rgba(255,255,255,.03)'" onmouseout="this.style.background=''">
-            <input type="checkbox" class="cmp-chk" value="${escAttr(d.id)}" checked style="width:14px;accent-color:var(--accent)"> <span>${esc(d.id)}</span><span style="margin-left:auto;font-size:9px;color:var(--text-ter)">${esc(d.driver)}</span>
-          </label>`).join('') : `<div style="font-size:11px;color:var(--text-ter);padding:8px">${__t('comp_no_devices')}</div>`}
-        </div>
-        <button class="btn btn-p btn-sm" onclick="checkCompliance()" style="margin-top:8px"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> ${__t('comp_check_btn')}</button>
-        <button class="btn btn-o btn-sm" onclick="loadCompReport()" style="margin-top:8px" ${(devices || []).length ? '' : 'disabled'}><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> ${__t('comp_report_btn')}</button>
-      </div>
-    </div>
-    <div id="cmp-result" style="margin-top:12px"></div>`;
-    }
-    async function setBaseline() {
-      const group = document.getElementById('cmp-bl-group')?.value.trim();
-      const config = document.getElementById('cmp-bl-config')?.value;
-      if (!group || !config) return;
-      try {
-        const r = await fetch(`${A}/compliance/baseline`, { method: 'POST', headers: h(), body: JSON.stringify({ group, config }) });
-        // Antes no se miraba r.ok: un 403/500 cantaba éxito. Ahora el toast dice la verdad.
-        if (!r.ok) {
-          const d = await r.json().catch(() => ({}));
-          toast(`${__t('comp_baseline_fail')} · ${esc(d.detail || 'HTTP ' + r.status)}`, 'error');
-          return;
-        }
-        toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> ${__t('comp_baseline_saved').replace('{g}', group)}`, 's')
-      } catch (e) { toast(`${__t('comp_baseline_fail')}: ${e.message}`, 'error') }
-    }
-    async function checkCompliance() {
-      const checks = [...document.querySelectorAll('.cmp-chk:checked')].map(c => c.value);
-      if (!checks.length) { toast(__t('comp_need_device'), 'error'); return }
-      const el = document.getElementById('cmp-result');
-      el.innerHTML = `<div class="sp"></div> ${__t('comp_checking')}`;
-      try {
-        const r = await fetch(`${A}/compliance/check`, { method: 'POST', headers: h(), body: JSON.stringify({ device_ids: checks }) });
-        // Antes un 403 renderizaba estado para todos: sin r.ok se inventaba compliant=true. Nunca más.
-        if (!r.ok) {
-          const d = await r.json().catch(() => ({}));
-          el.innerHTML = `<div style="border:1px solid var(--border);border-radius:6px;margin-top:8px;padding:10px;font-size:12px;color:var(--text-ter)">${__t('np_unverified')} · ${esc(d.detail || 'HTTP ' + r.status)}</div>`;
-          return;
-        }
-        const d = await r.json();
-        // Contrato real (device_ids): {total, compliant, non_compliant, results: {id: {compliant, violations}}}.
-        const raw = d.results && typeof d.results === 'object' ? d.results : {};
-        const list = Array.isArray(raw) ? raw : Object.entries(raw).map(([id, rx]) => ({ device_id: id, compliant: !!(rx && rx.compliant), violations: (rx && rx.violations) || [] }));
-        const okCount = typeof d.compliant === 'number' ? d.compliant : list.filter(x => x.compliant).length;
-        const badCount = typeof d.non_compliant === 'number' ? d.non_compliant : list.length - okCount;
-        const total = Number(d.total) || list.length;
-        el.innerHTML = `<div style="border:1px solid var(--border);border-radius:6px;margin-top:8px">
-          <div style="padding:10px 12px;font-size:12px;font-weight:600;color:${badCount ? 'var(--yellow)' : 'var(--green)'}">${okCount}/${total} ${__t('comp_ok_summary')}${badCount ? ` · ${badCount} ${__t('comp_mal_summary')}` : ''}</div>
-          <table><tr><th>${__t('comp_th_device')}</th><th>${__t('comp_th_result')}</th><th>${__t('comp_th_violations')}</th></tr>
-          ${list.length ? list.map(rx => `<tr><td style="font-weight:500">${esc(rx.device_id || rx.id || '?')}</td>
-          <td aria-label="${escAttr(__t(rx.compliant ? 'comp_ok_summary' : 'comp_mal_summary'))}">${rx.compliant ? '<span class="badge badge-g"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>' : '<span class="badge badge-r"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>'}</td>
-          <td>${(rx.violations || rx.errors || []).length || '—'}</td></tr>`).join('') : `<tr><td colspan="3" style="color:var(--text-ter)">${__t('np_unverified')}</td></tr>`}</table></div>`;
-      } catch (e) { el.innerHTML = `<div style="color:var(--text-ter)">${__t('comp_check_fail')}: ${esc(e.message)}</div>` }
-    }
-    async function loadCompReport() {
-      const el = document.getElementById('cmp-result'); if (!el) return;
-      el.innerHTML = `<div class="sp"></div> ${__t('comp_report_running')}`;
-      try {
-        const r = await fetch(`${A}/compliance/report`, { headers: h(), signal: AbortSignal.timeout(120000) });
-        if (!r.ok) {
-          const d = await r.json().catch(() => ({}));
-          el.innerHTML = `<div style="border:1px solid var(--border);border-radius:6px;margin-top:8px;padding:10px;font-size:12px;color:var(--text-ter)">${__t('np_unverified')} · ${esc(d.detail || 'HTTP ' + r.status)}</div>`;
-          return;
-        }
-        const d = await r.json();
-        // Contrato real: {summary: {total, compliant, non_compliant, errors}, devices: {id: {compliant, violations}}}.
-        const s = d.summary || {};
-        const list = Object.entries(d.devices || {}).map(([id, rx]) => ({ device_id: id, compliant: !!(rx && rx.compliant), violations: (rx && rx.violations) || [] }));
-        const okN = s.compliant != null ? Number(s.compliant) : list.filter(x => x.compliant).length;
-        const errN = s.errors != null ? Number(s.errors) : 0;
-        const tot = Number(s.total) || list.length;
-        el.innerHTML = `<div style="border:1px solid var(--border);border-radius:6px;margin-top:8px">
-          <div style="padding:10px 12px;font-size:12px;font-weight:600">${tot ? `${okN}/${tot} ${__t('comp_ok_summary')}${errN ? ` · ${errN} ${__t('comp_errors')}` : ''}` : `<span style="color:var(--text-ter)">${__t('comp_no_devices')}</span>`}</div>
-          ${tot ? `<table><tr><th>${__t('comp_th_device')}</th><th>${__t('comp_th_result')}</th><th>${__t('comp_th_violations')}</th></tr>
-          ${list.map(rx => `<tr><td style="font-weight:500">${esc(rx.device_id || '?')}</td>
-          <td aria-label="${escAttr(__t(rx.compliant ? 'comp_ok_summary' : 'comp_mal_summary'))}">${rx.compliant ? '<span class="badge badge-g"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></span>' : '<span class="badge badge-r"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span>'}</td>
-          <td style="font-size:10px;max-width:280px;overflow:hidden;text-overflow:ellipsis">${esc((rx.violations || []).map(v => v.expected || v.got || '').filter(Boolean).join(' | ')) || '—'}</td></tr>`).join('')}</table>` : ''}</div>`;
-      } catch (e) { el.innerHTML = `<div style="color:var(--text-ter)">${__t('comp_check_fail')}: ${esc(e.message)}</div>` }
-    }
-
     // ── GRUPOS DE DISPOSITIVOS (módulo dormido: GET /api/groups) ──
     // Contrato real: GET /api/groups → 200 para viewer con [{name, description, device_count}].
     // POST /api/groups → 201 admin, 409 si existe duplicado, 403 si operador no admin.
@@ -5503,65 +5321,6 @@
     function __isAdmin() { return (currentUser?.role || 'viewer') === 'admin'; }
     function npGray(msgHtml) {
       return `<div class="empty" style="background:var(--bg2)"><span class="icon" style="filter:grayscale(1)">—</span><br><span style="color:var(--text-ter)">${msgHtml}</span></div>`;
-    }
-    async function loadGroups() {
-      const el = document.getElementById('groups-content'); if (!el || !t) return;
-      el.innerHTML = '<div class="empty"><div class="sp"></div></div>';
-      try {
-        const r = await fetch(`${A}/groups`, { headers: h(), signal: AbortSignal.timeout(15000) });
-        if (r.status === 403) { el.innerHTML = npGray(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> ${__t('grp_admin_required')}`); return; }
-        if (!r.ok) { el.innerHTML = npGray(`${__t('np_unverified')} · HTTP ${r.status}`); return; }
-        const groups = await r.json();
-        const list = Array.isArray(groups) ? groups : [];
-        const rows = list.map(g => `<tr>
-          <td style="font-weight:500">${esc(g.name || '?')}</td>
-          <td style="font-size:11px;color:var(--text-secondary)">${esc(g.description || '—')}</td>
-          <td><span class="badge" style="background:var(--surface)">${Number(g.device_count ?? 0)}</span></td>
-          <td><button class="btn btn-o btn-xs" onclick="grpDevs('${escAttr(g.name || '')}')">${__t('grp_view_devices')}</button></td>
-        </tr>`);
-        el.innerHTML = `
-          ${rows.length ? `
-            <div style="border:1px solid var(--border);border-radius:6px;margin-bottom:12px"><table><tr><th>${__t('grp_col_group')}</th><th>${__t('grp_col_desc')}</th><th>${__t('grp_col_devices')}</th><th></th></tr>${rows.join('')}</table></div>
-            <div id="grp-devs" style="margin-bottom:12px"></div>`
-            : npGray(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 17a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3.9a2 2 0 0 1-1.69-.9l-.81-1.2a2 2 0 0 0-1.67-.9H8a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2Z"/><path d="M2 8v11a2 2 0 0 0 2 2h14"/></svg> ${__t('grp_empty')}`)}
-          <div class="sc">
-            <div class="sl"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg> ${__t('grp_add_title')}</div>
-            ${__isAdmin()
-            ? `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-                  <input id="grp-name" placeholder="${__t('grp_name_ph')}" style="flex:1;min-width:140px">
-                  <input id="grp-desc" placeholder="${__t('grp_desc_ph')}" style="flex:2;min-width:200px">
-                  <button class="btn btn-p btn-sm" onclick="createGroup()"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg> ${__t('grp_add_btn')}</button>
-                </div>`
-            : `<div style="font-size:11px;color:var(--text-ter);margin-top:8px"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> ${__t('grp_admin_required')}</div>`}
-          </div>`;
-      } catch (e) { el.innerHTML = npGray(`${__t('np_unverified')}: ${esc(e.message)}`); }
-    }
-    async function grpDevs(name) {
-      const el = document.getElementById('grp-devs'); if (!el || !name) return;
-      el.innerHTML = `<div class="bt"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 3 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8M7.5 5.5l9 5"/></svg> ${esc(name)} · …</div>`;
-      try {
-        const r = await fetch(`${A}/groups/${encodeURIComponent(name)}/devices`, { headers: h(), signal: AbortSignal.timeout(15000) });
-        // 404 = grupo vacío o inexistente: estado honesto, no error genérico.
-        if (r.status === 404) { el.innerHTML = `<div class="bt" style="color:var(--text-ter)"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 3 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8M7.5 5.5l9 5"/></svg> ${esc(name)} · ${__t('grp_devices_none')}</div>`; return; }
-        if (!r.ok) { el.innerHTML = `<div class="bt" style="color:var(--text-ter)">${__t('np_unverified')} · HTTP ${r.status}</div>`; return; }
-        const devs = await r.json();
-        const list = Array.isArray(devs) ? devs : [];
-        el.innerHTML = `<div class="bt"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m12 3 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8M7.5 5.5l9 5"/></svg> ${esc(name)} · ${list.length} ${list.length === 1 ? 'equipo' : 'equipos'}</div>
-          ${list.map(d => `<span class="tag" style="font-size:10px;padding:3px 8px;margin:2px">${esc(d.id || d.hostname || '?')}</span>`).join('')}`;
-      } catch (e) { el.innerHTML = `<div class="bt" style="color:var(--text-ter)">${__t('np_unverified')}: ${esc(e.message)}</div>`; }
-    }
-    async function createGroup() {
-      const name = document.getElementById('grp-name')?.value.trim();
-      const desc = document.getElementById('grp-desc')?.value.trim() || '';
-      if (!name) { toast(__t('grp_name_missing'), 'error'); return; }
-      try {
-        const r = await fetch(`${A}/groups`, { method: 'POST', headers: h(), body: JSON.stringify({ name, description: desc }) });
-        if (r.status === 403) { toast('<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> ' + __t('grp_admin_required'), 'error'); return; }
-        if (r.status === 409) { const d = await r.json().catch(() => ({})); toast(esc(d.detail || __t('grp_exists')), 'error'); return; }
-        if (!r.ok) { toast(`${__t('grp_create_fail')} · HTTP ${r.status}`, 'error'); return; }
-        toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> ${__t('grp_created').replace('{g}', name)}`, 's');
-        loadGroups();
-      } catch (e) { toast(`${__t('grp_create_fail')}: ${e.message}`, 'error'); }
     }
 
     // ── NETBOX (contrato docs/handoffs/netbox-ui.md; /api/netbox/* es SOLO admin) ──
@@ -5768,39 +5527,6 @@
         res.innerHTML = nbFailBanner(`${__t('nb_unavailable')}: ${e.message}`);
       }
     }
-
-    // ── WEBHOOKS ──
-    async function loadWebhooks() {
-      const el = document.getElementById('webhooks-content'); if (!el || !t) return;
-      try {
-        const r = await fetch(`${A}/notifications/webhooks`, { headers: h() });
-        const whs = await r.json();
-        const list = Array.isArray(whs) ? whs : (whs.webhooks || whs.results || []);
-        el.innerHTML = `<div class="sc" style="margin-bottom:12px"><div class="sl">Nuevo webhook</div>
-      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-        <input id="wh-url" placeholder="https://hooks.slack.com/..." style="flex:2;min-width:200px">
-        <select id="wh-event" style="flex:1">
-          <option value="device_down">Device Down</option>
-          <option value="device_up">Device Up</option>
-          <option value="backup_complete">Backup Complete</option>
-          <option value="all">Todos los eventos</option>
-        </select>
-        <button class="btn btn-p btn-sm" onclick="addWebhook()"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg> Agregar</button>
-      </div>
-    </div>
-    ${list.length ? `<div style="border:1px solid var(--border);border-radius:6px"><table><tr><th>URL</th><th>Eventos</th><th>Acción</th></tr>
-      ${list.map(w => `<tr><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;font-size:10px">${esc(w.url || '?')}</td>
-      <td>${(w.events || ['all']).join(', ')}</td>
-      <td><button class="btn btn-o btn-xs" onclick="deleteWebhook('${w.id || w.url}')" aria-label="${currentLang === 'en' ? 'Delete webhook' : 'Eliminar webhook'}"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></td></tr>`).join('')}</table></div>` : '<div class="empty"><span class="icon"><svg class="ic" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="opacity:0.4;color:var(--text-ter)"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span><br>Sin webhooks configurados</div>'}`
-      } catch (e) { el.innerHTML = `<div class="empty"><span class="icon"><svg class="ic" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false" style="opacity:0.4;color:var(--text-ter)"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span><br>Cargando...</div>` }
-    }
-    async function addWebhook() {
-      const url = document.getElementById('wh-url')?.value; const event = document.getElementById('wh-event')?.value;
-      if (!url) return;
-      try { await fetch(`${A}/notifications/webhooks`, { method: 'POST', headers: h(), body: JSON.stringify({ url, events: event === 'all' ? ['device_down', 'device_up', 'backup_complete'] : [event] }) }); toast('<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Webhook agregado', 's'); loadWebhooks() }
-      catch (e) { toast('Error al agregar webhook', 'error') }
-    }
-    async function deleteWebhook(id) { try { await fetch(`${A}/notifications/webhooks/${id}`, { method: 'DELETE', headers: h() }); toast('<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Webhook eliminado', 'info'); loadWebhooks() } catch (e) { } }
 
     // ── DEVICE MANAGER (V-INVENTORY) ──
     function _invContainer(el) {
