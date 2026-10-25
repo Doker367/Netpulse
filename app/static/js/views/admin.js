@@ -5,6 +5,8 @@
  * lote 3) sin cambio de comportamiento: loadUsers, createUser, delUser y los
  * helpers de scopes userScope* (la tabla los invoca vía onclick generado en
  * loadUsers), más la caché `_r4Groups` que solo llena/lee `userScopePanel`.
+ * Tarjeta 12D añade revokeUserSessions (botón por usuario, POST
+ * revoke-sessions, confirmación y detail literal en 403/404).
  * Líneas en el mismo orden relativo entre sí (el orden original era:
  * loadUsers…delUser < _r4Groups < userScope*).
  *
@@ -43,6 +45,7 @@
         <span class="badge" style="background:${roleColors[u.role] || 'var(--accent-l)'};color:#fff">${u.role}</span>
         ${userScopeBadge(u)}
         ${__isAdmin() ? `<button class="btn btn-o btn-xs" onclick="userScopePanel('${escAttr(u.username)}')" aria-label="Configurar permisos"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></button>` : ''}
+        ${__isAdmin() ? `<button class="btn btn-o btn-xs" onclick="revokeUserSessions('${escAttr(u.username)}')" aria-label="${escAttr(__t('adm_revoke'))}" title="${escAttr(__t('adm_revoke'))}"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>` : ''}
         <button class="btn btn-o btn-xs" onclick="if(confirm('Eliminar ${u.username}?'))delUser('${u.username}')" aria-label="${currentLang === 'en' ? 'Delete user' : 'Eliminar usuario'}"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         <div id="sc-panel-${escAttr(u.username)}" style="display:none;flex-basis:100%"></div>
       </div>`).join('')}
@@ -71,6 +74,24 @@
     async function delUser(u) {
       try { await fetch(`${A}/admin/users/${u}`, { method: 'DELETE', headers: h() }); toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> ${u} eliminado`, 'info'); loadUsers() }
       catch (e) { toast('No puedes eliminarte a ti mismo', 'error') }
+    }
+
+    // Cierra todas las sesiones del usuario incrementando token_version.
+    // Confirmación explícita; 403/404 muestran el detail literal del backend.
+    async function revokeUserSessions(username) {
+      if (!confirm(__t('adm_revoke_confirm').replace('{u}', username))) return;
+      try {
+        const r = await fetch(`${A}/admin/users/${encodeURIComponent(username)}/revoke-sessions`, { method: 'POST', headers: h() });
+        let b = null; try { b = await r.json(); } catch (e) { }
+        if (!r.ok) {
+          toast(`${__t('adm_revoke_fail')} ${esc(_detText(b, 'HTTP ' + r.status))}`, 'error');
+          return;
+        }
+        toast(`${__t('adm_revoke_ok').replace('{u}', esc(username)).replace('{v}', String(b && b.token_version != null ? b.token_version : '?'))}`, 's');
+        loadUsers();
+      } catch (e) {
+        toast(`${__t('np_unverified')} · ${esc(e.message)}`, 'error');
+      }
     }
 
     let _r4Groups = null; // cache de /api/groups para el panel de scopes

@@ -33,7 +33,8 @@
     // Cliente puro de /api/remote/* (collectors-site.md §8/§9.3), /api/retention/*
     // (retention.md) y /api/admin/users + /api/groups (rbac-site.md). Sin paths
     // fuera de esos contratos. Regla de oro: site stale nunca verde; ok=false
-    // nunca "caído"; null nunca se muestra como 0.
+    // nunca "caído"; null nunca se muestra como 0. Un site provisionado sin
+    // heartbeat (contact="never") se pinta gris «sin contacto», sin métricas.
 
     const _r4Epochs = {}; // site_id → último buffer_epoch visto (detecta "Buffer reiniciado")
 
@@ -88,9 +89,11 @@
 
     function _sitesCard(s) {
       const c = s.contact === 'fresh';
+      const age = s.last_contact_age_s;
       const contactHtml = c
-        ? `<span class="badge" style="background:rgba(34,197,94,.15);color:var(--green)">fresh · ${__t('sites_last_seen')}: ${_ageHuman(s.last_contact_age_s)}</span>`
-        : `<span class="badge" style="background:var(--surface);color:var(--text-ter)">${__t('sites_stale')}: ${_ageHuman(s.last_contact_age_s)}</span>`;
+        ? `<span class="badge" style="background:rgba(34,197,94,.15);color:var(--green)">fresh · ${__t('sites_last_seen')}: ${_ageHuman(age)}</span>`
+        : `<span class="badge" style="background:var(--surface);color:var(--text-ter)">${__t('sites_stale')}${age == null ? '' : ': ' + _ageHuman(age)}</span>`;
+      const never = s.contact === 'never';
       const cols = s.collectors || [];
       const cl = cols[0] || {};
       const buffs = [];
@@ -113,12 +116,14 @@
           <button class="btn btn-o btn-xs" onclick="siteToggle('${escAttr(s.site_id)}')" id="sites-btn-${escAttr(s.site_id)}">${__t('sites_view_devices')}</button>
         </div>
         ${buffs.join('')}
-        <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;margin-top:10px;color:var(--text-secondary)">
+        ${never
+          ? `<div style="font-size:12px;margin-top:10px;color:var(--text-ter)">${__t('sites_never_help')}</div>`
+          : `<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;margin-top:10px;color:var(--text-secondary)">
           <span>${__t('sites_st_ok')}: <b style="color:var(--green)">${Number(dvs.reachable ?? 0)}</b></span>
           <span>${__t('sites_st_noresp')}: <b style="color:var(--red)">${Number(dvs.unreachable ?? 0)}</b></span>
           <span>${__t('dw_st_error')}: <b style="color:var(--text-ter)">${Number(dvs.unverifiable ?? 0)}</b></span>
           <span>${__t('sites_unmatched')}: <b style="color:var(--orange)">${Number(dvs.unmatched ?? 0)}</b></span>
-        </div>
+        </div>`}
         <div id="sites-devs-${escAttr(s.site_id)}" style="display:none;margin-top:12px"></div>
       </div>`;
     }
@@ -140,6 +145,7 @@
         r = await fetch(`${A}/remote/sites/${encodeURIComponent(siteId)}/devices?include_unmatched=true`, { headers: h(), signal: AbortSignal.timeout(15000) });
         try { body = await r.json(); } catch (e) { }
         if (!r.ok) { box.innerHTML = npGray(`${__t('np_unverified')} · HTTP ${r.status}${_detText(body, '') ? ' · ' + esc(_detText(body, '')) : ''}`); return; }
+        if (body && body.contact === 'never') { box.innerHTML = npGray(__t('sites_never_help')); return; }
         const list = Array.isArray(body.devices) ? body.devices : [];
         if (!list.length) { box.innerHTML = npGray(__t('sites_no_devs')); return; }
         const rows = list.map(d => {

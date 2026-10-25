@@ -53,6 +53,9 @@
  * compartido del inline (devices/sel/bSel/bMode), esc/escAttr/iconTextHTML
  * (inline), swView (inline, lote k), loadBk (backups.js), dCmp (compare.js),
  * renderD/updStats (dashboard.js — mismo lote, archivo distinto).
+ * `_detText` (router.js) se usa en los errores de plantillas (Tarjeta 12D):
+ * un 403/404 de apply/apply-confirm muestra el detail literal, no un diff
+ * vacío ni "Falló".
  */
 
 let cmdH = [];
@@ -408,7 +411,15 @@ let cmdH = [];
       const el = document.getElementById('tpl-r'); el.innerHTML = '<div class="sp"></div>';
       try {
         const r = await fetch(`${A}/templates/${document.getElementById('tpl-s').value}/apply`, { method: 'POST', headers: h(), body: JSON.stringify({ device_id: id, params: p }) });
-        const d = await r.json();
+        let d = null; try { d = await r.json(); } catch (e) { }
+        if (!r.ok) {
+          // 403/404 de scope o plantilla: el detail del backend es la única
+          // explicación útil; nunca un diff vacío ni un "Falló" genérico.
+          const detail = esc(_detText(d, `HTTP ${r.status}`));
+          el.innerHTML = `<div style="color:var(--red)"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> ${detail}</div>`;
+          toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> ${detail}`, 'error');
+          return;
+        }
         el.innerHTML = `<div style="margin-bottom:4px;font-size:11px;font-weight:500"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></svg> Diff:</div>${(d.diff || '').split('\n').map(l => {
           if (l.startsWith('@@')) return `<span class="diff-h">${esc(l)}</span>`; if (l.startsWith('+')) return `<span class="diff-a">${esc(l)}</span>`; if (l.startsWith('-')) return `<span class="diff-d">${esc(l)}</span>`; return esc(l)
         }).join('\n')}`;
@@ -420,7 +431,16 @@ let cmdH = [];
       const el = document.getElementById('tpl-r'); el.innerHTML = '<div class="sp"></div>';
       try {
         const r = await fetch(`${A}/templates/${document.getElementById('tpl-s').value}/apply/confirm`, { method: 'POST', headers: h(), body: JSON.stringify({ session_token: tplT }) });
-        const d = await r.json(); el.innerHTML = d.success || d.committed ? '<div style="color:var(--green);font-weight:500"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> Aplicado</div>' : `<div style="color:var(--red)"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> ${d.error || 'Falló'}</div>`;
+        let d = null; try { d = await r.json(); } catch (e) { }
+        if (!r.ok) {
+          // 403/404: mostrar el detail literal y conservar tplT para reintentar
+          // cuando el operador tenga el scope correcto.
+          const detail = esc(_detText(d, `HTTP ${r.status}`));
+          el.innerHTML = `<div style="color:var(--red)"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> ${detail}</div>`;
+          toast(`<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> ${detail}`, 'error');
+          return;
+        }
+        el.innerHTML = d.success || d.committed ? '<div style="color:var(--green);font-weight:500"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> Aplicado</div>' : `<div style="color:var(--red)"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> ${esc(_detText(d, 'Falló'))}</div>`;
         if (d.success || d.committed) toast('<svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> Template aplicado', 's'); tplT = null; document.getElementById('tpl-c').style.display = 'none'
       } catch (e) { el.innerHTML = `<div style="color:var(--red)">${e.message}</div>` }
     }
