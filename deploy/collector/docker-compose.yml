@@ -1,0 +1,98 @@
+# NetPulse — colector remoto por site (Docker Compose).
+#
+# Uso previsto en un nodo Linux del site:
+#   sudo install -d -m 0750 /etc/netpulse
+#   sudo install -m 0600 -o 10002 -g 10002 deploy/collector/collector.yaml.example /etc/netpulse/collector.yaml
+#   sudo install -m 0600 -o root -g root /dev/null /etc/netpulse/collector.env   # NETPULSE_COLLECTOR_API_KEY=np_...
+#   docker compose -f deploy/collector/docker-compose.yml config
+#   docker compose -f deploy/collector/docker-compose.yml run --rm collector \
+#        --config /etc/netpulse/collector.yaml --check
+#   docker compose -f deploy/collector/docker-compose.yml up -d
+#
+# Build desde la raíz del repo (el Dockerfile necesita app/ y requirements-*):
+#   docker compose -f deploy/collector/docker-compose.yml build
+#
+# No publica puertos: el colector no escucha; solo inicia conexiones salientes
+# (HTTPS al central, TCP/ICMP a los equipos del site).
+
+name: netpulse-collector
+
+services:
+  collector:
+    build:
+      context: ../..
+      dockerfile: deploy/collector/Dockerfile
+    image: netpulse-collector:0.1.0
+    container_name: netpulse-collector
+
+    # network_mode: host es deliberado.
+    #   1) ICMP: el binario ping usa la pila de red del contenedor; en bridge
+    #      el source NAT puede romper el eco ICMP hacia equipos del site.
+    #   2) Alcance del site: el colector debe llegar a las mismas redes que el
+    #      host (VLANs, VPN, rutas estáticas, loopback del propio nodo). En
+    #      bridge solo llega a lo que el host enrute y enrute de vuelta.
+    #   3) Sin puertos: no hay nada que publicar; host evita el NAT.
+    # Alternativa bridge: quitar network_mode y añadir una red con salida al
+    # central; sigue haciendo falta CAP_NET_RAW y rutas explícitas. No se
+    # recomienda si el site depende de ICMP o de vecinos L2.
+    network_mode: host
+
+    # ping usa ICMP datagram si ping_group_range lo permite; CAP_NET_RAW cubre
+    # el fallback a socket raw como uid 10002 en hosts endurecidos.
+    # Se descartan TODAS las demás capabilities.
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+    security_opt:
+      - no-new-privileges:true
+
+    # Rootfs inmutable. El único estado persistente es el buffer SQLite y
+    # status.json, ambos en /var/lib/netpulse-collector.
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m
+
+    volumes:
+      # Buffer SQLite (pending/synced/dead) y status.json. RW y persistente.
+      # Volumen nombrado con nombre fijo para que las copias de seguridad y el
+      # chown sean predecibles (ver README).
+      - collector-buffer:/var/lib/netpulse-collector
+      # Config del site, solo lectura. create_host_path:false hace que `up`
+      # falle con un error claro si el archivo no existe, en vez de crear un
+      # directorio vacío en /etc/netpulse.
+      - type: bind
+        source: /etc/netpulse/collector.yaml
+        target: /etc/netpulse/collector.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+
+    # NETPULSE_COLLECTOR_API_KEY=np_... (nunca en el YAML ni en la imagen).
+    # required:false permite `docker compose config` en un host de build sin
+    # secretos; el arranque real exige el archivo (el README lo crea antes).
+    env_file:
+      - path: /etc/netpulse/collector.env
+        required: false
+
+    restart: unless-stopped
+    # El CLI atiende SIGTERM y espera hasta 15 s a sus dos hilos.
+    stop_grace_period: 30s
+    init: true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.remote_collector", "--config", "/etc/netpulse/collector.yaml", "--status"]
+      interval: 60s
+      timeout: 10s
+      start_period: 90s
+      retries: 3
+
+volumes:
+  collector-buffer:
+    name: netpulse-collector-buffer
