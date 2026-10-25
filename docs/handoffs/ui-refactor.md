@@ -985,3 +985,188 @@ quedaron como llamadas window en tiempo de llamada en ambos sentidos) quedan:
 | 11 devices+discovery | hecha (Lote F) |
 | 12 dashboard+detalle (lote h), 13 terminal/sftp (i), 14 topology (j) | después |
 | 15 router, 16 boot (k) | al final por diseño |
+
+---
+
+# Lote H — Tarjeta 10D-H: dashboard + detalle (el corazón)
+
+Fecha: 2026-10-24 · Rama: `feat/ui-views-h` (worktree `/Users/doker/np-w10l`) ·
+Commit: `refactor(ui): extraer lote h (dashboard + detalle)`.
+
+Dos archivos nuevos, porque el lote son dos unidades cerradas y sin helper
+privado compartido (verificado por grep): la portada (`#v-dashboard`, con sus
+latidos y el estado del hero) y el modal de detalle (`#dp`, fuera de las 24
+vistas, con los restos muertos del detalle antiguo por pestañas).
+`dashboard.html` pasó de **5.828 → 5.244 líneas** (−584 netas: −622/+38; las
+38 añadidas son 2 `<script src>`, 3 líneas de estado restauradas, 10 de stub
+y 23 comentarios ajustados). El `<script>` inline residual baja de **2.800 a
+2.214 líneas**, el mínimo histórico.
+
+## Auditoría del trabajo parcial heredado (GLM) — obligatoria antes de seguir
+
+Estado encontrado: `dashboard.html` modificado + `views/dashboard.js` (310
+líneas) y `views/device-detail.js` (425) **sin commitear**, sin `<script src>`
+para ninguno de los dos y sin anexo en este handoff (la página habría quedado
+con `init`/`selD`/`renderD` sin definir: handlers y arranque rotos).
+
+Auditoría desde cero contra `git show HEAD:app/static/dashboard.html` (5.828
+líneas):
+
+1. **Contenido**: multiset de líneas no vacías del `<script>` inline de HEAD
+   frente a (inline nuevo + los 2 archivos) → **0 líneas de código perdidas y
+   0 duplicadas**. Las únicas diferencias eran comentarios y la línea del grupo
+   `let` de estado (`cmdH`). El corte era correcto y completo.
+2. **Orden**: subsecuencia estricta sobre líneas de código → `dashboard.js`
+   229/229 líneas en el mismo orden que el monolito; `device-detail.js` 338/339
+   (la única distinta es `let cmdH = [];`, izada fuera de la línea compartida).
+3. **Faltaba**: los 2 `<script src>`, el stub del bloque portada en el inline y
+   el anexo. Además GLM había movido a `dashboard.js` tres declaraciones de
+   estado compartido que la tarjeta manda dejar en el inline (ver Divergencias).
+
+**Decisión: se conserva el corte** (no se descarta nada) y se termina: se
+añaden los `<script src>`, el stub, la restauración del estado y este anexo.
+
+## Orden de carga en dashboard.html (tras core.js y los 22 previos, antes del inline)
+
+```html
+  <script src="/static/js/views/compare.js?v=1"></script>
+  <script src="/static/js/views/device-detail.js?v=1"></script>
+  <script src="/static/js/views/dashboard.js?v=1"></script>
+  <script> /* inline restante: router/login/theme/misc */ </script>
+```
+
+Ambos son scripts clásicos (sin `defer`/`async`), en la posición que fija la
+tarjeta (entre `compare.js` y el inline). `device-detail.js` va antes que
+`dashboard.js` porque el modal emite `onclick="setDTab/qaB/…"` y llama
+`renderD` en tiempo de llamada; aun así ninguno de los dos lee un símbolo al
+evaluarse (top-level = declaraciones `function` + `let` de estado propio).
+
+Única excepción de top-level ejecutable, deliberada y con el DOM ya parseado:
+`dashboard.js` contiene las **dos sentencias sueltas sin `DOMContentLoaded`**
+que la tarjeta manda mover — `document.getElementById('grid').addEventListener`
+y `document.getElementById('ops-focus-items').addEventListener` (mapa §7.9).
+El script se carga al final del body, después de todo el markup, igual que
+cuando vivían en el inline; la de `.sidebar-item[onclick]` (router, lote k)
+sigue inline y no se tocó.
+
+## Qué fue a cada archivo (mismo orden relativo; rangos 1-indexed del archivo pre-lote)
+
+| Archivo | Contenido movido |
+|---|---|
+| `views/device-detail.js` | Tramo 1 (3544–3706): `let dTab`, `setDTab(t)` (parámetro `t` que eclipsa el token, §7.3, conservado), comentario `── DETAIL (all-in-one) ──`, `selD` (4 fetch en paralelo, `setLang(currentLang)`, `window.dLiveT` de 5 s con autodestrucción y limpieza por `closeD`/`logout`), `rCmdBig` (c-big/t-big; dentro `t` es el elemento DOM, no el JWT — §7.3), `closeD`. Tramo 2 (3748–3950): `qaB`, `qaS`, `qaP` (el `prompt()` es preexistente), `qaM`, y el bloque muerto del detalle antiguo tal cual — `loadF`, `loadI`, `loadC` + `let curC`, `uc`, `dep`, `cDep`, `dlC`, `renderCmd`, `rCmd`, `let tplT`, `renderTpl`, `tplP`, `tplR`, `tplA`, `tplC`. Estado propio: `let cmdH` (solo `rCmdBig`/`rCmd`). |
+| `views/dashboard.js` | `loadDonuts` (1 fetch por equipo, AbortController 2,5 s), `refreshAlertSummary` (latido 45 s → badge sidebar/header; `alertSummary === null` = sin verificar, no 0), `init` (setLang, restauración de hash, 4 `_npTick`: loadH 10 s / loadBk 60 s / refreshAlertSummary 45 s / loadDev 30 s, `#info-dev`, `setTimeout(loadDonuts, 1500)` y `setInterval(loadDonuts, 120000)` con guard de `#v-devices`), `loadH` (latido 10 s), `fDev` (filtro `#sb`), `renderD` (± `fDev()` final), listener `#grid`, `goToOverviewDevices`, `showAddDevicePanel`, listener `#ops-focus-items`, `updateDashboardHero`, `updStats` (escribe `overviewState` y termina en `setLang(currentLang)`). |
+
+Los `function` top-level cuelgan de window: los onclick/oninput del markup
+(`fDev()` del buscador, `goToOverviewDevices()`, `showAddDevicePanel()`,
+`closeD()`, `delDev(sel.id)`), los generados por `renderD` (`tB2`, `selD`) y
+por `selD` (`setDTab`, `qaB/qaS/qaP/qaM`, `dlC`, `rCmdBig`), los despachos de
+`swView` (`loadDev` ya en devices.js; `init` en `enterSession`) y los latidos
+`_npTick` resuelven todos sin cambios.
+
+## Qué NO se movió (grep de exclusividad previo a mover nada)
+
+| Símbolo | Consumidores (grep post-Lote G) | Decisión |
+|---|---|---|
+| `populateCmdDevices` | `loadBk` (backups.js, cada latido 60 s y tras cada backup) y `swView('commands')` (inline) | **QUEDA inline** (N=2 usuarios; regla anti-compartidas, decisión del Lote G) |
+| `buildSchedForms` / `loadBk` | backups.js (loadDev de devices.js y `swView('backups')`; `init`/`qaB`) | **QUEDAN en backups.js** (Lote G); este lote solo las llama en tiempo de llamada (`init`, `qaB`) |
+| `dCmp` | compare.js; `qaM` (movida) | **QUEDA en compare.js** (Lote G) |
+| `esc` / `escAttr` / `iconTextHTML` / `setIconText` / `IC` / `icon` | compartidos | **QUEDAN inline** (tiempo de llamada) |
+| `__isAdmin` / `npGray` / `_detText` / `_fmtBytes` (×2) / `_fmtUptime` / `alDur` | compartidos (Lotes A–G) | **QUEDAN inline**, in situ entre los dos tramos del detalle (mapa §7.1 intacta) |
+| `devices` / `sel` / `aTab` / `bSel` / `bMode` | todo el árbol / renderD / listener `#grid` | **QUEDAN en la línea de estado del inline** (L3026); `dashboard.js` y `device-detail.js` los resuelven en tiempo de llamada, sin `window.x` |
+| `alertSummary` / `overviewState` / `inventoryError` | `overviewState` lo lee `setLang` (core.js, cada cambio de idioma); `inventoryError` lo escribe `loadDev` (devices.js) | **QUEDAN en el inline** (L3027–3028), como pidió la tarjeta (`inventoryError` en la lista de compartidas) y por la regla 4 |
+| `swView` | router inline (lote k) | **QUEDA** (no se tocó ni una línea de su despacho) |
+| `A`, `h`, `t`, `toast`, `__t`, `setLang`, `_npTick`, `currentLang` | core.js | **QUEDAN** (tiempo de llamada) |
+
+## Trampas de la tarjeta — decisiones
+
+| Tema | Decisión |
+|---|---|
+| `init` con `setInterval(loadDonuts, 120000)` no cancelable (§7.12) | Viaja **tal cual**: id no guardado, `logout` no lo para, guard de `#v-devices`. Defecto preexistente documentado, NO "arreglado" |
+| 4 latidos `_npTick` sin id guardado (§7.12) | Viajan tal cual: se autolimitan con `if (t)` |
+| `loadDev` escribe en DOM de otras vistas (§7.6) | `loadDev` sigue en devices.js (Lote F); sus llamadas `renderD()/loadDonuts()/updStats()` y el pisado de `#cmp-a/#cmp-b` ahora resuelven contra window. Cero cambios de lógica |
+| `updStats` llama `setLang(currentLang)` cada pasada (§7.16) | Conservado; `setLang` (core.js) lee `overviewState` y llama `updateDashboardHero` en tiempo de llamada |
+| `selD` reescribe pestañas y arranca intervalo (§7.10) | Viaja con `window.dLiveT` intacto (lo limpian `closeD` y `logout` de core.js) |
+| `setDTab(t)` y `rCmdBig` eclipsan `t` (§7.3) | Byte a byte, sin renombrar |
+| Código muerto `loadF/loadI/loadC/renderCmd/rCmd/renderTpl/tpl*/uc/dep/cDep` (§2.3) | **Se movió tal cual, no se borró ni se revivió** (la tarjeta lo permite si es exclusivo; grep: 1 referencia = su declaración) |
+| `cmdH` | Salía de la línea `let` compartida; sus únicos consumidores eran `rCmdBig`/`rCmd` → viaja como `let cmdH` interno de device-detail.js |
+| Markup del modal `#dp` y de la portada | **Intacto**: los cortes son solo del `<script>` |
+
+## Verificación del lote
+
+- `node --check`: `views/dashboard.js` (307 líneas), `views/device-detail.js`
+  (425), `core.js`, los 22 `.js` previos y el inline restante extraído a
+  temporal (**2.214 líneas**) → OK los 25.
+- **Smoke de evaluación real (vm de Node, contexto único)**: los 25 scripts en
+  su orden de carga (core → 22 vistas → inline) evalúan sin `SyntaxError` ni
+  redeclaraciones; y llamadas cruzadas posteriores (`renderD`, `fDev`,
+  `updStats`, `setDTab`, `closeD`, `goToOverviewDevices`,
+  `showAddDevicePanel`, `populateCmdDevices`, `updateDashboardHero`,
+  `loadDonuts`, `renderCmd`, `renderTpl`, `rCmdBig`, `qaM`, `uc`, `tplC`) no
+  lanzan `ReferenceError`.
+- Auditoría de equivalencia: `dashboard.js` = **229/229 líneas de código
+  byte a byte en el mismo orden** que el monolito; `device-detail.js` =
+  338/339 (única diferencia: `let cmdH = [];` izado del grupo `let` compartido).
+  0 líneas perdidas y 0 duplicadas en el multiset del inline completo.
+- Grep de redeclaración: los 32 nombres movidos con EXACTAMENTE 1
+  `(async )?function <nombre>` en core.js + views/*.js + inline;
+  `cmdH`/`dTab`/`curC`/`tplT` solo en device-detail.js;
+  `alertSummary`/`overviewState`/`inventoryError`/`devices`/`sel`/`aTab`/
+  `bSel`/`bMode` solo en el inline. Cero duplicados de `let/const/class`
+  entre scripts (verificador estático).
+- Handlers invocados desde atributos `on*` (markup + strings generados en
+  todos los `.js` e inline): **0 sin resolver** (único falso positivo `if`,
+  como en todos los lotes).
+- CSS intacto (`style.css?v=4` L12, `overview.css?v=3` L1505); los 2 `.js`
+  nuevos con `?v=1`. Sin `console.log`/`confirm` nuevos.
+- `tests/`: **358 passed** (con el `.venv` del repo principal, `PYTHONPATH=.`).
+
+## Divergencias documentadas
+
+1. **Estado del hero de vuelta al inline**: el corte heredado había movido a
+   `dashboard.js` las declaraciones `let alertSummary / overviewState /
+   inventoryError`. Se restauran en el bloque de estado del inline (L3026–3028,
+   como HEAD): `inventoryError` lo escribe `loadDev` (devices.js) y
+   `overviewState` lo lee `setLang` (core.js) — no son de un único archivo
+   (regla 4), y la tarjeta lista `inventoryError` entre las compartidas.
+   Comportamiento idéntico: todo son resoluciones en tiempo de llamada.
+2. **`let cmdH` sale de la línea `let` compartida** y pasa al inicio de
+   `device-detail.js`: es la única línea de código que no es byte a byte la
+   original (misma semántica, declaración izarada; solo lo usan `rCmdBig` y
+   `rCmd`). `aTab` sigue inline aunque esté muerta (§2.3: no borrar sin
+   tarjeta aparte).
+3. **El código muerto viaja** (`loadF/loadI/loadC`, `renderCmd/rCmd`,
+   `renderTpl/tpl*`, `uc/dep/cDep`, `curC`, `tplT`) en vez de quedarse: grep
+   confirma exclusividad del bloque del detalle y la tarjeta autoriza moverlo
+   "tal cual si es exclusivo". No se revivió ninguna referencia.
+4. **Dos archivos, no uno**: la tarjeta nombra `views/dashboard.js` y
+   `views/device-detail.js`; se respeta. No hay helper privado compartido entre
+   ambos (`selD→renderD` y `rCmd→updStats` son llamadas de tiempo de llamada),
+   así que el corte no duplica nada.
+5. **Orden de carga** `device-detail.js → dashboard.js` (el inverso del orden
+   de líneas del monolito: la portada va 3277–3543, el detalle 3544–3950).
+   No observable: ningún símbolo movido se lee a la evaluación; el único
+   top-level ejecutable (los 2 listeners del dashboard) solo necesita el DOM,
+   que ya está parseado.
+
+## Estado del plan de extracción (siguiente ronda)
+
+Tras este lote quedan:
+
+| Lote | Contenido |
+|---|---|
+| i | terminal+sftp (`_term*`, `term*`, `cmdOpenConsole`, `_sftp*`, `sftp*` + `_formatBytes`/`_formatTime`) |
+| j | topology (`_topo*`, `topoTab`, `buildTraceOrigins`, `startTopoGraph`, `ensureTopoMap`, `runTopoTrace`, …) |
+| k | router (`swView` + `hashchange`) y boot (listeners globales + IIFE de tema/`restoreSession`) — cierre |
+
+| Fase del mapa (§5.2) | Estado |
+|---|---|
+| 1 core/state, 2 i18n, 5 session | hecha en core.js (paso 1) |
+| 3 dom, 4 format, 6 theme | pendiente (inline conserva esc/escAttr/IC/icon/tema) |
+| 7 vistas simples: A + B | hecha |
+| 8 performance+alerts+admin (Lote C) · backups/compare (Lote G) | hecha |
+| 9 reports, retention, sites, netbox | hecha (Lote D) |
+| 10 commands, monitoring | hecha (Lote E) |
+| 11 devices+discovery | hecha (Lote F) |
+| 12 dashboard+detalle | **hecha (este lote)** |
+| 13 terminal/sftp (i), 14 topology (j) | siguiente |
+| 15 router, 16 boot (k) | al final por diseño |
