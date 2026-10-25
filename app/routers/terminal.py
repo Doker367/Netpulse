@@ -36,9 +36,10 @@ import socket
 import time
 
 import anyio
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.core.security import verify_token
+from app.middleware.auth import _reject_revoked_session
 from app.middleware.rbac import scope_error
 from app.services import napalm_svc
 
@@ -219,6 +220,21 @@ def _closed_reason(code: str) -> str:
     }.get(code, "fin de sesión")
 
 
+def _session_revoked(payload: dict) -> bool:
+    """True si el JWT pertenece a una sesión revocada (``token_version``).
+
+    Reutiliza la comprobación del middleware HTTP (``JWTBearer``) para no
+    duplicar la lectura de usuarios ni la semántica del claim: ``tv`` ausente
+    vale 0, un usuario borrado revoca solo los tokens que llevan ``tv`` y las
+    API keys ``np_`` no pasan por aquí.
+    """
+    try:
+        _reject_revoked_session(payload)
+    except HTTPException:
+        return True
+    return False
+
+
 async def _send_event(websocket: WebSocket, payload: dict) -> None:
     """Envía un evento JSON escapado correctamente."""
     await websocket.send_text(json.dumps(payload, ensure_ascii=False))
@@ -239,6 +255,16 @@ async def terminal(websocket: WebSocket, device_id: str) -> None:
         return
 
     json_mode = (websocket.query_params.get("fmt") or "").lower() == "json"
+
+    # Revocación de sesión: mismo ``tv`` que valida JWTBearer. Se acepta y se
+    # cierra con 4401 sin resolver inventario ni abrir SSH. El evento JSON es
+    # el mínimo pactado; la UI trata el 4401 como sesión caducada.
+    if _session_revoked(payload):
+        await websocket.accept()
+        logger.warning("[terminal] token revocado para %s", payload.get("sub"))
+        await _send_event(websocket, {"type": "error", "error": "revoked"})
+        await websocket.close(code=4401)
+        return
 
     try:
         import paramiko
