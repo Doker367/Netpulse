@@ -119,10 +119,11 @@
           if (nd.id in hl) {
             const val = hl[nd.id];
             if (typeof val === 'object' && val !== null) {
-              nd._online = !!val.online;
-              nd._lat = val.online ? (val.latency_ms != null ? val.latency_ms + 'ms' : '<1ms') : '—';
-              nd._rx = val.online ? (val.rx || '0.0 Mb/s') : '—';
-              nd._tx = val.online ? (val.tx || '0.0 Mb/s') : '—';
+              // online=null = sin medición fresca (desconocido), no offline.
+              nd._online = val.online === null ? null : !!val.online;
+              nd._lat = nd._online === true ? (val.latency_ms != null ? val.latency_ms + 'ms' : '<1ms') : '—';
+              nd._rx = nd._online === true ? (val.rx || '0.0 Mb/s') : '—';
+              nd._tx = nd._online === true ? (val.tx || '0.0 Mb/s') : '—';
             } else {
               nd._online = !!val;
               nd._lat = nd._online ? (od?._lat || '<1ms') : '—';
@@ -555,7 +556,7 @@
 
     function _invRowHtml(d) {
       return `<tr style="border-bottom:1px solid var(--border-s);transition:background .15s" onmouseover="this.style.background='var(--surface-hover)'" onmouseout="this.style.background='transparent'">
-        <td style="padding:12px 10px;font-weight:600;color:var(--text)">${d.id} <span style="display:inline-block;margin-left:4px;width:6px;height:6px;border-radius:50%;background:${d._online || d.status === 'active' ? 'var(--green)' : 'var(--red)'}"></span></td>
+        <td style="padding:12px 10px;font-weight:600;color:var(--text)">${d.id} <span style="display:inline-block;margin-left:4px;width:6px;height:6px;border-radius:50%;background:${d._online === true || (d._online == null && d.status === 'active') ? 'var(--green)' : d._online === false ? 'var(--red)' : 'var(--text-ter)'}"></span></td>
         <td style="padding:12px 10px;font-family:var(--mono);color:var(--text-secondary)">${d.host || d.ip || d.hostname || '—'}</td>
         <td style="padding:12px 10px;color:var(--text-ter)">${d.port || 22}</td>
         <td style="padding:12px 10px;color:var(--text-secondary)"><span class="badge" style="background:#202124">${(d.driver || 'desconocido').toUpperCase()}</span></td>

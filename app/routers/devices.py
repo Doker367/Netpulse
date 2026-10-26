@@ -3,8 +3,6 @@
 CRUD endpoints para gestionar el inventario de dispositivos.
 """
 
-import asyncio
-import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -12,67 +10,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import get_current_user, requires_role, requires_scope
 from app.models.schemas import DeviceCreate, DeviceResponse, DeviceUpdate
+from app.services import device_health as health_svc
 from app.services import inventory_svc
 
 router = APIRouter(prefix="/api/devices", tags=["Devices"])
 
-# ── Caché/histéresis del health ──────────────────────────────
-# Evita parpadeos: un equipo solo pasa a OFFLINE tras N fallos
-# consecutivos y los resultados se reutilizan durante TTL segundos.
-_HEALTH_TTL = 8.0
-_HEALTH_FAILS_TO_OFFLINE = 2
-_health_cache: dict[str, tuple[float, bool, float]] = {}
-_health_fails: dict[str, int] = {}
 
-
-# ── Device Health Check (fast TCP probe, no NAPALM) ──────────
+# ── Device Health Check (TCP/ICMP, sin NAPALM) ───────────────
 # ⚠ MUST be defined BEFORE /{device_id} to avoid route collision.
-
-
-_traffic_cache: dict[str, tuple[str, str]] = {}
-_traffic_cache_time: float = 0.0
-
-
-def _get_device_traffic() -> dict[str, tuple[str, str]]:
-    """Devuelve un mapa {nombre: (rx_str, tx_str)} desde Docker stats con caché de 5s."""
-    global _traffic_cache, _traffic_cache_time
-    now = time.monotonic()
-    if now - _traffic_cache_time < 5.0 and _traffic_cache:
-        return _traffic_cache
-
-    traffic_map: dict[str, tuple[str, str]] = {}
-    import subprocess
-    try:
-        out = subprocess.check_output(
-            ["docker", "stats", "--no-stream", "--format", "{{.Name}}\t{{.NetIO}}"],
-            stderr=subprocess.DEVNULL,
-            timeout=2.0,
-        ).decode()
-        for line in out.strip().splitlines():
-            parts = line.split("\t")
-            if len(parts) == 2 and " / " in parts[1]:
-                cname = parts[0].strip()
-                rx, tx = parts[1].split(" / ")
-                traffic_map[cname] = (rx.strip(), tx.strip())
-                if cname.startswith("netpulse-"):
-                    short = cname[len("netpulse-"):]
-                    traffic_map[short] = (rx.strip(), tx.strip())
-        _traffic_cache = traffic_map
-        _traffic_cache_time = now
-    except Exception:
-        pass
-    return _traffic_cache
-
-
-def _lookup_traffic(dev_id: str) -> tuple[str, str]:
-    """Busca el tráfico rx/tx de un dispositivo online."""
-    tmap = _get_device_traffic()
-    prefix = dev_id.split("-")[0]
-    candidates = [dev_id, f"netpulse-{dev_id}", prefix, f"netpulse-{prefix}", dev_id.replace("_", "-")]
-    for c in candidates:
-        if c in tmap:
-            return tmap[c]
-    return ("0.0 Mb/s", "0.0 Mb/s")
+# La lógica vive en app/services/device_health.py: TTL por equipo, sondeo
+# incremental acotado y refresco de fondo.
 
 
 @router.get("/health")
@@ -82,11 +29,20 @@ async def device_health(
 ):
     """Quick health check: which devices are online?
 
-    Uses a fast TCP connect (2 s timeout) or ICMP ping.
-    Returns ``{device_id: {"online": bool, "latency_ms": float | null, "rx": str, "tx": str}, ...}``
-    o ``{device_id: bool, ...}`` si ``simple=true``.
+    Sonda TCP (o ICMP en equipos SNMP) con TTL por equipo. Respuesta:
 
-    Aplica caché corta + histéresis para que el estado no parpadee.
+    ``{device_id: {"online": bool | null, "latency_ms": float | null,
+    "rx": str, "tx": str, "checked_at": ISO-8601 | null, "stale": bool}, ...}``
+
+    - ``online=true``: sondeo dentro del TTL y respondió.
+    - ``online=false``: dos fallos consecutivos dentro del TTL.
+    - ``online=null``: sin medición fresca (``stale=true``) o no medible
+      (DNS, sin permiso ICMP). **Nunca se devuelve verde con datos viejos.**
+
+    Con ``simple=true`` devuelve ``{device_id: bool}``; un equipo desconocido
+    se representa como ``false`` (conservador, nunca un falso verde).
+
+    ``rx``/``tx`` son informativos (docker stats) y no afectan al estado.
     This endpoint is **public** (no auth required).
     """
     devices = inventory_svc.list_devices()
@@ -96,113 +52,7 @@ async def device_health(
         if not devices:
             raise HTTPException(404, f"Dispositivo '{device_id}' no encontrado")
 
-    now = time.monotonic()
-    result: dict = {}
-    to_probe = []
-    is_simple = (simple is True)
-    for d in devices:
-        did = d["id"]
-        cached = _health_cache.get(did)
-        if cached and now - cached[0] < _HEALTH_TTL:
-            online, lat, rx, tx = cached[1], cached[2], cached[3], cached[4]
-            result[did] = online if is_simple else {
-                "online": online,
-                "latency_ms": lat if online else None,
-                "rx": rx,
-                "tx": tx,
-            }
-        else:
-            to_probe.append(d)
-
-    if to_probe:
-        probes = await asyncio.gather(
-            *(_probe_device(d, timeout=2.5) for d in to_probe),
-            return_exceptions=True,
-        )
-        for d, res in zip(to_probe, probes):
-            did = d["id"]
-            if isinstance(res, tuple):
-                ok, lat = res
-            elif res is True:
-                ok, lat = True, 1.0
-            else:
-                ok, lat = False, 0.0
-
-            if ok:
-                _health_fails[did] = 0
-                online = True
-                rx, tx = _lookup_traffic(did)
-            else:
-                _health_fails[did] = _health_fails.get(did, 0) + 1
-                if _health_fails[did] >= _HEALTH_FAILS_TO_OFFLINE:
-                    online = False
-                    lat = 0.0
-                    rx, tx = "—", "—"
-                else:
-                    # Primer fallo: mantener el último estado conocido
-                    prev = _health_cache.get(did, (0.0, False, 0.0, "—", "—"))
-                    online = prev[1]
-                    lat = prev[2]
-                    rx = prev[3] if len(prev) > 3 else "—"
-                    tx = prev[4] if len(prev) > 4 else "—"
-
-            _health_cache[did] = (now, online, lat, rx, tx)
-            result[did] = online if is_simple else {
-                "online": online,
-                "latency_ms": lat if online else None,
-                "rx": rx,
-                "tx": tx,
-            }
-
-    return result
-
-
-async def _probe_device(dev: dict, timeout: float = 2.5) -> tuple[bool, float]:
-    """Sondea la conectividad del dispositivo según su protocolo y mide latencia real."""
-    import re
-    import sys
-    host = dev.get("hostname", "")
-    port = int(dev.get("port", 22))
-    protocol = (dev.get("protocol") or "").lower()
-    driver = (dev.get("driver") or "").lower()
-
-    if protocol == "snmp" or driver == "snmp" or port == 161:
-        # ICMP Ping probe (1 paquete rápido para medir RTT)
-        ping_args = ["ping", "-c", "1", "-t", "2", host] if sys.platform == "darwin" else ["ping", "-c", "1", "-W", "2", host]
-        start = time.monotonic()
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *ping_args,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.DEVNULL,
-            )
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-            if proc.returncode == 0:
-                out = stdout.decode("utf-8", errors="ignore")
-                m = re.search(r"time[=<]([\d.]+)\s*ms", out)
-                latency = float(m.group(1)) if m else round((time.monotonic() - start) * 1000, 1)
-                return True, max(0.1, latency)
-        except Exception:
-            pass
-        return False, 0.0
-
-    return await _tcp_check(host, port, timeout=timeout)
-
-
-async def _tcp_check(host: str, port: int, timeout: float = 2.0) -> tuple[bool, float]:
-    """Fast TCP-connect probe. Returns (True, latency_ms) if port is reachable."""
-    start = time.monotonic()
-    try:
-        _, writer = await asyncio.wait_for(
-            asyncio.open_connection(host, port),
-            timeout=timeout,
-        )
-        latency = round((time.monotonic() - start) * 1000, 1)
-        writer.close()
-        await writer.wait_closed()
-        return True, max(0.1, latency)
-    except (asyncio.TimeoutError, OSError, ConnectionRefusedError):
-        return False, 0.0
+    return await health_svc.collect(devices, simple=bool(simple))
 
 
 # ── CRUD Endpoints ───────────────────────────────────────────
