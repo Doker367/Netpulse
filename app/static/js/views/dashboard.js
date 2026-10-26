@@ -182,10 +182,11 @@
           if (d.id in hl) {
             const val = hl[d.id];
             if (typeof val === 'object' && val !== null) {
-              d._online = !!val.online;
-              d._lat = val.online ? (val.latency_ms != null ? val.latency_ms + 'ms' : '<1ms') : '—';
-              d._rx = val.online ? (val.rx || '0.0 Mb/s') : '—';
-              d._tx = val.online ? (val.tx || '0.0 Mb/s') : '—';
+              // online=null significa "sin medición fresca": ni verde ni rojo.
+              d._online = val.online === null ? null : !!val.online;
+              d._lat = d._online === true ? (val.latency_ms != null ? val.latency_ms + 'ms' : '<1ms') : '—';
+              d._rx = d._online === true ? (val.rx || '0.0 Mb/s') : '—';
+              d._tx = d._online === true ? (val.tx || '0.0 Mb/s') : '—';
             } else {
               d._online = !!val;
               if (!d._online) { d._lat = '—'; d._rx = '—'; d._tx = '—'; }
