@@ -571,7 +571,9 @@ def compare_reports(current: dict, baseline: dict) -> tuple[list[dict], list[str
             continue
         change_pct = (after / before - 1) * 100
         # Comparar valores evita que 30.0% exacto se vuelva 30.000000000000004.
-        if after > before * 1.30:
+        # También exigir +5 ms absolutos: en métricas de pocos ms, 30% es ruido
+        # (p. ej. 2.7 → 5.5 ms) y no una regresión operativa.
+        if after > before * 1.30 and (after - before) > 5.0:
             regressions.append(
                 {
                     "métrica": name,

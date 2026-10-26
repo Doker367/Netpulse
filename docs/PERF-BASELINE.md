@@ -112,10 +112,12 @@ PYTHONPATH=. /Users/doker/netpulse-noc/.venv/bin/python \
 ```
 
 La comparación empareja métricas por nombre y usa p95. Una métrica queda
-marcada como regresión cuando su p95 es **más de 30 % peor** que la referencia;
-el proceso termina con código 1. Un `SKIP`/`ERROR`, una métrica ausente o un
-`N` distinto se informa y no se convierte en un número inventado. Sin
-regresiones el código es 0; errores de medición producen código 2.
+marcada como regresión cuando su p95 es **más de 30 % peor** que la referencia
+**y** empeora al menos **5 ms absolutos** (para que métricas de pocos ms no
+disparen falsos positivos por ruido); el proceso termina con código 1.
+Un `SKIP`/`ERROR`, una métrica ausente o un `N` distinto se informa y no se
+convierte en un número inventado. Sin regresiones el código es 0; errores de
+medición producen código 2.
 
 Para atribuir una mejora, ejecute el mismo comando, `N` y máquina con el sistema
 lo más ocioso posible. Compare primero tras 13A y repita tras 13B, guardando un
