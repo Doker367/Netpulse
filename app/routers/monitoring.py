@@ -8,6 +8,7 @@ Cada servicio sigue en su propio puerto; esto es solo la capa de
 agregación que consume el dashboard.
 """
 
+import asyncio
 import json
 import logging
 import urllib.parse
@@ -105,18 +106,34 @@ def _targets() -> list[dict]:
 
 
 @router.get("/overview", dependencies=AUTH)
-def overview():
-    """Estado consolidado de la observabilidad + métricas clave."""
+async def overview():
+    """Estado consolidado de la observabilidad + métricas clave.
+
+    Los sondeos HTTP a los cuatro servicios y las cinco consultas a
+    Prometheus son independientes: se lanzan en paralelo fuera del event
+    loop. Antes eran secuenciales dentro de un handler síncrono, así que la
+    latencia era la suma (y con un Prometheus colgado podía llegar a ~40 s).
+    """
+    urls = (
+        f"{PROMETHEUS_URL}/-/ready",
+        f"{LOKI_URL}/ready",
+        f"{GRAFANA_URL}/api/health",
+        f"{ALERTMANAGER_URL}/-/ready",
+    )
+    probes = await asyncio.gather(*(asyncio.to_thread(_http_ok, u) for u in urls))
+    targets, *values = await asyncio.gather(
+        asyncio.to_thread(_targets),
+        *(asyncio.to_thread(_instant, q) for q in _METRICS.values()),
+    )
     return {
         "services": {
-            "prometheus": {"url": PROMETHEUS_URL, "up": _http_ok(f"{PROMETHEUS_URL}/-/ready")},
-            "loki": {"url": LOKI_URL, "up": _http_ok(f"{LOKI_URL}/ready")},
-            "grafana": {"url": GRAFANA_URL, "up": _http_ok(f"{GRAFANA_URL}/api/health")},
-            "alertmanager": {"url": ALERTMANAGER_URL,
-                             "up": _http_ok(f"{ALERTMANAGER_URL}/-/ready")},
+            "prometheus": {"url": PROMETHEUS_URL, "up": probes[0]},
+            "loki": {"url": LOKI_URL, "up": probes[1]},
+            "grafana": {"url": GRAFANA_URL, "up": probes[2]},
+            "alertmanager": {"url": ALERTMANAGER_URL, "up": probes[3]},
         },
-        "targets": _targets(),
-        "metrics": {name: _instant(q) for name, q in _METRICS.items()},
+        "targets": targets,
+        "metrics": dict(zip(_METRICS.keys(), values)),
         "links": {
             "grafana_dashboard": f"{GRAFANA_URL}{GRAFANA_DASHBOARD}?kiosk",
             "prometheus": PROMETHEUS_URL,
@@ -126,7 +143,7 @@ def overview():
 
 
 @router.get("/series", dependencies=AUTH)
-def series(
+async def series(
     query: str = Query(..., description="Consulta PromQL"),
     minutes: int = Query(60, ge=1, le=1440),
     step: str = Query("30s"),
@@ -140,7 +157,7 @@ def series(
         f"{PROMETHEUS_URL}/api/v1/query_range?"
         f"query={urllib.parse.quote(query)}&start={start}&end={end}&step={step}"
     )
-    data = _get_json(url)
+    data = await asyncio.to_thread(_get_json, url)
     if not data or data.get("status") != "success":
         return {"series": [], "error": (data or {}).get("error", "Prometheus no disponible")}
     result = data.get("data", {}).get("result", [])

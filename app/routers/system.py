@@ -3,15 +3,25 @@
 Expone métricas del servidor donde corre NetPulse y el resumen de
 recursos de todos los dispositivos (recolectado por el poller en
 segundo plano).
+
+**Regla de la casa:** ningún handler ``async`` de este router ejecuta I/O
+síncrono. ``psutil``, SQLite, ``subprocess`` y ``docker stats`` se lanzan
+con ``asyncio.to_thread`` + timeout, para no congelar el event loop (y con
+él el dashboard, el WebSocket de terminal y el resto de peticiones).
 """
 
+import asyncio
+import os
+import platform
+import re
+import subprocess
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import requires_role
-from app.services import host_metrics_svc, metrics_history_svc
+from app.services import docker_stats_svc, host_metrics_svc, metrics_history_svc
 from app.services.collectors import metrics_poller
 
 router = APIRouter(prefix="/api/system", tags=["System Metrics"])
@@ -20,8 +30,28 @@ AUTH = [Depends(JWTBearer()), Depends(requires_role("viewer"))]
 ADMIN = [Depends(JWTBearer()), Depends(requires_role("admin"))]
 
 
+def _poll_timeout() -> float:
+    """Tope de espera para un poll forzado desde HTTP."""
+    try:
+        return max(1.0, float(os.getenv("NETPULSE_SYSTEM_POLL_TIMEOUT", "120")))
+    except (TypeError, ValueError):
+        return 120.0
+
+
+async def _poll_all_async() -> dict:
+    """Ejecuta ``poll_all`` (red + NAPALM/SNMP) fuera del event loop."""
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(metrics_poller.poll_all), timeout=_poll_timeout()
+        )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(
+            504, "El ciclo de recolección superó el tiempo máximo de espera"
+        ) from exc
+
+
 @router.post("/ping", dependencies=AUTH)
-def host_ping(
+async def host_ping(
     target: str = Query(..., description="IP o hostname a sondear desde el servidor"),
     count: int = Query(3, ge=1, le=10, description="Número de paquetes ICMP"),
 ):
@@ -30,10 +60,6 @@ def host_ping(
     Mide conectividad real del NOC (server → destino), sin depender de la
     CLI de los equipos.
     """
-    import platform
-    import re
-    import subprocess
-
     system = platform.system()
     if system == "Windows":
         cmd = ["ping", "-n", str(count), "-w", "1500", target]
@@ -42,9 +68,21 @@ def host_ping(
     else:
         cmd = ["ping", "-c", str(count), "-W", "3", target]
 
+    # subprocess es bloqueante: al hilo, con cota dura incluso si el binario
+    # ignorase su propio timeout.
+    hard_timeout = count * 3 + 4
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=count * 3 + 3)
-    except (subprocess.TimeoutExpired, OSError) as exc:
+        proc = await asyncio.wait_for(
+            asyncio.to_thread(
+                subprocess.run,
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=count * 3 + 3,
+            ),
+            timeout=hard_timeout,
+        )
+    except (asyncio.TimeoutError, subprocess.TimeoutExpired, OSError) as exc:
         return {
             "target": target, "success": False, "probes_sent": count,
             "probes_received": 0, "rtt_min": 0.0, "rtt_avg": 0.0,
@@ -79,16 +117,19 @@ def host_ping(
 
 
 @router.get("/host", dependencies=AUTH)
-def host_metrics():
+async def host_metrics():
     """Métricas en vivo del servidor NetPulse (CPU, RAM, disco, red, proceso)."""
-    return host_metrics_svc.collect()
+    try:
+        return await host_metrics_svc.collect_async()
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(503, "Métricas del host no disponibles (timeout)") from exc
 
 
 @router.get("/devices", dependencies=AUTH)
-def device_metrics(refresh: bool = Query(False, description="Forzar un poll inmediato")):
+async def device_metrics(refresh: bool = Query(False, description="Forzar un poll inmediato")):
     """Recursos de todos los dispositivos (último snapshot del poller)."""
     if refresh:
-        return metrics_poller.poll_all()
+        return await _poll_all_async()
     snap = metrics_poller.snapshot()
     devices = list(snap.get("devices", {}).values())
     online = [d for d in devices if d.get("online")]
@@ -108,29 +149,43 @@ def device_metrics(refresh: bool = Query(False, description="Forzar un poll inme
 
 
 @router.post("/poll", dependencies=ADMIN)
-def poll_now():
+async def poll_now():
     """Fuerza un ciclo de recolección inmediato (host + dispositivos)."""
-    return metrics_poller.poll_all()
+    return await _poll_all_async()
 
 
 @router.get("/history", dependencies=AUTH)
-def history(
+async def history(
     hours: float = Query(6, ge=0.1, le=168, description="Ventana temporal en horas"),
     device_id: Optional[str] = Query(None, description="Limitar a un dispositivo"),
 ):
     """Historial de métricas nativo (host + dispositivos) sin Prometheus."""
-    return metrics_history_svc.overview(hours=hours, device_id=device_id)
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(
+                metrics_history_svc.overview, hours=hours, device_id=device_id
+            ),
+            timeout=20,
+        )
+    except asyncio.TimeoutError as exc:
+        raise HTTPException(504, "El historial de métricas tardó demasiado") from exc
 
 
 @router.get("/overview", dependencies=AUTH)
-def overview():
+async def overview():
     """Vista consolidada: host + resumen de dispositivos + estado del poller."""
     snap = metrics_poller.snapshot()
     devices = list(snap.get("devices", {}).values())
     online = [d for d in devices if d.get("online")]
     avg = (lambda k: round(sum(float(d.get(k, 0) or 0) for d in online) / len(online), 2)) if online else (lambda k: 0)
+    host = snap.get("host")
+    if not host:
+        try:
+            host = await host_metrics_svc.collect_async()
+        except asyncio.TimeoutError:
+            host = host_metrics_svc.last_snapshot() or {}
     return {
-        "host": snap.get("host") or host_metrics_svc.collect(),
+        "host": host,
         "poller": {
             "running": snap.get("running", False),
             "interval": snap.get("interval"),
@@ -147,3 +202,15 @@ def overview():
             "avg_latency_ms": avg("latency_ms"),
         },
     }
+
+
+@router.get("/docker", dependencies=AUTH)
+async def docker_metrics(refresh: bool = Query(False, description="Ignorar la caché corta")):
+    """Tráfico por contenedor Docker (``docker stats``) sin bloquear el loop.
+
+    Si Docker no está instalado o el daemon no responde, devuelve
+    ``available: false`` con el motivo — nunca un 500. La respuesta se sirve
+    desde una caché de ``NETPULSE_DOCKER_STATS_TTL`` segundos (8 s por
+    defecto) y el comando tiene ``NETPULSE_DOCKER_STATS_TIMEOUT`` (2 s).
+    """
+    return await docker_stats_svc.snapshot_async(refresh=refresh)
