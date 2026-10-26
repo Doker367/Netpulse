@@ -11,9 +11,11 @@ Se usa en dos lugares:
   Prometheus en cada petición.
 """
 
+import asyncio
 import logging
 import os
 import platform
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -31,6 +33,18 @@ _BOOT_TIME = psutil.boot_time()
 # Primera lectura de CPU: en algunas plataformas la primera llamada a
 # cpu_percent devuelve 0.0; un muestreo corto al importar deja el baseline listo.
 psutil.cpu_percent(interval=0.1)
+
+# ── Caché y ejecución fuera del event loop ───────────────────
+# collect() tarda ~100 ms de forma deliberada (muestra de CPU) y puede tardar
+# más si `net_connections` o un disco lento se atascan. Los endpoints del
+# dashboard lo piden en paralelo (/overview + /host), así que una caché de
+# pocos segundos evita duplicar el trabajo y un lock single-flight evita que
+# N requests concurrentes lancen N recolecciones.
+_CACHE_TTL = float(os.getenv("NETPULSE_HOST_METRICS_CACHE_TTL", "2"))
+_ASYNC_TIMEOUT = float(os.getenv("NETPULSE_HOST_METRICS_TIMEOUT", "10"))
+_cache_lock = threading.Lock()
+_cache_data: Optional[dict] = None
+_cache_at: float = 0.0
 
 
 def _get_process() -> psutil.Process:
@@ -199,6 +213,72 @@ def collect() -> dict:
     }
 
 
+def collect_cached(max_age: Optional[float] = None) -> dict:
+    """Como :func:`collect`, con caché corta y single-flight.
+
+    Args:
+        max_age: Antigüedad máxima en segundos. ``None`` usa
+            ``NETPULSE_HOST_METRICS_CACHE_TTL`` (2 s por defecto). ``0``
+            desactiva la caché.
+    """
+    global _cache_data, _cache_at
+
+    ttl = _CACHE_TTL if max_age is None else max_age
+    if ttl <= 0:
+        return collect()
+
+    now = time.monotonic()
+    cached = _cache_data
+    if cached is not None and now - _cache_at <= ttl:
+        return cached
+
+    with _cache_lock:
+        now = time.monotonic()
+        cached = _cache_data
+        if cached is not None and now - _cache_at <= ttl:
+            return cached
+        data = collect()
+        _cache_data = data
+        _cache_at = time.monotonic()
+        return data
+
+
+def last_snapshot() -> Optional[dict]:
+    """Último snapshot cacheado (puede estar vencido) o ``None``."""
+    return _cache_data
+
+
+def reset_cache() -> None:
+    """Limpia la caché (tests y cambios de configuración)."""
+    global _cache_data, _cache_at
+    with _cache_lock:
+        _cache_data = None
+        _cache_at = 0.0
+
+
+async def collect_async(
+    *, cached: bool = True, timeout: Optional[float] = None
+) -> dict:
+    """Recolecta métricas del host fuera del event loop.
+
+    ``psutil`` es síncrono (incluida una muestra de CPU de 100 ms), así que
+    se ejecuta en el executor acotado de asyncio con un timeout. Si el
+    timeout vence y hay un snapshot previo, se devuelve ese (misma forma);
+    si no, se propaga ``asyncio.TimeoutError`` para que el router responda
+    503 en lugar de un 500.
+    """
+    fn = collect_cached if cached else collect
+    wait = timeout if timeout is not None else _ASYNC_TIMEOUT
+    try:
+        return await asyncio.wait_for(asyncio.to_thread(fn), timeout=wait)
+    except asyncio.TimeoutError:
+        logger.warning("collect() de host superó %.2fs", wait)
+        stale = last_snapshot()
+        if stale is not None:
+            return stale
+        raise
+
+
 def update_prometheus(data: Optional[dict] = None) -> dict:
     """Actualiza los gauges ``netpulse_host_*`` con las métricas actuales.
 
@@ -249,3 +329,19 @@ def update_prometheus(data: Optional[dict] = None) -> dict:
     metrics_svc.netpulse_process_uptime_seconds.set(proc.get("uptime_seconds", 0) or 0)
 
     return d
+
+
+async def update_prometheus_async(
+    data: Optional[dict] = None, timeout: Optional[float] = None
+) -> dict:
+    """Igual que :func:`update_prometheus` pero fuera del event loop.
+
+    ``/api/metrics`` es ``async`` y lo scrapea Prometheus: recolectar en
+    línea bloqueaba el loop durante la muestra de CPU (~100 ms) o más si
+    ``psutil`` se atascaba.
+    """
+    if data is None:
+        # Un scrape quiere valores frescos: no reutilizar la caché del
+        # dashboard.
+        data = await collect_async(cached=False, timeout=timeout)
+    return update_prometheus(data)
