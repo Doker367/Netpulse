@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "label": "baseline-d865c0e",
+  "commit": "d865c0ebc5d4d8121241c27d9e21f1246d6549fe",
+  "fecha": "2026-10-26T23:30:22+00:00",
+  "máquina": {
+    "hostname": "dokers-MacBook-Pro.local",
+    "os": "macOS-26.6.2-arm64-arm-64bit",
+    "modelo": "MacBookPro17,1",
+    "cpu": "Apple M1",
+    "ram_gib": 16.0,
+    "python": "3.12.14"
+  },
+  "N": 500,
+  "métricas": {
+    "health_simple_cold": {
+      "estado": "OK",
+      "n": 5,
+      "p50_ms": 18.698,
+      "p95_ms": 21.092,
+      "p99_ms": 21.092,
+      "min_ms": 17.981,
+      "max_ms": 21.092,
+      "http_status": {
+        "200": 5
+      },
+      "cache": "fría; un proceso Uvicorn nuevo por muestra",
+      "instancias": 5
+    },
+    "health_simple_hot": {
+      "estado": "OK",
+      "n": 20,
+      "p50_ms": 2.31,
+      "p95_ms": 2.74,
+      "p99_ms": 3.289,
+      "min_ms": 2.024,
+      "max_ms": 3.289,
+      "http_status": {
+        "200": 20
+      },
+      "warmup": true,
+      "cache": "caliente"
+    },
+    "health_full_cold": {
+      "estado": "OK",
+      "n": 5,
+      "p50_ms": 21.808,
+      "p95_ms": 23.676,
+      "p99_ms": 23.676,
+      "min_ms": 21.616,
+      "max_ms": 23.676,
+      "http_status": {
+        "200": 5
+      },
+      "cache": "fría; un proceso Uvicorn nuevo por muestra",
+      "instancias": 5
+    },
+    "health_full_hot": {
+      "estado": "OK",
+      "n": 20,
+      "p50_ms": 4.597,
+      "p95_ms": 5.172,
+      "p99_ms": 5.37,
+      "min_ms": 4.374,
+      "max_ms": 5.37,
+      "http_status": {
+        "200": 20
+      },
+      "warmup": true,
+      "cache": "caliente"
+    },
+    "devices_list": {
+      "estado": "OK",
+      "n": 20,
+      "p50_ms": 3.642,
+      "p95_ms": 4.482,
+      "p99_ms": 4.493,
+      "min_ms": 3.259,
+      "max_ms": 4.493,
+      "http_status": {
+        "200": 20
+      },
+      "warmup": true
+    },
+    "device_put_10": {
+      "estado": "OK",
+      "n": 10,
+      "p50_ms": 315.536,
+      "p95_ms": 323.309,
+      "p99_ms": 323.309,
+      "min_ms": 286.717,
+      "max_ms": 323.309,
+      "http_status": {
+        "200": 10
+      },
+      "warmup": true,
+      "equipos": [
+        "perf-0000",
+        "perf-0001",
+        "perf-0002",
+        "perf-0003",
+        "perf-0004",
+        "perf-0005",
+        "perf-0006",
+        "perf-0007",
+        "perf-0008",
+        "perf-0009"
+      ],
+      "cambio_logico": false
+    },
+    "dashboard": {
+      "estado": "OK",
+      "n": 20,
+      "p50_ms": 1.969,
+      "p95_ms": 2.393,
+      "p99_ms": 2.447,
+      "min_ms": 1.782,
+      "max_ms": 2.447,
+      "http_status": {
+        "200": 20
+      },
+      "warmup": true
+    },
+    "core_js": {
+      "estado": "OK",
+      "n": 20,
+      "p50_ms": 1.843,
+      "p95_ms": 2.112,
+      "p99_ms": 3.106,
+      "min_ms": 1.652,
+      "max_ms": 3.106,
+      "http_status": {
+        "200": 20
+      },
+      "warmup": true
+    },
+    "event_loop_health_during_docker_stats": {
+      "estado": "SKIP",
+      "n": 0,
+      "motivo": "daemon Docker no disponible: failed to connect to the docker API at unix:///Users/doker/.colima/default/docker.sock; check if the path is correct and if the daemon is running: dial unix /Users/doker/.colima/default/docker.sock: connect: no such file or directory",
+      "trigger": "GET /api/devices/health (docker stats)"
+    }
+  },
+  "configuración": {
+    "modo": "uvicorn temporal",
+    "base_url": "temporal (eliminada)",
+    "hot_repetitions": 20,
+    "cold_repetitions": 5,
+    "request_timeout_s": 15.0,
+    "cold_cache_controlada": true,
+    "working_tree_dirty_al_medir": true,
+    "dirty_paths_al_medir": [
+      "scripts/perf_bench.py"
+    ]
+  },
+  "regresiones": [],
+  "notas_comparación": []
+}
