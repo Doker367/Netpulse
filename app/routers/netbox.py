@@ -6,6 +6,11 @@ Todos los endpoints requieren rol **admin**.
 Si NetBox no está configurado o no está disponible, devuelven 503 con un
 ``detail`` en español que explica la causa.
 
+I/O: las llamadas HTTP a NetBox usan ``httpx.AsyncClient`` (no bloquean el
+loop y no se mueven a un hilo: hacerlo sería un paso atrás). Lo que sí es
+síncrono —leer y escribir ``devices.yaml`` con PyYAML— se ejecuta en un hilo
+con tope de tiempo (tarjeta 13C), conservando la escritura atómica.
+
 Endpoints de esta tarjeta (contrato completo en ``docs/handoffs/netbox-ui.md``):
 
 - ``GET  /api/netbox/status`` → checklist previo a sincronizar (no contacta NetBox).
@@ -31,12 +36,19 @@ from app.middleware.auth import JWTBearer
 from app.middleware.rbac import get_current_user, requires_role, scope_error
 from app.models.schemas import UserRole
 from app.services.inventory_svc import invalidate_cache
+from app.utils.async_io import BlockingCallTimeout, env_timeout, run_blocking
 
 router = APIRouter(
     prefix="/api/netbox",
     tags=["NetBox"],
     dependencies=[Depends(JWTBearer()), Depends(requires_role(UserRole.ADMIN))],
 )
+
+#: Tope para leer/escribir devices.yaml (parseo/dump YAML + replace atómico).
+#: Con 500 equipos el dump ronda 100 ms; 10 s sigue siendo una red de
+#: seguridad holgada y configurable.
+_INVENTORY_IO_TIMEOUT_ENV = "NETPULSE_INVENTORY_IO_TIMEOUT_S"
+_INVENTORY_IO_TIMEOUT_S = 10.0
 
 # ── Errores estables ─────────────────────────────────────────
 
@@ -416,6 +428,34 @@ def _write_devices_yaml(data: dict) -> None:
         invalidate_cache()
 
 
+async def _read_devices_yaml_async() -> dict:
+    """``_read_devices_yaml`` fuera del event loop.
+
+    Parsear 500 equipos cuesta decenas de ms (cientos con inventarios
+    mayores) y el archivo puede estar en un disco lento: en un handler
+    ``async`` eso congela todo el loop.
+    """
+    return await run_blocking(
+        _read_devices_yaml,
+        timeout=env_timeout(_INVENTORY_IO_TIMEOUT_ENV, _INVENTORY_IO_TIMEOUT_S),
+        label="leer devices.yaml",
+    )
+
+
+async def _write_devices_yaml_async(data: dict) -> None:
+    """``_write_devices_yaml`` fuera del event loop.
+
+    La atomicidad la sigue garantizando tmp + ``os.replace`` dentro del hilo;
+    el tope solo acota cuánto espera el handler.
+    """
+    await run_blocking(
+        _write_devices_yaml,
+        data,
+        timeout=env_timeout(_INVENTORY_IO_TIMEOUT_ENV, _INVENTORY_IO_TIMEOUT_S),
+        label="escribir devices.yaml",
+    )
+
+
 def _build_local_entry(nb_dev: dict) -> dict:
     """Convierte un dispositivo de NetBox en la entrada de devices.yaml.
 
@@ -473,7 +513,16 @@ async def sync_from_netbox(request: Request):
     netbox_devices = await _netbox_paginated("/dcim/devices/")
 
     try:
-        data = _read_devices_yaml()
+        data = await _read_devices_yaml_async()
+    except BlockingCallTimeout as e:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "No se pudo leer el inventario local a tiempo: "
+                f"superó {env_timeout(_INVENTORY_IO_TIMEOUT_ENV, _INVENTORY_IO_TIMEOUT_S):g} s "
+                f"({_INVENTORY_IO_TIMEOUT_ENV}). No se aplicó ningún cambio."
+            ),
+        ) from e
     except (yaml.YAMLError, OSError) as e:
         raise HTTPException(
             status_code=500,
@@ -584,7 +633,18 @@ async def sync_from_netbox(request: Request):
     if creados or actualizados:
         data["devices"] = local_devices
         try:
-            _write_devices_yaml(data)
+            await _write_devices_yaml_async(data)
+        except BlockingCallTimeout as e:
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    "La escritura del inventario local superó "
+                    f"{env_timeout(_INVENTORY_IO_TIMEOUT_ENV, _INVENTORY_IO_TIMEOUT_S):g} s "
+                    f"({_INVENTORY_IO_TIMEOUT_ENV}); la escritura es atómica, pero "
+                    "no se puede confirmar si llegó a aplicarse. Verifica "
+                    "devices.yaml antes de reintentar."
+                ),
+            ) from e
         except OSError as e:
             raise HTTPException(
                 status_code=500,
@@ -624,7 +684,17 @@ async def push_to_netbox():
     Returns:
         dict con contadores: ``{created: N, skipped: N, errors: N}``.
     """
-    data = _read_devices_yaml()
+    try:
+        data = await _read_devices_yaml_async()
+    except BlockingCallTimeout as e:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "No se pudo leer el inventario local a tiempo: "
+                f"superó {env_timeout(_INVENTORY_IO_TIMEOUT_ENV, _INVENTORY_IO_TIMEOUT_S):g} s. "
+                "No se envió nada a NetBox."
+            ),
+        ) from e
     local_devices = data.get("devices", [])
 
     if not local_devices:
