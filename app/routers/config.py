@@ -4,10 +4,11 @@ Endpoints para backup, diff, y restauración de configuraciones.
 """
 
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import PlainTextResponse
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse, PlainTextResponse
 
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import get_current_user, partition_device_scope, requires_role, requires_scope
@@ -20,13 +21,30 @@ router = APIRouter(prefix="/api/config", tags=["Config"])
 
 # ── Backup offsite (S3/MinIO o SFTP) ────────────────────────
 
+def _offsite_response(result: dict) -> JSONResponse | dict:
+    """HTTP coherente: fallo remoto total → 502 con causa; parcial → 200 visible."""
+    if result.get("status") == "error":
+        error = result.get("error") or {}
+        detail = error.get("message") or (result.get("errors") or ["fallo offsite"])[0]
+        code = error.get("code")
+        message = f"Offsite {result.get('backend', '')}: {detail}" + (f" [{code}]" if code else "")
+        return JSONResponse(status_code=backup_offsite_svc.http_status_for(result),
+                            content={"detail": message, **result})
+    return result
+
+
 @router.get(
     "/offsite/status",
     dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
 )
-def offsite_status():
-    """Estado del destino de backup offsite."""
-    return backup_offsite_svc.status()
+def offsite_status(probe: bool = False):
+    """Estado del destino offsite.
+
+    ``probe=true`` comprueba de verdad la conexión y cuenta objetos remotos;
+    sin él no se toca la red y ``last_export`` es el último resultado real
+    (``null`` si nunca se exportó).
+    """
+    return backup_offsite_svc.status(probe=probe)
 
 
 @router.post(
@@ -37,15 +55,70 @@ def offsite_export(request: Request, device_id: Optional[str] = None):
     """Exporta backups; sin device_id solo exporta dispositivos autorizados."""
     if device_id is not None:
         requires_scope(device_id=device_id, request=request)
-        return backup_offsite_svc.export_all(device_id)
+        return _offsite_response(backup_offsite_svc.export_all(device_id))
     # export_all(None) exportaría archivos de TODOS los grupos.
     user = get_current_user(request)
     if user.get("scope_group") is None and user.get("scope_sites") is None:
-        return backup_offsite_svc.export_all(None)
+        return _offsite_response(backup_offsite_svc.export_all(None))
     allowed, rejected = partition_device_scope(request, [d["id"] for d in inventory_svc.list_devices()])
-    return {"total": len(allowed) + len(rejected), "results": [
-        {"device_id": did, "result": backup_offsite_svc.export_all(did)} for did in allowed
-    ], "errors": rejected}
+    results = [{"device_id": did, "result": backup_offsite_svc.export_all(did)} for did in allowed]
+    statuses = [row["result"].get("status") for row in results]
+    aggregate = {
+        "status": "error" if results and all(s == "error" for s in statuses)
+        else ("partial" if any(s in {"error", "partial"} for s in statuses) else "ok"),
+        "total": len(allowed) + len(rejected),
+        "results": results,
+        "errors": rejected,
+    }
+    return _offsite_response(aggregate)
+
+
+@router.post(
+    "/offsite/verify",
+    dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
+)
+def offsite_verify(request: Request, device_id: Optional[str] = None):
+    """Comprueba que los backups locales existen en el destino y coinciden."""
+    if device_id is not None:
+        requires_scope(device_id=device_id, request=request)
+    elif get_current_user(request).get("scope_group") is not None or \
+            get_current_user(request).get("scope_sites") is not None:
+        raise HTTPException(
+            403,
+            "La verificación offsite compara todos los backups locales; "
+            "indica device_id para un alcance restringido",
+        )
+    return _offsite_response(backup_offsite_svc.verify_all(device_id))
+
+
+@router.post(
+    "/offsite/restore",
+    dependencies=[Depends(JWTBearer()), Depends(requires_role("admin"))],
+)
+def offsite_restore(request: Request, dest: Optional[str] = None,
+                    device_id: Optional[str] = None, overwrite: bool = False):
+    """Restaura desde el destino a un subdirectorio del directorio configurado.
+
+    ``dest`` es un nombre relativo bajo ``NETPULSE_OFFSITE_RESTORE_DIR``
+    (por defecto ``backups/restored``). No se aceptan rutas absolutas ni
+    ``..``: la restauración no puede escribir fuera de ese árbol.
+    """
+    if device_id is not None:
+        requires_scope(device_id=device_id, request=request)
+    base = Path(backup_offsite_svc.RESTORE_DIR).resolve()
+    if dest:
+        candidate = Path(dest)
+        if candidate.is_absolute() or ".." in candidate.parts:
+            raise HTTPException(400, "dest debe ser un subdirectorio relativo sin '..'")
+        target = (base / candidate).resolve()
+        if target != base and base not in target.parents:
+            raise HTTPException(400, "dest fuera del directorio de restauración")
+    else:
+        target = base
+    result = backup_offsite_svc.restore_all(
+        device_id=device_id, dest_dir=target, overwrite=overwrite
+    )
+    return _offsite_response(result)
 
 
 @router.post(
