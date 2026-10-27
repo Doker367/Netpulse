@@ -136,7 +136,8 @@ def test_docker_cache_configurable_a_cero(tmp_path, monkeypatch):
 def test_docker_timeout_devuelve_estado_no_excepcion(tmp_path, monkeypatch):
     monkeypatch.setenv(
         "PATH",
-        _fake_docker(tmp_path, "exec sleep 2\n"),  # exec: un solo proceso, se puede matar
+        _fake_docker(tmp_path, "exec /bin/sleep 2\n")
+        + ":/usr/bin:/bin",  # /bin/sleep sigue disponible en Linux y macOS
     )
     monkeypatch.setenv("NETPULSE_DOCKER_STATS_TIMEOUT", "0.2")
     started = time.monotonic()
