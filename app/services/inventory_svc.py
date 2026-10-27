@@ -5,12 +5,16 @@ CRUD operations on devices.yaml. Passwords stored in config
 
 Desde Fase 2, la lectura del YAML se cachea en memoria (firma por
 mtime/tamaño) para que cada operación NAPALM/netmiko no re-parseé el
-archivo. Las escrituras invalidan la caché y son atómicas (tmp + rename).
+archivo. Las escrituras son atómicas (tmp + rename) y dejan la caché
+apuntando al contenido recién escrito, para no reparsear el YAML entero
+después de cada update (tarjeta 13A). Cualquier cambio externo sigue
+invalidando por firma.
 """
 
 import copy
 import os
 import tempfile
+import threading
 from typing import Optional
 
 import yaml
@@ -33,6 +37,19 @@ _cache_signature: Optional[tuple] = None
 _cache_data: Optional[dict] = None
 _last_read_error: Optional[str] = None
 
+# Serializa las secuencias leer-modificar-escribir dentro del proceso. Sin
+# este cerrojo dos PUT concurrentes podían perder el cambio del otro (ambos
+# partían de la misma copia). No protege entre workers: si se despliegan
+# varios procesos con el mismo devices.yaml, el último replace gana (igual
+# que antes); el archivo nunca queda a medias porque sigue siendo atómico.
+_lock = threading.RLock()
+
+# PyYAML con libyaml (CSafe*) produce exactamente el mismo YAML que las
+# clases puras pero 4-9× más rápido. Si el entorno no trae libyaml, se usa
+# el dumper/loader puro sin cambiar el contrato.
+_Loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+_Dumper = getattr(yaml, "CSafeDumper", yaml.SafeDumper)
+
 
 def _sanitize_for_yaml(data: dict) -> dict:
     """Convierte objetos enum/Pydantic a strings planos para yaml.safe_dump."""
@@ -51,9 +68,10 @@ def _sanitize_for_yaml(data: dict) -> dict:
 def invalidate_cache() -> None:
     """Invalida la caché de inventario (tras escrituras o en tests)."""
     global _cache_signature, _cache_data, _last_read_error
-    _cache_signature = None
-    _cache_data = None
-    _last_read_error = None
+    with _lock:
+        _cache_signature = None
+        _cache_data = None
+        _last_read_error = None
 
 
 def inventory_health() -> tuple[bool, Optional[str]]:
@@ -81,36 +99,37 @@ def _signature() -> Optional[tuple]:
 def _read() -> dict:
     """Lee el YAML, usando la caché si el archivo no cambió."""
     global _cache_signature, _cache_data, _last_read_error
-    sig = _signature()
-    if sig is None:
-        _last_read_error = "devices.yaml no existe"
-        if _cache_data is None:
-            return DEFAULT_CONFIG
-        return _cache_data
-    if _cache_data is not None and _cache_signature == sig:
-        return _cache_data
-    try:
-        with open(DEVICES_FILE) as f:
-            data = yaml.safe_load(f) or DEFAULT_CONFIG
-    except (yaml.YAMLError, OSError) as e:
-        # Nunca dejar la app caída por un YAML corrupto a mitad de escritura
-        import logging
-        _last_read_error = str(e)
-        logging.getLogger(__name__).error("devices.yaml inválido (%s); usando caché o vacío", e)
-        return _cache_data or DEFAULT_CONFIG
-    if not isinstance(data, dict):
-        _last_read_error = "devices.yaml no contiene un objeto"
-        return _cache_data or DEFAULT_CONFIG
-    _last_read_error = None
+    with _lock:
+        sig = _signature()
+        if sig is None:
+            _last_read_error = "devices.yaml no existe"
+            if _cache_data is None:
+                return DEFAULT_CONFIG
+            return _cache_data
+        if _cache_data is not None and _cache_signature == sig:
+            return _cache_data
+        try:
+            with open(DEVICES_FILE) as f:
+                data = yaml.load(f, Loader=_Loader) or DEFAULT_CONFIG
+        except (yaml.YAMLError, OSError) as e:
+            # Nunca dejar la app caída por un YAML corrupto a mitad de escritura
+            import logging
+            _last_read_error = str(e)
+            logging.getLogger(__name__).error("devices.yaml inválido (%s); usando caché o vacío", e)
+            return _cache_data or DEFAULT_CONFIG
+        if not isinstance(data, dict):
+            _last_read_error = "devices.yaml no contiene un objeto"
+            return _cache_data or DEFAULT_CONFIG
+        _last_read_error = None
 
-    # Auto-fix ROS ports for existing devices added wrongly via SSH
-    for d in data.get("devices", []):
-        if d.get("driver") == "ros" and d.get("port") == 22:
-            d["port"] = 8728
+        # Auto-fix ROS ports for existing devices added wrongly via SSH
+        for d in data.get("devices", []):
+            if d.get("driver") == "ros" and d.get("port") == 22:
+                d["port"] = 8728
 
-    _cache_signature = sig
-    _cache_data = data
-    return data
+        _cache_signature = sig
+        _cache_data = data
+        return data
 
 
 def get_raw_devices() -> list[dict]:
@@ -123,22 +142,42 @@ def get_raw_devices() -> list[dict]:
 
 
 def _write(data: dict):
-    DEVICES_FILE.parent.mkdir(parents=True, exist_ok=True)
-    clean = _sanitize_for_yaml(data)
-    # Escritura atómica: tmp en el mismo dir + os.replace
-    fd, tmp_path = tempfile.mkstemp(dir=str(DEVICES_FILE.parent), suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w") as f:
-            yaml.safe_dump(clean, f, default_flow_style=False, allow_unicode=True)
-        os.replace(tmp_path, DEVICES_FILE)
-    except Exception:
+    """Escribe el YAML completo de forma atómica y refresca la caché.
+
+    Sigue siendo **síncrona** a propósito: la llaman endpoints sync (PUT/POST)
+    y también código async. Antes, tras escribir se invalidaba la caché y el
+    ``get_device()`` del final de ``update_device`` volvía a parsear el YAML
+    entero (~273 ms con 500 equipos). Ahora se cachea exactamente el objeto
+    saneado que se acaba de volcar, con la firma del archivo nuevo; la
+    siguiente lectura es O(1) y el archivo en disco sigue siendo la verdad
+    (cualquier cambio externo invalida por mtime/tamaño).
+    """
+    global _cache_signature, _cache_data, _last_read_error
+    with _lock:
+        DEVICES_FILE.parent.mkdir(parents=True, exist_ok=True)
+        clean = _sanitize_for_yaml(data)
+        # Escritura atómica: tmp en el mismo dir + os.replace
+        fd, tmp_path = tempfile.mkstemp(dir=str(DEVICES_FILE.parent), suffix=".tmp")
         try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
-        raise
-    finally:
-        invalidate_cache()
+            with os.fdopen(fd, "w") as f:
+                yaml.dump(
+                    clean,
+                    f,
+                    Dumper=_Dumper,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                )
+            os.replace(tmp_path, DEVICES_FILE)
+        except Exception:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            invalidate_cache()
+            raise
+        _cache_data = clean
+        _cache_signature = _signature()
+        _last_read_error = None
 
 
 def list_devices() -> list[dict]:
@@ -189,6 +228,11 @@ def get_device(device_id: str) -> Optional[dict]:
 
 def add_device(device: dict) -> dict:
     """Agrega un dispositivo al inventario."""
+    with _lock:
+        return _add_device_locked(device)
+
+
+def _add_device_locked(device: dict) -> dict:
     data = copy.deepcopy(_read())
     # Prevent duplicates
     if any(d["id"] == device["id"] for d in data.get("devices", [])):
@@ -266,6 +310,11 @@ def add_device(device: dict) -> dict:
 
 def update_device(device_id: str, updates: dict) -> Optional[dict]:
     """Actualiza un dispositivo existente."""
+    with _lock:
+        return _update_device_locked(device_id, updates)
+
+
+def _update_device_locked(device_id: str, updates: dict) -> Optional[dict]:
     data = copy.deepcopy(_read())
     for i, d in enumerate(data.get("devices", [])):
         if d["id"] == device_id:
@@ -293,6 +342,11 @@ def update_device(device_id: str, updates: dict) -> Optional[dict]:
 
 
 def delete_device(device_id: str) -> bool:
+    with _lock:
+        return _delete_device_locked(device_id)
+
+
+def _delete_device_locked(device_id: str) -> bool:
     data = copy.deepcopy(_read())
     original_len = len(data.get("devices", []))
     data["devices"] = [d for d in data.get("devices", []) if d["id"] != device_id]

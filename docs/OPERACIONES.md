@@ -285,6 +285,46 @@ Métricas por dispositivo que faltan (estándar NOC):
 
 ---
 
+## Probar el backup offsite
+
+El backup offsite (S3/MinIO o SFTP) se puede ensayar de punta a punta en
+local con dependencias desechables. El drill levanta un S3 compatible y un
+SFTP en puertos libres, arranca la API de este repo, exporta, verifica los
+objetos remotos, restaura a un directorio temporal y compara SHA-256. También
+prueba credenciales malas, bucket inexistente y endpoint caído.
+
+```bash
+export NETPULSE_PYTHON="$PWD/.venv/bin/python"   # venv con los requirements
+scripts/offsite_drill.sh                          # ~2-3 min; limpia al salir
+scripts/offsite_drill.sh --keep                   # guarda logs y $TMP
+scripts/offsite_drill.sh --s3-only                # o --sftp-only
+```
+
+Sale `0` solo si todo pasa; imprime `PASS=… FAIL=…` y el detalle de cada
+comprobación. El trap elimina contenedores, API, archivos del drill y
+snapshots de `config/` incluso con `Ctrl-C`. No toca los contenedores del
+laboratorio ni los backups existentes.
+
+- Imagen S3 por defecto: `versity/versitygw:latest` (S3 real sobre POSIX).
+  La imagen oficial de MinIO ya no está disponible en Docker Hub; si tienes
+  una copia local, usa `NP_DRILL_S3_IMAGE=minio/minio:latest`.
+- SFTP: `atmoz/sftp:latest`.
+- Puertos: se eligen libres y se publican solo en `127.0.0.1`; se pueden fijar
+  con `NP_DRILL_S3_PORT`, `NP_DRILL_SFTP_PORT` y `NP_DRILL_API_PORT`.
+- Contrato, variables (`NETPULSE_OFFSITE_*`), naming, manifiesto,
+  verificación, restauración, retención (no implementada) y límites:
+  [`docs/handoffs/backups-offsite.md`](handoffs/backups-offsite.md).
+
+Para una configuración real, el endpoint y las credenciales se pasan por
+entorno a la API (`NETPULSE_OFFSITE_ENABLED=true`, `NETPULSE_OFFSITE_BACKEND`
+`s3|sftp` y el bloque `NETPULSE_OFFSITE_S3_*` o `NETPULSE_OFFSITE_SFTP_*`).
+`GET /api/config/offsite/status?probe=true` comprueba la conexión y lista los
+objetos; sin `probe` no toca la red. `POST /api/config/offsite/verify` compara
+los backups locales con lo publicado y `POST /api/config/offsite/restore`
+restaura bajo `NETPULSE_OFFSITE_RESTORE_DIR` (por defecto `backups/restored`).
+
+---
+
 ## Smoke completo
 
 Con el laboratorio FRR/RouterOS levantado (SSH en 2222–2225), la API

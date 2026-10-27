@@ -4,6 +4,8 @@ Expone el endpoint /api/metrics en formato texto de Prometheus.
 Endpoint público (sin autenticación) para que Prometheus pueda scrape.
 """
 
+import asyncio
+
 from fastapi import APIRouter
 from fastapi.responses import Response
 from prometheus_client import generate_latest, REGISTRY
@@ -22,7 +24,11 @@ async def metrics():
     antes de serializar para que el scrape siempre vea datos actuales.
     """
     try:
-        host_metrics_svc.update_prometheus()
+        # psutil es síncrono (~100 ms de muestra de CPU): fuera del loop.
+        await host_metrics_svc.update_prometheus_async()
+    except asyncio.TimeoutError:
+        # Prometheus seguirá viendo los últimos gauges publicados.
+        pass
     except Exception:
         pass
     return Response(

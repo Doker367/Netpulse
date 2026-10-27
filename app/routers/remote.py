@@ -21,6 +21,7 @@ from app.middleware.auth import JWTBearer
 from app.middleware.rbac import requires_role
 from app.models.remote_schemas import RemoteIngestIn
 from app.services.remote import ingest_svc, query_svc, store
+from app.utils.async_io import BlockingCallTimeout, env_timeout, run_blocking
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/remote", tags=["Remote Collectors"])
@@ -28,6 +29,11 @@ router = APIRouter(prefix="/api/remote", tags=["Remote Collectors"])
 VIEWER = [Depends(JWTBearer()), Depends(requires_role("viewer"))]
 MAX_BODY_BYTES = 1024 * 1024
 MAX_SAMPLES = 500
+
+#: Tope de una ingesta completa (SQLite + validación de inventario). Un lote
+#: normal tarda decenas de ms; 20 s es una red de seguridad, no el caso real.
+_INGEST_TIMEOUT_ENV = "NETPULSE_REMOTE_INGEST_TIMEOUT_S"
+_INGEST_TIMEOUT_S = 20.0
 
 
 def collector_auth(request: Request) -> dict[str, Any]:
@@ -120,12 +126,26 @@ async def ingest(
         )
 
     try:
-        return ingest_svc.ingest(
+        # SQLite + lectura del inventario en un hilo: la idempotencia y el
+        # orden los garantiza la clave única/transacción del store, no el
+        # hilo. Solo cambia dónde corre, no lo que hace.
+        return await run_blocking(
+            ingest_svc.ingest,
             collector["site_id"],
             collector["collector_id"],
             payload,
+            timeout=env_timeout(_INGEST_TIMEOUT_ENV, _INGEST_TIMEOUT_S),
+            label=f"ingesta del colector {collector['collector_id']}",
             remote_addr=request.client.host if request.client else None,
         )
+    except BlockingCallTimeout as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=(
+                "La ingesta superó el tiempo máximo de espera; "
+                "reintenta el lote (es idempotente)"
+            ),
+        ) from exc
     except store.RemoteStoreUnavailable as exc:
         raise HTTPException(
             status_code=503,

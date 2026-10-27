@@ -1,5 +1,8 @@
 """NetPulse — FastAPI Application."""
 
+import asyncio
+import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -21,6 +24,9 @@ from app.models.schemas import HealthResponse
 from app.routers import devices, facts, config, bulk, audit, auth, netbox, command, metrics as metrics_router, templates, compliance, notifications, groups, export, scheduler, admin_users, prometheus_proxy, alerts, alerts_admin, topology, traceroute, traffic, ops, security_ext, integrations, collectors, system, monitoring, ai, terminal, firewall, sftp
 from app.routers import discovery, reports, remote
 from app.services.inventory_svc import list_devices
+from app.utils.async_io import BlockingCallTimeout, env_timeout, run_blocking
+
+logger = logging.getLogger(__name__)
 
 # ── Redacción de secretos en logs ───────────────────────────
 # Debe instalarse antes de que uvicorn registre el upgrade del WebSocket de
@@ -38,6 +44,13 @@ async def lifespan(app: FastAPI):
         from app.services.inventory_svc import add_lab_devices
         add_lab_devices()
         print("📦 Lab inventory initialized with 5 devices")
+
+    # Calentar el contador de /api/health: la primera petición no paga la
+    # lectura del inventario (y el loop nunca la espera).
+    try:
+        await _devices_configured()
+    except Exception as e:  # noqa: BLE001 — nunca impedir el arranque
+        print(f"⚠️ No se pudo calentar el contador de health: {e}")
 
     # Arrancar collector syslog (si está habilitado)
     from app.core.settings import SYSLOG_ENABLED
@@ -99,6 +112,12 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
+    # Executor propio de SFTP (hilos de transferencia).
+    try:
+        sftp.shutdown_executor()
+    except Exception:
+        pass
+
 
 app = FastAPI(
     title=API_TITLE,
@@ -140,13 +159,86 @@ app.add_middleware(MetricsMiddleware)
 
 # ── Health ──────────────────────────────────────────────────
 
+# ``/api/health`` es el canario de todo el sistema (balanceadores, Prometheus,
+# el propio banco de rendimiento). Antes llamaba ``list_devices()`` en línea:
+# con la caché fría eso parsea devices.yaml (50–75 ms medidos con 500 equipos,
+# y cientos de ms con inventarios mayores) y bloquea el loop justo cuando más
+# se le consulta. Ahora:
+#
+# - la lectura corre en un hilo (``run_blocking``), nunca en el loop;
+# - el resultado se cachea ``NETPULSE_HEALTH_COUNT_TTL_S`` segundos (5 por
+#   defecto) con *single-flight*: N health concurrentes lanzan una lectura;
+# - si el valor está vencido pero existe, se devuelve al instante y la
+#   lectura se refresca en segundo plano.
+_HEALTH_COUNT_TTL_ENV = "NETPULSE_HEALTH_COUNT_TTL_S"
+_HEALTH_COUNT_TTL_S = 5.0
+_HEALTH_COUNT_TIMEOUT_ENV = "NETPULSE_HEALTH_COUNT_TIMEOUT_S"
+_HEALTH_COUNT_TIMEOUT_S = 2.0
+
+_health_count: int | None = None
+_health_count_at = 0.0
+# ``(loop, task)``: el task se reutiliza solo en el mismo event loop (los
+# tests crean un loop por TestClient; un task de otro loop no se puede await).
+_health_count_task: tuple[asyncio.AbstractEventLoop, asyncio.Task] | None = None
+
+
+def reset_health_cache() -> None:
+    """Limpia la caché del contador de health (tests y banco de rendimiento)."""
+    global _health_count, _health_count_at, _health_count_task
+    _health_count = None
+    _health_count_at = 0.0
+    _health_count_task = None
+
+
+async def _read_device_count() -> int:
+    """Cuenta dispositivos fuera del loop; nunca lanza (health es vital)."""
+    global _health_count, _health_count_at
+    try:
+        count = await run_blocking(
+            lambda: len(list_devices()),
+            timeout=env_timeout(_HEALTH_COUNT_TIMEOUT_ENV, _HEALTH_COUNT_TIMEOUT_S),
+            label="contar dispositivos para /api/health",
+        )
+    except BlockingCallTimeout as exc:
+        logger.warning("[health] inventario no leído a tiempo: %s", exc)
+        return _health_count if _health_count is not None else 0
+    except Exception as exc:  # noqa: BLE001 — el health no puede caerse
+        logger.warning("[health] no se pudo leer el inventario: %s", exc)
+        return _health_count if _health_count is not None else 0
+    _health_count = count
+    _health_count_at = time.monotonic()
+    return count
+
+
+async def _devices_configured() -> int:
+    """Número de dispositivos para ``/api/health``, sin bloquear el loop."""
+    global _health_count_task
+
+    ttl = env_timeout(_HEALTH_COUNT_TTL_ENV, _HEALTH_COUNT_TTL_S)
+    if _health_count is not None and time.monotonic() - _health_count_at <= ttl:
+        return _health_count
+
+    loop = asyncio.get_running_loop()
+    current = _health_count_task
+    if current is None or current[0] is not loop or current[1].done():
+        _health_count_task = (loop, asyncio.create_task(_read_device_count()))
+    task = _health_count_task[1]
+
+    if _health_count is None:
+        # Primera petición tras el arranque: hay que esperar la lectura
+        # (fuera del loop, así que el resto de peticiones sigue vivo).
+        return await asyncio.shield(task)
+
+    # Valor vencido: responder ya con el último conocido y refrescar detrás.
+    return _health_count
+
 
 @app.get("/api/health", response_model=HealthResponse, tags=["Health"])
 @limiter.limit("10/minute")  # Stricter limit for health checks
 async def health(request: Request):
     return HealthResponse(
         status="healthy",
-        devices_configured=len(list_devices()),
+        devices_configured=await _devices_configured(),
     )
 
 
