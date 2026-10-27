@@ -18,6 +18,12 @@ Notas de conexión:
   el *kex* SSH. RouterOS del laboratorio tarda 8–26 s en negociarlo, así que
   el default es 30 s (``NETPULSE_SFTP_CONNECT_TIMEOUT_S``). Un kex incompleto
   se clasifica como negociación fallida, **nunca** como credenciales.
+- **Ningún handler ``async`` abre SSH en línea** (tarjeta 13C). Conectar y
+  transferir corre en un executor *propio y acotado*
+  (``NETPULSE_SFTP_WORKERS``, 4 hilos) para no consumir el pool compartido
+  del loop con transferencias largas. La espera tiene un tope duro de
+  ``connect + NETPULSE_SFTP_TRANSFER_TIMEOUT_S``. Si vence, se responde 504
+  honesto; el hilo termina cuando su socket timeout de paramiko lo corta.
 """
 
 import errno
@@ -26,6 +32,8 @@ import logging
 import os
 import socket
 import stat
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
@@ -33,6 +41,7 @@ from fastapi.responses import StreamingResponse
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import requires_role, requires_scope
 from app.services import napalm_svc
+from app.utils.async_io import BlockingCallTimeout, env_timeout, run_blocking
 
 logger = logging.getLogger(__name__)
 
@@ -88,12 +97,64 @@ def _connect_timeout_s() -> float:
     Default 30 s. Valores no numéricos o ``<= 0`` vuelven al default (mismo
     criterio que ``app/routers/terminal.py``).
     """
-    raw = os.getenv(_CONNECT_TIMEOUT_ENV, "")
-    try:
-        value = float(raw)
-    except (TypeError, ValueError):
-        return _CONNECT_TIMEOUT_S
-    return value if value > 0 else _CONNECT_TIMEOUT_S
+    return env_timeout(_CONNECT_TIMEOUT_ENV, _CONNECT_TIMEOUT_S)
+
+
+# ── Executor acotado para SSH/SFTP ──────────────────────────
+# Las transferencias pueden durar minutos: si usaran el executor por defecto
+# del loop (compartido con health, auditoría, métricas…) acabarían sin hilos
+# disponibles. Aquí el cupo es fijo y explícito.
+
+_TRANSFER_TIMEOUT_ENV = "NETPULSE_SFTP_TRANSFER_TIMEOUT_S"
+_TRANSFER_TIMEOUT_S = 120.0
+_WORKERS_ENV = "NETPULSE_SFTP_WORKERS"
+_WORKERS = 4
+
+_pool: ThreadPoolExecutor | None = None
+_pool_lock = threading.Lock()
+
+
+def _executor() -> ThreadPoolExecutor:
+    """Executor perezoso y acotado para conectar/transferir por SFTP."""
+    global _pool
+    with _pool_lock:
+        if _pool is None:
+            workers = int(env_timeout(_WORKERS_ENV, float(_WORKERS)))
+            _pool = ThreadPoolExecutor(
+                max_workers=max(1, workers), thread_name_prefix="np-sftp"
+            )
+        return _pool
+
+
+def shutdown_executor() -> None:
+    """Cierra el executor (tests y shutdown ordenado)."""
+    global _pool
+    with _pool_lock:
+        if _pool is not None:
+            _pool.shutdown(wait=False, cancel_futures=True)
+            _pool = None
+
+
+def _transfer_timeout_s() -> float:
+    """Tope del trabajo tras el kex (``NETPULSE_SFTP_TRANSFER_TIMEOUT_S``)."""
+    return env_timeout(_TRANSFER_TIMEOUT_ENV, _TRANSFER_TIMEOUT_S)
+
+
+def _op_deadline_s() -> float:
+    """Tope duro de la operación completa: kex + transferencia/listado."""
+    return _connect_timeout_s() + _transfer_timeout_s()
+
+
+def _deadline_error(device_id: str, action: str, target: str) -> HTTPException:
+    """504 cuando la operación SFTP completa supera el tope duro."""
+    return HTTPException(
+        status_code=504,
+        detail=(
+            f"Tiempo de espera agotado {action} {target} en {device_id}: "
+            f"la operación SFTP superó {_op_deadline_s():g} s. "
+            f"Revisa la red o sube {_TRANSFER_TIMEOUT_ENV}."
+        ),
+    )
 
 
 # ── Resolución de puerto SSH ────────────────────────────────
@@ -546,15 +607,15 @@ def _get_ssh_client_and_sftp(device_id: str):
 
 
 # ── Endpoints ───────────────────────────────────────────────
+#
+# El cuerpo de cada operación vive en una función **síncrona** (``_*_sync``):
+# la conexión paramiko y la transferencia se ejecutan en el executor SFTP y
+# el handler ``async`` solo espera. Así el event loop sigue atendiendo health,
+# dashboard y el WebSocket de terminal mientras dura la operación.
 
 
-@router.get("/{device_id}/list")
-def list_remote_directory(device_id: str, path: str = Query("/", description="Ruta remota a listar")):
-    """Lista el contenido de un directorio remoto en el dispositivo.
-
-    Un fallo de conexión/lectura devuelve 4xx/5xx con ``detail``; un
-    directorio vacío legítimo devuelve 200 con ``items: []``.
-    """
+def _list_sync(device_id: str, path: str) -> dict:
+    """Lista un directorio remoto (bloqueante; llamar desde un hilo)."""
     client, sftp = _get_ssh_client_and_sftp(device_id)
     try:
         remote_path = path.strip() or "/"
@@ -594,27 +655,37 @@ def list_remote_directory(device_id: str, path: str = Query("/", description="Ru
         _safe_close(sftp, client)
 
 
-@router.post("/{device_id}/upload")
-async def upload_file_to_device(
-    device_id: str,
-    request: Request,
-    filename: str = Query(..., description="Nombre del archivo a guardar"),
-    remote_dir: str = Query("/", description="Directorio remoto de destino"),
-):
-    """Sube un archivo desde la máquina local al dispositivo de red vía SFTP.
+@router.get("/{device_id}/list")
+async def list_remote_directory(device_id: str, path: str = Query("/", description="Ruta remota a listar")):
+    """Lista el contenido de un directorio remoto en el dispositivo.
 
-    Es una mutación: un token con scope debe pertenecer al grupo real del
-    equipo antes de que se abra la sesión SSH.
+    Un fallo de conexión/lectura devuelve 4xx/5xx con ``detail``; un
+    directorio vacío legítimo devuelve 200 con ``items: []``.
     """
-    requires_scope(device_id=device_id, request=request)
+    try:
+        return await run_blocking(
+            _list_sync,
+            device_id,
+            path,
+            timeout=_op_deadline_s(),
+            executor=_executor(),
+            label=f"listar {path or '/'} en {device_id}",
+        )
+    except BlockingCallTimeout as exc:
+        raise _deadline_error(device_id, "al listar", path.strip() or "/") from exc
+
+
+def _upload_sync(
+    device_id: str, filename: str, remote_dir: str, content: bytes
+) -> dict:
+    """Sube ``content`` al dispositivo (bloqueante; llamar desde un hilo)."""
     client, sftp = _get_ssh_client_and_sftp(device_id)
     try:
         clean_name = os.path.basename(filename or "uploaded_file")
         clean_dir = remote_dir.rstrip("/")
         dest_path = f"{clean_dir}/{clean_name}" if clean_dir else f"/{clean_name}"
 
-        # Leer contenido enviado directamente en el cuerpo HTTP
-        content = await request.body()
+        # El cuerpo HTTP ya se leyó en el handler; aquí solo se transfiere.
         file_obj = io.BytesIO(content)
 
         try:
@@ -644,15 +715,51 @@ async def upload_file_to_device(
         _safe_close(sftp, client)
 
 
-@router.get("/{device_id}/download")
-def download_file_from_device(
+@router.post("/{device_id}/upload")
+async def upload_file_to_device(
     device_id: str,
-    remote_path: str = Query(..., description="Ruta completa del archivo remoto a descargar"),
+    request: Request,
+    filename: str = Query(..., description="Nombre del archivo a guardar"),
+    remote_dir: str = Query("/", description="Directorio remoto de destino"),
 ):
-    """Descarga un archivo desde el dispositivo de red vía SFTP."""
-    client, sftp = _get_ssh_client_and_sftp(device_id)
-    filename = os.path.basename(remote_path) or "download"
+    """Sube un archivo desde la máquina local al dispositivo de red vía SFTP.
 
+    Es una mutación: un token con scope debe pertenecer al grupo real del
+    equipo antes de que se abra la sesión SSH.
+    """
+    # RBAC/scope en el loop: es O(1) sobre el inventario cacheado y rechaza
+    # antes de consumir el cuerpo y de abrir una conexión.
+    requires_scope(device_id=device_id, request=request)
+
+    # Leer contenido enviado directamente en el cuerpo HTTP (async).
+    content = await request.body()
+
+    try:
+        return await run_blocking(
+            _upload_sync,
+            device_id,
+            filename,
+            remote_dir,
+            content,
+            timeout=_op_deadline_s(),
+            executor=_executor(),
+            label=f"subir {filename or 'archivo'} a {device_id}",
+        )
+    except BlockingCallTimeout as exc:
+        raise _deadline_error(
+            device_id, "al subir", os.path.basename(filename or "uploaded_file")
+        ) from exc
+
+
+def _download_stat_sync(device_id: str, remote_path: str):
+    """Abre la sesión y valida la ruta a descargar (bloqueante).
+
+    Devuelve ``(client, sftp, attr)``. El cliente se crea y se cierra en el
+    mismo flujo; el generador de streaming lo usa de forma **secuencial**
+    (Starlette itera los generadores síncronos en su threadpool, nunca en
+    paralelo), igual que hacía el handler síncrono anterior.
+    """
+    client, sftp = _get_ssh_client_and_sftp(device_id)
     try:
         # Verificar que el archivo existe y no sea un directorio
         try:
@@ -673,6 +780,31 @@ def download_file_from_device(
     except Exception:
         _safe_close(sftp, client)
         raise
+    return client, sftp, attr
+
+
+@router.get("/{device_id}/download")
+async def download_file_from_device(
+    device_id: str,
+    remote_path: str = Query(..., description="Ruta completa del archivo remoto a descargar"),
+):
+    """Descarga un archivo desde el dispositivo de red vía SFTP."""
+    filename = os.path.basename(remote_path) or "download"
+
+    try:
+        client, sftp, attr = await run_blocking(
+            _download_stat_sync,
+            device_id,
+            remote_path,
+            timeout=_op_deadline_s(),
+            executor=_executor(),
+            label=f"leer {remote_path} en {device_id}",
+            # Si el tope vence, el hilo puede terminar después con la sesión
+            # abierta: se cierra al recibirla para no dejar conexiones vivas.
+            cleanup_on_timeout=lambda result: _safe_close(result[1], result[0]),
+        )
+    except BlockingCallTimeout as exc:
+        raise _deadline_error(device_id, "al leer", remote_path) from exc
 
     def iterfile():
         try:

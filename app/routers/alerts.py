@@ -3,6 +3,12 @@
 Recibe alertas de Alertmanager (Prometheus) y las reenvía a los
 webhooks registrados en notifications_svc. También expone las
 alertas activas actuales para el dashboard.
+
+**I/O fuera del event loop** (tarjeta 13C): el webhook es ``async`` y antes
+leía las ventanas de mantenimiento (JSON en disco) y notificaba (webhooks
+HTTP, Telegram, Slack, SMTP) en línea. Ambas cosas se ejecutan ahora con
+``run_blocking`` (``asyncio.to_thread`` + tope de tiempo): un SMTP lento ya no
+congela el loop, y un fallo/timeout de notificación no cambia la respuesta.
 """
 
 import hmac
@@ -17,9 +23,20 @@ from app.core.settings import ALERTMANAGER_TOKEN
 from app.middleware.auth import JWTBearer
 from app.middleware.rbac import requires_role
 from app.services import notifications_svc
+from app.utils.async_io import BlockingCallTimeout, env_timeout, run_blocking
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/alerts", tags=["Alerts"])
+
+#: Tope para leer las ventanas de mantenimiento (JSON local, milisegundos).
+_WINDOWS_TIMEOUT_ENV = "NETPULSE_ALERT_WINDOWS_TIMEOUT_S"
+_WINDOWS_TIMEOUT_S = 5.0
+
+#: Tope para UNA notificación (varios webhooks + canales externos, cada uno
+#: con su propio timeout de red). Si vence, se registra y se sigue: la
+#: respuesta al webhook no depende de la entrega.
+_NOTIFY_TIMEOUT_ENV = "NETPULSE_ALERT_NOTIFY_TIMEOUT_S"
+_NOTIFY_TIMEOUT_S = 60.0
 
 
 async def alertmanager_auth(
@@ -132,9 +149,23 @@ async def alertmanager_webhook(request: Request):
     delivered = 0
     suppressed = 0
 
-    # Cargar ventanas de mantenimiento una sola vez
+    # Cargar ventanas de mantenimiento una sola vez (fuera del loop). Si el
+    # disco falla o tarda, se degrada a "sin ventanas": la alerta se entrega
+    # (mejor duplicar que silenciar) y se registra el motivo.
     from app.services.ops import maintenance_svc
-    active_windows = maintenance_svc.active_windows()
+    try:
+        active_windows = await run_blocking(
+            maintenance_svc.active_windows,
+            timeout=env_timeout(_WINDOWS_TIMEOUT_ENV, _WINDOWS_TIMEOUT_S),
+            label="leer ventanas de mantenimiento",
+        )
+    except BlockingCallTimeout as exc:
+        logger.warning("[alerts] ventanas de mantenimiento no leídas a tiempo: %s", exc)
+        active_windows = []
+    except Exception as e:  # noqa: BLE001 — nunca romper el webhook por esto
+        logger.warning("[alerts] ventanas de mantenimiento no disponibles: %s", e)
+        active_windows = []
+
     suppressed_ids = {w["device_id"] for w in active_windows}
 
     for alert in alerts:
@@ -156,12 +187,17 @@ async def alertmanager_webhook(request: Request):
         event = f"alert_{severity}_{status}"
 
         try:
-            notifications_svc.notify_event(
-                event_type=event,
-                data={"title": title, "message": message, "labels": labels},
+            await run_blocking(
+                notifications_svc.notify_event,
+                event,
+                {"title": title, "message": message, "labels": labels},
+                timeout=env_timeout(_NOTIFY_TIMEOUT_ENV, _NOTIFY_TIMEOUT_S),
+                label=f"notificar {event}",
             )
             delivered += 1
-        except Exception as e:
+        except BlockingCallTimeout as exc:
+            logger.error("[alerts] Notificación %s no terminó a tiempo: %s", event, exc)
+        except Exception as e:  # noqa: BLE001 — un canal caído no rompe el webhook
             logger.error("[alerts] Fallo al notificar: %s", e)
 
     logger.info("[alerts] Recibidas %d, entregadas %d, suprimidas %d (mantenimiento)",

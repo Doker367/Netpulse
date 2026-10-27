@@ -373,3 +373,141 @@ mucho más; en Linux/Docker el límite habitual es 1024+.
 * `scripts/perf_devices_bench.py` (nuevo): banco reproducible antes/después.
 * `tests/test_devices_perf.py` (nuevo): 12 tests de salud honesta, presupuesto,
   contrato, credenciales, atomicidad y concurrencia.
+
+---
+
+## Anexo — Últimos bloqueos del event loop (tarjeta 13C)
+
+13B sacó `psutil`, `subprocess`, SQLite y `docker stats` de los handlers
+`async`. Quedaban seis puntos con el mismo patrón. Ninguno cambia contrato,
+código de respuesta ni semántica: solo **dónde** corre el trabajo.
+
+### Qué se corrigió
+
+| Archivo | Antes (en línea en `async`) | Ahora |
+|---|---|---|
+| `app/routers/sftp.py` upload | `paramiko` connect + `putfo` dentro del handler | `run_blocking` en un **executor propio de 4 hilos** (`NETPULSE_SFTP_WORKERS`) con tope `connect + transfer` |
+| `app/routers/sftp.py` list/download | `def` síncrono (threadpool) y `stat` en el handler | `async` + `run_blocking`; el streaming sigue iterándose en el threadpool de Starlette |
+| `app/routers/alerts.py` webhook | `maintenance_svc.active_windows()` (JSON) y `notify_event()` (webhooks HTTP, Telegram, Slack, SMTP) en línea | dos `await run_blocking` con topes de 5 s / 60 s; un fallo o timeout no cambia la respuesta |
+| `app/routers/remote.py` ingest | `ingest_svc.ingest()` (SQLite + inventario) en línea | `run_blocking` con tope de 20 s; la idempotencia sigue en la clave única y la transacción |
+| `app/routers/netbox.py` sync/push | leer y escribir `devices.yaml` (PyYAML) en línea | `run_blocking` con tope de 10 s; escritura atómica intacta |
+| `app/main.py` `/api/health` | `len(list_devices())` en cada request (parseo en cache miss) | `to_thread` + caché de 5 s *single-flight* + valor previo servido al instante + calentado en el arranque |
+
+El HTTP a NetBox **no** se movió a un hilo a propósito: usa
+`httpx.AsyncClient`, que ya es asíncrono. Moverlo sería un paso atrás.
+
+Nuevo helper `app/utils/async_io.py` (`run_blocking` + `env_timeout`):
+
+- `asyncio.to_thread` (executor acotado por asyncio) o un `Executor` propio.
+- Tope con `asyncio.wait` **y no** `wait_for`/`except TimeoutError`: en Python
+  ≥3.10 `socket.timeout` **es** `TimeoutError`, así que `wait_for` habría
+  convertido un timeout real del equipo en "trabajo demasiado lento" y roto
+  la clasificación 401/403/502/504. Si el tope vence se lanza
+  `BlockingCallTimeout`; las excepciones de la función se propagan sin
+  envolver.
+
+### Configuración (todo por entorno)
+
+| Variable | Default | Efecto |
+|---|---|---|
+| `NETPULSE_SFTP_CONNECT_TIMEOUT_S` | `30` | kex/SSH (ya existía, sin cambios) |
+| `NETPULSE_SFTP_TRANSFER_TIMEOUT_S` | `120` | trabajo tras el kex; el tope duro es `connect + transfer` |
+| `NETPULSE_SFTP_WORKERS` | `4` | hilos del executor SFTP (fijo, no crece con la carga) |
+| `NETPULSE_ALERT_WINDOWS_TIMEOUT_S` | `5` | leer ventanas de mantenimiento |
+| `NETPULSE_ALERT_NOTIFY_TIMEOUT_S` | `60` | una notificación completa (todos sus canales) |
+| `NETPULSE_REMOTE_INGEST_TIMEOUT_S` | `20` | una ingesta |
+| `NETPULSE_INVENTORY_IO_TIMEOUT_S` | `10` | leer/escribir `devices.yaml` desde NetBox |
+| `NETPULSE_HEALTH_COUNT_TTL_S` | `5` | vida de la caché del contador de health |
+| `NETPULSE_HEALTH_COUNT_TIMEOUT_S` | `2` | tope de la lectura del inventario para health |
+
+### Qué se midió después
+
+Método: `scripts/perf_async_bench.py --mode handlers-demo`. Monta los routers
+reales en una app en memoria, sustituye **la red** por esperas de 300 ms
+(`--slow-ms`) y ejecuta el **mismo** trabajo con el patrón anterior (en línea)
+y con el actual. El hueco máximo del event loop se mide con un latido de 20 ms.
+El escenario de health usa un `devices.yaml` real de **500 equipos**
+(`--devices 500`) y fuerza un *cache miss* en cada ronda.
+
+| escenario (7 rondas) | patrón | request p50 | bloqueo máximo del loop |
+|---|---|---|---|
+| subida SFTP (putfo 300 ms) | en línea | 305,3 ms | **296,4 ms** |
+| subida SFTP (putfo 300 ms) | `run_blocking` | 306,9 ms | **13,4 ms** (rondas típicas 1–3 ms) |
+| webhook Alertmanager | en línea | 307,0 ms | **300,1 ms** |
+| webhook Alertmanager | `run_blocking` | 311,4 ms | **8,6 ms** |
+| `/api/health` cache miss (500 equipos) | en línea | 74,4 ms | **73,9 ms** |
+| `/api/health` cache miss (500 equipos) | `to_thread` + caché | 60,3 ms | **47,0 ms** (techo del GIL, ver límites) |
+| `/api/health` caché caliente | — | 0,8 ms | **1,7 ms** |
+
+API real (`--mode health`: uvicorn, 50 peticiones secuenciales, inventario de
+laboratorio de 5 equipos):
+
+| métrica | valor |
+|---|---|
+| `GET /api/health` p50 | **2,6 ms** |
+| p95 | **7,3 ms** |
+| máximo | **10,6 ms** |
+| códigos | solo `200` |
+
+La subida SFTP tarda lo mismo que antes (el trabajo sigue existiendo): lo que
+cambia es que ya no se hace en el loop. Las 20 peticiones concurrentes al
+dashboard y el WebSocket de terminal dejan de esperar 300 ms.
+
+### Límites conocidos (honestidad)
+
+- **Cancelar la espera no mata el hilo.** Si vence el tope, se responde 504 y
+  la transferencia sigue hasta que su socket timeout de paramiko la corta. Por
+  eso los topes son holgados: son una red de seguridad, no el corte normal.
+- **El executor SFTP es propio y fijo** (4 hilos): una transferencia larga no
+  consume el pool compartido de health/auditoría, pero 4 subidas simultáneas
+  hacen cola la quinta. Es deliberado (no hilos sin límite).
+- **El parseo YAML es CPU-bound y retiene el GIL.** libyaml (`CSafeLoader`) es
+  una llamada C: con 500 equipos tarda ~50–75 ms y, aunque corra en un hilo,
+  el loop puede quedarse ~45 ms esperando el GIL. Un hilo no arregla trabajo
+  CPU-bound; lo que sí lo arregla es no hacerlo en régimen normal: health
+  cachea 5 s, calienta el contador en el arranque y sirve el valor anterior
+  mientras refresca. Con 5000 equipos el parseo ronda 600 ms y el hueco del
+  GIL sería mayor: haría falta un subproceso o un inventario incremental.
+- **`/api/health` puede dar un `devices_configured` de hasta 5 s de antigüedad**
+  (`NETPULSE_HEALTH_COUNT_TTL_S`). Es el intercambio por responder en ~1 ms;
+  el número real se refresca en segundo plano.
+- **Las notificaciones se envían en serie**, igual que antes: N alertas ×
+  notificación es tiempo aditivo (no bloquea el loop, pero el webhook tarda).
+  Si una notificación supera su tope, se registra y se sigue; el hilo puede
+  terminar enviándola igualmente (mejor duplicar que silenciar).
+- **Timeout de escritura de `devices.yaml`**: la escritura es atómica y nunca
+  deja el YAML a medias, pero si el tope vence el 504 lo dice explícitamente:
+  no se puede confirmar si llegó a aplicarse.
+- **`requires_scope` sigue leyendo el inventario en el loop** antes de abrir
+  SSH (una entrada cacheada: stat + O(1)). Moverlo a un hilo cambiaría el
+  orden de errores (RBAC antes de consumir el cuerpo) y pertenece a auth, fuera
+  del alcance de esta tarjeta.
+- **NetBox push es secuencial**: cada POST espera al anterior. No bloquea el
+  loop, pero la latencia es la suma. No se paralelizó para no cambiar el orden
+  de creación ni el recuento de errores.
+
+### Reproducir
+
+```bash
+# SFTP upload + webhook + health con inventario real de 500 equipos
+PYTHONPATH=. .venv/bin/python scripts/perf_async_bench.py --mode handlers-demo \
+    --rounds 7 --devices 500 --json /tmp/bench-13c.json
+
+# Health real contra uvicorn (50 muestras)
+PYTHONPATH=. .venv/bin/python scripts/perf_async_bench.py --mode health \
+    --rounds 5 --json /tmp/bench-health.json
+
+# Suites
+PYTHONPATH=. .venv/bin/pytest tests/ -q
+```
+
+### Tests
+
+`tests/test_event_loop_13c.py` (22 tests): SFTP listar/subir/descargar
+(incluye timeout 504 y EACCES 403), webhook (lento, fallo, ventanas lentas,
+supresión en mantenimiento), ingesta (lenta, 503 del store, timeout 504),
+NetBox (lectura/escritura de YAML y timeout), health (lectura lenta, caché
+caliente <100 ms, inventario roto) y el helper (`run_blocking` no enmascara
+`socket.timeout` y libera la sesión SSH que llega tarde).
+
+Suite completa: **468 passed** (446 previos + 22 nuevos).
