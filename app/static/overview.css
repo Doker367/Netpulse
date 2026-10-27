@@ -1,4 +1,4 @@
-/* Panel principal del NOC. Alcance deliberado: no modifica otras vistas. */
+/* Panel principal del NMS. Alcance deliberado: no modifica otras vistas. */
 #v-dashboard {
   --ops-surface: #151c23;
   --ops-raised: #1d2832;

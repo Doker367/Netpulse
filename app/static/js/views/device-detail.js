@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — detalle de equipo (modal #dp) y restos del detalle antiguo por
+ * NetPulse NMS — detalle de equipo (modal #dp) y restos del detalle antiguo por
  * pestañas (views/device-detail.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-H,

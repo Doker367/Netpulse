@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════
-   NetPulse — Design System (Linear-inspired NOC Dashboard)
+   NetPulse — Design System (Linear-inspired NMS Dashboard)
    ═══════════════════════════════════════════════════════════ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
@@ -244,7 +244,7 @@ body {
   height: 100vh
 }
 
-/* Main NOC Structure in style.css */
+/* Main NMS Structure in style.css */
 .sidebar {
   width: 260px;
   background: var(--panel);

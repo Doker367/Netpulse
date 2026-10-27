@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Sitios remotos (views/sites.js).
+ * NetPulse NMS — vista Sitios remotos (views/sites.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-D,
  * lote 4) sin cambio de comportamiento: estado `_r4Epochs` (site_id → buffer

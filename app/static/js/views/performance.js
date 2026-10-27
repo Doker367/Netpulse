@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Performance / Equipment (views/performance.js).
+ * NetPulse NMS — vista Performance / Equipment (views/performance.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-C,
  * lote 3) sin cambio de comportamiento: solo `loadPerformance`, la misma

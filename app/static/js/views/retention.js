@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Retención (views/retention.js).
+ * NetPulse NMS — vista Retención (views/retention.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-D,
  * lote 4) sin cambio de comportamiento: estado `_retPreview` (sin simulación

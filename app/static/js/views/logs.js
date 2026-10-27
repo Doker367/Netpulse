@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Logs: auditoría + Loki (views/logs.js).
+ * NetPulse NMS — vista Logs: auditoría + Loki (views/logs.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-B,
  * lote 2) sin cambio de comportamiento: switchLogSource, loadLokiLabels,

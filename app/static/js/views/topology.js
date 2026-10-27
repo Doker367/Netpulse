@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — Topología (vista #v-topology, Tarjeta 10D-J / Lote J).
+ * NetPulse NMS — Topología (vista #v-topology, Tarjeta 10D-J / Lote J).
  *
  * Extraída del <script> inline de app/static/dashboard.html SIN cambio de
  * comportamiento: el bloque viaja CONTIGUO y byte a byte en el mismo orden
@@ -253,7 +253,7 @@
       const g = _topoGraph;
 
       function step() {
-        // Repulsión O(n²) — inventarios NOC chicos
+        // Repulsión O(n²) — inventarios NMS chicos
         for (let i = 0; i < g.ns.length; i++) {
           const na = g.ns[i];
           for (let j = i + 1; j < g.ns.length; j++) {

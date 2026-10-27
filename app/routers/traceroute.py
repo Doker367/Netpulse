@@ -1,6 +1,6 @@
 """NetPulse — Traceroute Router.
 
-Ejecuta traceroutes hacia un destino desde el servidor NOC o desde un
+Ejecuta traceroutes hacia un destino desde el servidor NMS o desde un
 dispositivo del inventario, y devuelve los saltos enriquecidos con
 geolocalización (GeoIP) para dibujarlos sobre el mapa interactivo.
 
@@ -130,7 +130,7 @@ def _parse_device_traceroute(text: str) -> list[dict]:
 
 
 def _run_server_traceroute(destination: str) -> tuple[list[dict], str]:
-    """Traceroute ICMP/UDP desde el servidor NOC (subprocess)."""
+    """Traceroute ICMP/UDP desde el servidor NMS (subprocess)."""
     system = platform.system()
     if system == "Windows":
         cmd = ["tracert", "-d", "-h", str(MAX_HOPS), "-w", "2000", destination]
@@ -145,7 +145,7 @@ def _run_server_traceroute(destination: str) -> tuple[list[dict], str]:
     except FileNotFoundError:
         raise HTTPException(
             status_code=501,
-            detail="No hay binario 'traceroute' en el servidor NOC — "
+            detail="No hay binario 'traceroute' en el servidor NMS — "
             "instala el paquete 'traceroute' (o usa origen = dispositivo).",
         )
     except subprocess.TimeoutExpired:

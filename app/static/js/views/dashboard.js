@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Dashboard (portada #v-dashboard): hero, KPIs, grid de
+ * NetPulse NMS — vista Dashboard (portada #v-dashboard): hero, KPIs, grid de
  * equipos, donuts de recursos y latidos (views/dashboard.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-H,

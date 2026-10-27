@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — wizard de auto-discovery (views/discovery.js).
+ * NetPulse NMS — wizard de auto-discovery (views/discovery.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-F,
  * Lote f) tal cual, sin cambio de comportamiento: estado `let dw` +
