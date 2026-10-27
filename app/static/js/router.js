@@ -1,4 +1,4 @@
-// NetPulse NOC — Router y arranque (Lote K): accesibilidad del sidebar,
+// NetPulse NMS — Router y arranque (Lote K): accesibilidad del sidebar,
 // listeners globales (Escape, Ctrl/Cmd+K, click del menú), swView +
 // hashchange y los helpers residuales. Último <script> de la página:
 // sustituye al bloque inline del monolito sin cambiar su posición.

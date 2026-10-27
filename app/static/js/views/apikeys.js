@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista API Keys de colector (views/apikeys.js).
+ * NetPulse NMS — vista API Keys de colector (views/apikeys.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-B,
  * lote 2) sin cambio de comportamiento: showKeyForm, loadKeys, createKey

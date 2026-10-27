@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — infraestructura compartida del panel (core.js).
+ * NetPulse NMS — infraestructura compartida del panel (core.js).
  *
  * Extraído del <script> inline de app/static/dashboard.html (Tarjeta 10C,
  * paso 1 del refactor UI) sin cambio de comportamiento:

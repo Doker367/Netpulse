@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista 2FA / TOTP por usuario (views/tfa.js).
+ * NetPulse NMS — vista 2FA / TOTP por usuario (views/tfa.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-B,
  * lote 2) sin cambio de comportamiento: setup2FA y verify2FA, mismas

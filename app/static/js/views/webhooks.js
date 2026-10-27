@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Webhooks (views/webhooks.js).
+ * NetPulse NMS — vista Webhooks (views/webhooks.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-A,
  * lote 1) sin cambio de comportamiento: loadWebhooks, addWebhook,

@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Compare: comparación de configuraciones y de backups
+ * NetPulse NMS — vista Compare: comparación de configuraciones y de backups
  * (views/compare.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-G,

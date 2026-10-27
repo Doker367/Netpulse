@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Alerts: alertas activas + admin de silencios y reglas
+ * NetPulse NMS — vista Alerts: alertas activas + admin de silencios y reglas
  * (views/alerts.js). Vista más grande del tramo medio.
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-C,

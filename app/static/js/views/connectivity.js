@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Conectividad (views/connectivity.js).
+ * NetPulse NMS — vista Conectividad (views/connectivity.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-A,
  * lote 1) sin cambio de comportamiento: _pingCard + loadConn, mismas líneas

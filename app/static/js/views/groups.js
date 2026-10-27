@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Grupos de dispositivos (views/groups.js).
+ * NetPulse NMS — vista Grupos de dispositivos (views/groups.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-A,
  * lote 1) sin cambio de comportamiento: loadGroups, grpDevs, createGroup,

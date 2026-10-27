@@ -1,4 +1,4 @@
-// NetPulse NOC — Helpers compartidos (Lote K): formato de importes/tiempos,
+// NetPulse NMS — Helpers compartidos (Lote K): formato de importes/tiempos,
 // población del selector de Commands y avisos «no verificable». Contenido y
 // orden heredados del inline del monolito (la 1.ª _fmtBytes sigue sombreada
 // por la del final de router.js, trampa §7.1 del mapa: no reordenar).

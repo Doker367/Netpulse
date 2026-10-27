@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Backups: inventario de backups, backup masivo, offsite
+ * NetPulse NMS — vista Backups: inventario de backups, backup masivo, offsite
  * y scheduler (views/backups.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-G,

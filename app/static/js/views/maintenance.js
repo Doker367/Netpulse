@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Ventanas de mantenimiento (views/maintenance.js).
+ * NetPulse NMS — vista Ventanas de mantenimiento (views/maintenance.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-B,
  * lote 2) sin cambio de comportamiento: loadMaint, showMaintForm,

@@ -57,7 +57,7 @@ async def host_ping(
 ):
     """Ping ICMP desde el servidor donde corre NetPulse hacia un destino.
 
-    Mide conectividad real del NOC (server → destino), sin depender de la
+    Mide conectividad real del NMS (server → destino), sin depender de la
     CLI de los equipos.
     """
     system = platform.system()

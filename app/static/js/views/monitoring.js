@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Monitoring: stack Prometheus/nativo, drag&drop de
+ * NetPulse NMS — vista Monitoring: stack Prometheus/nativo, drag&drop de
  * charts y métricas de plataforma (views/monitoring.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-E,

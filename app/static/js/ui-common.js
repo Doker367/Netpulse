@@ -1,4 +1,4 @@
-// NetPulse NOC — UI común (Lote K): estado compartido, escape/iconos, tema,
+// NetPulse NMS — UI común (Lote K): estado compartido, escape/iconos, tema,
 // login, menú de usuario y miscelánea global. Script clásico cargado tras
 // las vistas y antes de ui-helpers.js/router.js. Su top-level cuelga de
 // window, que es como lo resuelven los atributos on* del markup.

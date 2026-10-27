@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
-  <title>NetPulse — NOC Dashboard</title>
+  <title>NetPulse — NMS Dashboard</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
@@ -365,7 +365,7 @@
     .ic-lg { width: 20px; height: 20px }
     .icbtn { display: inline-flex; align-items: center; gap: 6px }
 
-    /* ── Indicadores NOC + menú de usuario ── */
+    /* ── Indicadores NMS + menú de usuario ── */
     .noc-ind { display: flex; align-items: center; gap: 14px; margin-right: 16px; border-right: 1px solid var(--border); padding-right: 16px }
     .noc-ind span { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary) }
     .noc-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--text-ter) }
@@ -1096,7 +1096,7 @@
       background: var(--surface)
     }
 
-    /* ── NOC Status pills ── */
+    /* ── NMS Status pills ── */
     .noc-status {
       display: flex;
       align-items: center;
@@ -1517,7 +1517,7 @@
     <form class="login-card" onsubmit="event.preventDefault(); login()">
       <div class="login-logo" aria-hidden="true">N</div>
       <h1 class="login-title">NetPulse</h1>
-      <p class="login-subtitle">Centro de Operaciones de Red</p>
+      <p class="login-subtitle">Sistema de Gestión de Red</p>
       <div id="login-error" class="login-error" role="alert" aria-live="assertive"></div>
       <div class="login-field"><label for="user">Usuario</label><input id="user" name="username" placeholder="Tu usuario" autocomplete="username" required autofocus></div>
       <div class="login-field"><label for="pass">Contraseña</label><input id="pass" name="password" type="password" placeholder="Tu contraseña" autocomplete="current-password" required></div>
@@ -1691,7 +1691,7 @@
       <h2><svg style="vertical-align:bottom;width:20px;margin-right:6px" fill="none" stroke="currentColor"
           viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-        </svg>NetPulse <span style="font-size:9px;color:var(--text-ter);font-weight:400">NOC</span></h2>
+        </svg>NetPulse <span style="font-size:9px;color:var(--text-ter);font-weight:400">NMS</span></h2>
       <button class="sidebar-close" type="button" aria-label="Cerrar menú" onclick="togSide()"><svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
 
@@ -1882,7 +1882,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
         </svg></button>
 
-      <!-- Search global NOC -->
+      <!-- Search global NMS -->
       <div class="search" style="flex:1;max-width:320px;margin-left:16px">
         <svg class="ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="sb" id="sb" placeholder="Search devices, IPs, hostnames (CTRL+K)..." oninput="fDev()"
@@ -2742,7 +2742,7 @@
           </div>
         </div>
 
-        <!-- Traceroute interactivo: origen (NOC o dispositivo) + destino -->
+        <!-- Traceroute interactivo: origen (NMS o dispositivo) + destino -->
         <div class="sc" style="padding:16px;margin-bottom:16px">
           <h3 style="font-size:11px;color:var(--text-ter);margin-bottom:10px" data-i18n="topo_tr_title">TRACEROUTE SOBRE EL MAPA</h3>
           <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">

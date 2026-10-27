@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Dispositivos / Inventario (views/devices.js).
+ * NetPulse NMS — vista Dispositivos / Inventario (views/devices.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-F,
  * Lote f) sin cambio de comportamiento. Bloques, en el mismo orden relativo

@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Admin usuarios + scopes RBAC (views/admin.js).
+ * NetPulse NMS — vista Admin usuarios + scopes RBAC (views/admin.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-C,
  * lote 3) sin cambio de comportamiento: loadUsers, createUser, delUser y los

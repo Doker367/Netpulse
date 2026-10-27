@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Reportes SLA (views/reports.js).
+ * NetPulse NMS — vista Reportes SLA (views/reports.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-D,
  * lote 4) sin cambio de comportamiento: estado de filtros (repState,

@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — Terminal SSH (vista #v-terminal, pestaña "Terminal"):
+ * NetPulse NMS — Terminal SSH (vista #v-terminal, pestaña "Terminal"):
  * consola xterm.js multi-pestaña con WebSocket en modo JSON
  * (views/terminal.js).
  *

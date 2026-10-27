@@ -9,7 +9,7 @@ def test_dashboard_is_the_only_root_interface_even_with_old_env_flag(monkeypatch
     monkeypatch.setenv("NETPULSE_FRONTEND", "react")
     response = TestClient(main.app).get("/")
     assert response.status_code == 200
-    assert "NetPulse — NOC Dashboard" in response.text
+    assert "NetPulse — NMS Dashboard" in response.text
     assert "no-cache" in response.headers["cache-control"]
 
 

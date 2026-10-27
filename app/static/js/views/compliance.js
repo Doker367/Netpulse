@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Compliance (views/compliance.js).
+ * NetPulse NMS — vista Compliance (views/compliance.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-A,
  * lote 1) sin cambio de comportamiento: loadCompliance, setBaseline,

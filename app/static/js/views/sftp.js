@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — SFTP (vista #v-terminal, pestaña "SFTP"):
+ * NetPulse NMS — SFTP (vista #v-terminal, pestaña "SFTP"):
  * navegación, subida, descarga y drag & drop (views/sftp.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-I,

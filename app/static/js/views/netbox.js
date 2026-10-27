@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista NetBox (views/netbox.js).
+ * NetPulse NMS — vista NetBox (views/netbox.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-D,
  * lote 4) sin cambio de comportamiento: el bloque completo NETBOX (contrato

@@ -1,5 +1,5 @@
 /**
- * NetPulse NOC — vista Commands: centro de comandos global
+ * NetPulse NMS — vista Commands: centro de comandos global
  * (views/commands.js).
  *
  * Extraída del <script> inline de app/static/dashboard.html (Tarjeta 10D-E,
